@@ -153,9 +153,6 @@ private:
     static bool checkDrawTerminalConditions(
         const chess::Board& b, int32_t& outScore, bool atRoot = false) noexcept;
 
-    // --- Draw scoring ---
-    static int32_t repetitionDrawScore(const chess::Board& b) noexcept;
-
     // --- Root search helpers ---
     static void updateMinMax(int32_t score, int32_t& alpha, int32_t& bestScore,
                              chess::Move& bestMove, const chess::Move& m) noexcept;

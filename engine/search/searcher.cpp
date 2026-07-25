@@ -141,16 +141,19 @@ bool Searcher::checkDrawTerminalConditions(
     int32_t& outScore,
     bool atRoot) noexcept {
     // A repetition needs at least 4 reversible plies (each side out and back;
-    // null moves preserve side-to-move parity so they cannot shorten the cycle),
-    // so the O(historySize) scan is skipped below that threshold. In quiescence
-    // nearly every move is a capture/promotion that resets the clock, so this
-    // guard removes the scan from most of the tree.
+    // this guard removes the scan from most of the tree.
     if (b.getHalfMoveClock() >= 4) {
         const int repCount = b.countRepetitions();
 
-        // Third repetition: forced draw — apply full contempt penalty.
+        // Third repetition: forced draw, apply full contempt penalty.
         if (repCount >= 3) {
-            outScore = repetitionDrawScore(b);
+            // Modest fixed contempt below: enough that the engine prefers to
+            // keep playing when winning, but smaller than any meaningful
+            // material amount so it won't trade a piece to avoid the draw.
+            const int32_t staticEval = Evaluator::evaluate(b);
+            outScore = (std::abs(staticEval) <= REPETITION_DRAW_ADVANTAGE_THRESHOLD)
+                ? 0
+                : (staticEval > 0 ? -REPETITION_CONTEMPT : REPETITION_CONTEMPT);
             return true;
         }
 
@@ -160,7 +163,7 @@ bool Searcher::checkDrawTerminalConditions(
         //
         // This is an INTERIOR-NODE heuristic only. At the root the current position
         // is not a draw under FIDE rules until it actually occurs a third time, so
-        // returning here would abandon the search and play moves[0] — a random legal
+        // returning here would abandon the search and play moves[0] - a random legal
         // move that, as observed, can hang the queen. At the root we must search.
         if (!atRoot && repCount >= 2) {
             outScore = 0;
@@ -181,19 +184,6 @@ bool Searcher::checkDrawTerminalConditions(
     return false;
 }
 
-
-int32_t Searcher::repetitionDrawScore(const chess::Board& b) noexcept {
-    // Evaluator::evaluate() is already side-to-move relative (negamax).
-    const int32_t staticEval = Evaluator::evaluate(b);
-    if (std::abs(staticEval) <= REPETITION_DRAW_ADVANTAGE_THRESHOLD) {
-        return 0;
-    }
-
-    // Modest fixed contempt: enough that the engine prefers to keep playing
-    // when winning, but smaller than any meaningful material amount so it
-    // won't trade a piece just to avoid the repetition.
-    return (staticEval > 0) ? -REPETITION_CONTEMPT : REPETITION_CONTEMPT;
-}
 
 void Searcher::updateMinMax(
     int32_t score,
