@@ -970,7 +970,6 @@ int32_t Searcher::quiescenceSearch(
     }
 
     const uint8_t activeColor = b.getActiveColor();
-    const bool usIsWhite = (activeColor == chess::Board::WHITE);
     const uint64_t checkers = b.checkersTo(activeColor);
     const bool inCheck = (checkers != 0ULL);
 
@@ -1007,31 +1006,7 @@ int32_t Searcher::quiescenceSearch(
         }
         updateBound(standPat, alpha);
 
-        const int32_t EARLY_DELTA_MARGIN = QUEEN_VALUE + 50;
-        if (shouldDeltaPrune(standPat, EARLY_DELTA_MARGIN, alpha)) {
-            return alpha; // negamax delta-prune fail-low
-        }
-
-        int32_t deltaMargin = QUEEN_VALUE;
-        const int side = chess::Board::colorToIndex(activeColor);
-        const uint64_t ourPawns = b.pawns_bb[side];
-        const uint64_t nearPromoMask = usIsWhite ? WHITE_NEAR_PROMO_PAWNS : BLACK_NEAR_PROMO_PAWNS;
-        if (ourPawns & nearPromoMask) deltaMargin += QSEARCH_PAWN_PROMO_DELTA;
-
-        // standPat is already side-to-move relative (negamax eval).
-        if (standPat < QSEARCH_STANDPAT_BAD) {
-            deltaMargin += QSEARCH_STANDPAT_BAD_DELTA;
-        } else if (standPat < QSEARCH_STANDPAT_WORSE) {
-            deltaMargin += QSEARCH_STANDPAT_WORSE_DELTA;
-        }
-
-        const int qsearchDepth = std::max(0, ply - runtime.depth);
-        if (qsearchDepth > QSEARCH_DEPTH_REDUCTION_THRESHOLD) {
-            deltaMargin -= QSEARCH_DEPTH_REDUCTION_PER_5 * ((qsearchDepth - QSEARCH_DEPTH_REDUCTION_THRESHOLD) / 5);
-            deltaMargin = std::max(deltaMargin, QSEARCH_DELTAMARGIN_MIN);
-        }
-
-        if (shouldDeltaPrune(standPat, deltaMargin, alpha)) {
+        if (shouldDeltaPrune(standPat, QSEARCH_DELTA_MARGIN, alpha)) {
             return alpha; // negamax delta-prune fail-low
         }
 
