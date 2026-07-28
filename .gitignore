@@ -22,7 +22,6 @@
 /stockfish/
 /engine/syzygy/files/
 /cutechess/
-CLAUDE.md
 
 # Local tuning artifacts
 /tuning/engines.json
@@ -40,8 +39,6 @@ CLAUDE.md
 /tuning/gauntlet_*.pgn
 /tuning/gauntlet_*.txt
 
-
-nodebench
 # NNUE training data (datagen output, GB-sized)
 /nnue/data/
 /nnue/trainer/target/
