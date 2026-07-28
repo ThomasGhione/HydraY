@@ -7,11 +7,11 @@
 # engine's replies (uciok / readyok / bestmove) before sending the next command.
 #
 # Usage (run from repo root):
-#   .claude/skills/run-hydray/driver.sh smoke                # handshake + short search
-#   .claude/skills/run-hydray/driver.sh bench [depth]        # startpos node count (default: 12)
-#   .claude/skills/run-hydray/driver.sh bench6 [depth]       # canonical 6-position node-count bench
-#   .claude/skills/run-hydray/driver.sh search "<uci moves>" [depth]
-#   .claude/skills/run-hydray/driver.sh tui [outfile]        # tmux-driven terminal game smoke
+#   script/engine_driver.sh smoke                # handshake + short search
+#   script/engine_driver.sh bench [depth]        # startpos node count (default: 12)
+#   script/engine_driver.sh bench6 [depth]       # canonical 6-position node-count bench
+#   script/engine_driver.sh search "<uci moves>" [depth]
+#   script/engine_driver.sh tui [outfile]        # tmux-driven terminal game smoke
 #
 # Eval is always NNUE (embedded net) — the HCE evaluator was removed (2.0.0).
 set -u
@@ -53,7 +53,8 @@ uci_close() {
 }
 
 setup_common() {
-    printf 'setoption name Threads value 1\nsetoption name Opening value false'
+    # Threads=1 keeps node counts deterministic (Lazy SMP is not reproducible).
+    printf 'setoption name Threads value 1'
 }
 
 nodes_of() { # <info-line>
@@ -82,8 +83,12 @@ cmd_bench() {
     echo "nodes=$(nodes_of "$info") depth=$depth"
 }
 
-# Canonical 6-position set (see memory/tooling-nodebench.md).
-# Baseline @ depth 12: 3,943,540 (NNUE v2 net 512, 2026-07-09); v1 net was 4,735,578.
+# Canonical 6-position set. The total is a behaviour fingerprint: a pure refactor
+# must leave it identical, a pruning/ordering change moves it.
+# Baseline @ depth 12 depends on the embedded net:
+# 4,595,112 (v3, current) · 3,943,540 (v2) · 4,735,578 (v1, release 2.0.0).
+# NB: the usage banner is built from lines matching '^#   ' — keep other
+# comments off that exact indentation.
 BENCH6_NAMES=(startpos kiwipete kp-endgame midgame tactical open)
 BENCH6_POS=(
     'position startpos'
@@ -141,7 +146,7 @@ case ${1:-} in
     smoke)  cmd_smoke ;;
     bench)  shift; cmd_bench "$@" ;;
     bench6) shift; cmd_bench6 "$@" ;;
-    search) shift; [[ $# -ge 1 ]] || DIE "usage: driver.sh search \"<uci moves>\" [depth]"; cmd_search "$@" ;;
+    search) shift; [[ $# -ge 1 ]] || DIE "usage: engine_driver.sh search \"<uci moves>\" [depth]"; cmd_search "$@" ;;
     tui)    shift; cmd_tui "$@" ;;
     *)      grep '^#   ' "$0" | sed 's/^#   //'; exit 2 ;;
 esac
