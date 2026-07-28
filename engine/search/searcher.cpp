@@ -290,7 +290,6 @@ int32_t Searcher::searchRootMoveScore(
     SearchRuntime& runtime,
     int32_t alpha,
     int32_t beta,
-    bool allowTTWrite,
     bool allowHeuristicUpdates,
     uint64_t* nodeCounter) noexcept {
     chess::Board::MoveState state;
@@ -299,7 +298,7 @@ int32_t Searcher::searchRootMoveScore(
     const int childDepth = std::max(0, runtime.depth - 1);
     const int32_t score = -searchPosition(
         b, runtime, childDepth, -beta, -alpha, 1,
-        allowTTWrite, allowHeuristicUpdates, nullptr, nodeCounter);
+        allowHeuristicUpdates, nullptr, nodeCounter);
     b.undoMove(m, state);
     return score;
 }
@@ -312,7 +311,6 @@ bool Searcher::tryNullMovePruning(
     int32_t alpha,
     int32_t beta,
     int ply,
-    bool allowTTWrite,
     bool allowHeuristicUpdates,
     uint64_t* nodeCounter,
     int32_t& outScore) noexcept {
@@ -328,7 +326,7 @@ bool Searcher::tryNullMovePruning(
     // Negamax: after the null move it is the opponent to move.
     const int32_t nullScore = -searchPosition(
         b, runtime, depth - reduction, -beta, -alpha, ply + 1,
-        allowTTWrite, allowHeuristicUpdates, nullptr, nodeCounter, false);
+        allowHeuristicUpdates, nullptr, nodeCounter, false);
 
     b.undoNullMove(nullState);
 
@@ -341,7 +339,7 @@ bool Searcher::tryNullMovePruning(
         // Verification re-search of THIS node (same side to move): no negation.
         const int32_t verifyScore = searchPosition(
             b, runtime, depth - reduction, alpha, beta, ply,
-            allowTTWrite, allowHeuristicUpdates, nullptr, nodeCounter, false);
+            allowHeuristicUpdates, nullptr, nodeCounter, false);
         confirmedCutoff = isBetaCutoff(verifyScore, beta);
     }
 
@@ -434,8 +432,7 @@ Searcher::SearchMoveResult Searcher::searchMoves(
     int32_t alpha,
     int32_t beta,
     SearchRuntime& runtime,
-    bool allowHeuristicUpdates,
-    bool allowTTWrite) noexcept {
+    bool allowHeuristicUpdates) noexcept {
     int32_t best = NEG_INF;
     chess::Move bestMove{};
     bool searchedAnyMove = false;
@@ -579,15 +576,15 @@ Searcher::SearchMoveResult Searcher::searchMoves(
 
             const int reducedDepth = std::max(1, childDepth - reduction);
             score = -searchPosition(b, runtime, reducedDepth, -scoutBeta, -scoutAlpha, ctx.ply + 1,
-                                    allowTTWrite, allowHeuristicUpdates, &m, ctx.nodeCounter);
+                                    allowHeuristicUpdates, &m, ctx.nodeCounter);
 
             if (shouldResearchPVS(score, scoutAlpha)) {
                 score = -searchPosition(b, runtime, childDepth, -scoutBeta, -scoutAlpha, ctx.ply + 1,
-                                        allowTTWrite, allowHeuristicUpdates, &m, ctx.nodeCounter);
+                                        allowHeuristicUpdates, &m, ctx.nodeCounter);
             }
         } else { // can't reduce, regular PVS search
             score = -searchPosition(b, runtime, childDepth, -scoutBeta, -scoutAlpha, ctx.ply + 1,
-                                    allowTTWrite, allowHeuristicUpdates, &m, ctx.nodeCounter);
+                                    allowHeuristicUpdates, &m, ctx.nodeCounter);
         }
 
         // Wide-window PV re-search, shared by both paths above. It only carries
@@ -597,7 +594,7 @@ Searcher::SearchMoveResult Searcher::searchMoves(
         // duplicate node. (In the reduce path !isFirstMove always holds.)
         if (ctx.isPVNode && !isFirstMove && shouldResearchPVS(score, scoutAlpha)) {
             score = -searchPosition(b, runtime, childDepth, -beta, -alpha, ctx.ply + 1,
-                                    allowTTWrite, allowHeuristicUpdates, &m, ctx.nodeCounter);
+                                    allowHeuristicUpdates, &m, ctx.nodeCounter);
         }
 
         b.undoMove(m, state);
@@ -667,7 +664,6 @@ int32_t Searcher::searchPosition(
     int32_t alpha,
     int32_t beta,
     int ply,
-    bool allowTTWrite,
     bool allowHeuristicUpdates,
     const chess::Move* previousMove,
     uint64_t* nodeCounter,
@@ -697,7 +693,7 @@ int32_t Searcher::searchPosition(
     }
 
     if (depth <= 0) {
-        return quiescenceSearch(b, runtime, alpha, beta, ply, counter, allowTTWrite);
+        return quiescenceSearch(b, runtime, alpha, beta, ply, counter);
     }
 
     // TB WDL probe (in-search): only return Draw as exact. Returning Win or
@@ -815,12 +811,12 @@ int32_t Searcher::searchPosition(
             const int32_t ttSeScore = scoreFromTT(tte.score, ply);
             const int32_t seBeta = ttSeScore - SE_BETA_MARGIN * depth;
 
-            // allowTTWrite stays on for the probe's DESCENDANTS (normal
-            // positions the main search revisits right after); only this
-            // node's own store is suppressed, via hasExcludedMove.
+            // The probe's DESCENDANTS store normally (they are ordinary
+            // positions the main search revisits right after); only this node's
+            // own store is suppressed, and seExcluded below is what does it.
             const int32_t seScore = searchPosition(
                 b, runtime, depth / 2 - 1, seBeta - 1, seBeta, ply,
-                allowTTWrite, allowHeuristicUpdates,
+                allowHeuristicUpdates,
                 previousMove, counter, false, seExcluded);
 
             if (seScore < seBeta - SE_DOUBLE_MARGIN) {
@@ -844,7 +840,7 @@ int32_t Searcher::searchPosition(
 
     if (canNullMove
         && tryNullMovePruning(b, node, runtime, depth, alpha, beta, ply,
-                              allowTTWrite, allowHeuristicUpdates,
+                              allowHeuristicUpdates,
                               counter, score)) {
         return score;
     }
@@ -871,7 +867,7 @@ int32_t Searcher::searchPosition(
             b.doMove(mc, pcState);
             // Negamax child: negate result and swap/negate the scout window.
             const int32_t pcScore = -searchPosition(b, runtime, depth - 4, -pcBeta, -pcAlpha,
-                ply + 1, allowTTWrite, false, &mc, counter, false);
+                ply + 1, false, &mc, counter, false);
             b.undoMove(mc, pcState);
             if (pcScore >= probcutBound) return beta;
         }
@@ -916,7 +912,7 @@ int32_t Searcher::searchPosition(
     }
 
     SearchMoveResult result = searchMoves(
-        b, movePicker, ctx, alpha, beta, runtime, allowHeuristicUpdates, allowTTWrite);
+        b, movePicker, ctx, alpha, beta, runtime, allowHeuristicUpdates);
     const int32_t best = result.score;
 
     if (runtime.isInterrupted()) {
@@ -937,7 +933,7 @@ int32_t Searcher::searchPosition(
 
     // hasExcludedMove suppresses only THIS node's store (its score reflects a
     // reduced move set under the same key); descendants store normally.
-    if (canUseTT && allowTTWrite && !hasExcludedMove) {
+    if (canUseTT && !hasExcludedMove) {
         runtime.transpositionTable->store(
             hashKey, static_cast<uint8_t>(ctx.depth),
             scoreToTT(best, ctx.ply),
@@ -954,8 +950,7 @@ int32_t Searcher::quiescenceSearch(
     int32_t alpha,
     int32_t beta,
     int ply,
-    uint64_t* nodeCounter,
-    bool allowTTWrite) noexcept {
+    uint64_t* nodeCounter) noexcept {
     uint64_t* counter = (nodeCounter != nullptr) ? nodeCounter : &runtime.nodesSearched;
     int32_t earlyScore = 0;
     if (enterNode(b, runtime, ply, counter, earlyScore)) return earlyScore;
@@ -1004,7 +999,7 @@ int32_t Searcher::quiescenceSearch(
         if (isBetaCutoff(standPat, beta)) {
             // Bound-only store (bestMove 0 preserves any stored move): sibling
             // qsearch nodes can then cut on this stand-pat without re-evaluating.
-            if (canUseTT && allowTTWrite) {
+            if (canUseTT) {
                 runtime.transpositionTable->store(
                     b.getHash(), 0, scoreToTT(standPat, ply), TT::Entry::LOWERBOUND);
             }
@@ -1063,7 +1058,7 @@ int32_t Searcher::quiescenceSearch(
             runtime.transpositionTable->prefetch(b.getHash());
         }
         // Negamax: child is opponent to move -> negate + swap/negate window.
-        const int32_t score = -quiescenceSearch(b, runtime, -beta, -alpha, ply + 1, counter, allowTTWrite);
+        const int32_t score = -quiescenceSearch(b, runtime, -beta, -alpha, ply + 1, counter);
         b.undoMove(m, state);
 
         if (isBetter(score, best)) {
@@ -1076,7 +1071,7 @@ int32_t Searcher::quiescenceSearch(
         }
     }
 
-    if (!inCheck && canUseTT && allowTTWrite) {
+    if (!inCheck && canUseTT) {
         runtime.transpositionTable->store(
             b.getHash(), 0, scoreToTT(best, ply),
             static_cast<uint8_t>(determineFlag(best, alphaOrig, beta)));
@@ -1113,7 +1108,7 @@ chess::Move Searcher::getBestMove(
     const MoveList& rootMoves = orderedRootMoves.moves;
 
     const auto scoreMove = [&](const chess::Move& mv, int32_t a, int32_t b) {
-        return searchRootMoveScore(rootBoard, mv, runtime, a, b, true, true, &localNodes);
+        return searchRootMoveScore(rootBoard, mv, runtime, a, b, true, &localNodes);
     };
 
     // Plain PVS root loop: full window for the first move, null-window scout

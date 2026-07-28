@@ -34,8 +34,7 @@ void testQuiescenceScoresThreefoldAsDrawBeforeStaticEval() {
         engine::Searcher::NEG_INF,
         engine::Searcher::POS_INF,
         0,
-        nullptr,
-        false);
+        nullptr);
 
     assert(qScore < 0);
 }
