@@ -141,8 +141,8 @@ In ordine di valore atteso; nessuno è bloccante per il ciclo v2:
 
 ## Manutenzione / backlog
 
-- [ ] `.claude/commands/hydray.md` (skill /hydray) è ferma all'era HCE
-      (~2000 Elo, YBWC, evaluator handcrafted): riscriverla sullo stato 2.0.0.
+- [ ] Le note di lavoro locali sono ferme all'era HCE (~2000 Elo, YBWC,
+      evaluator handcrafted): riscriverle sullo stato 2.0.0.
 - [ ] `make test`: da riscrivere da zero (deciso 2026-07-06, non urgente).
 - [x] Gauntlet: convenzione anchor aggiornata a 2.0.0=3000 (default dello script,
       2026-07-10).
@@ -154,8 +154,8 @@ In ordine di valore atteso; nessuno è bloccante per il ciclo v2:
 - **Bench NPS**: macchina quieta (stop datagen/match), run interleaved,
   preferire l'`nps` riportato dal motore al wall time. Sotto carico ±13-15%
   e guadagni fantasma.
-- **Node-identity**: `.claude/skills/run-hydray/driver.sh bench6` — baseline
-  2.0.0 = **4.735.578 @ d12**; ogni swap di rete stabilisce un baseline nuovo.
+- **Node-identity**: `script/engine_driver.sh bench6` — baseline 2.0.0 =
+  **4.735.578 @ d12**; ogni swap di rete stabilisce un baseline nuovo.
 - **Dati**: mai mischiare prefissi/etichettatori diversi nello stesso file;
   validare SEMPRE con bullet-utils prima e dopo l'interleave; i dati si
   spostano via scp/zip, MAI via git (`nnue/data` è gitignored).
