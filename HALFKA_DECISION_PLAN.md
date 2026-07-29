@@ -254,20 +254,42 @@ misurare.
 
 ## Binario B — qualità del datagen (in parallelo, nessuna dipendenza da A)
 
-### B1. Fix del buco bucket-0 ← **DA FARE SUBITO**
+### B1. Fix del buco bucket-0 — ✅ **FATTO** (2026-07-29, `4d2a157` + `a8b4af6`)
 
-`DATAGEN_QUALITY_PLAN.md` §5: l'adjudication Syzygy chiude le partite appena si
-entra a ≤5 pezzi, quindi il bucket di output 0 riceve ~zero esempi e resta ai
-pesi di inizializzazione (la v3 valuta **KQvK = −13 cp**).
+Misurato prima di intervenire: su 300k record del merge da 2B il bucket 0 è allo
+**0,00%** — vuoto, non scarso. Da qui `KQvK = 0 cp` sulla 768 addestrata proprio
+su quei dati.
 
-**Generare altri miliardi senza il fix moltiplica il difetto.** Se il datagen
-deve girare per settimane, deve girare col fix.
+**Il seeding da solo non bastava**, ed è il motivo per cui il difetto è
+sopravvissuto al ciclo v4. Tre filtri lo proteggevano e andavano tolti insieme:
 
-Opzioni dal piano, da misurare col protocollo §3:
-- quota del **5-10% di partite seedate da finali** (8-16 pezzi) — popola i
-  bucket bassi e genera esempi 6-7 pezzi fuori dal range TB;
-- in alternativa, registrare la posizione terminale adjudicata con lo score TB
-  come etichetta extra.
+1. l'adjudication Syzygy chiude la partita appena si entra in range TB;
+2. un finale vinto vale **punteggio di matto**, che `MAX_RECORD_SCORE_CP` scarta
+   — `KQvK` non sarebbe entrata *nemmeno* con le tablebase spente;
+3. `MIN_RECORD_PLY = 16` taglia i primi 16 ply, e un finale seminato è deciso
+   prima.
+
+Le partite seminate ora registrano da ply 0, saltano adjudication e filtro di
+bilanciamento, e **clampano** invece di scartare.
+
+Due correzioni venute dalla misura, non dal design:
+- colori indipendenti per pezzo → materiale bilanciato → **70% patte, 96% dei
+  record sotto 100 cp**: insegnerebbe "sotto i 5 pezzi è tutto pari". Ora il 65%
+  dei semi dà tutti i pezzi extra a un lato solo.
+- le partite decise finiscono in pochi ply, le patte tirano fino alle 50 mosse:
+  senza un tetto per partita le patte inondavano i record comunque.
+
+Resa misurata (tablebase attive): run misto 1-su-8 → bucket 0 all'**1,54%**;
+**run dedicato** (`CHESS_DATAGEN_EG_EVERY=1`) → **88,8%**, cioè ~20× per ora di
+macchina. Il run misto serve al datagen lungo, quello dedicato a riempire il
+bucket in una finestra corta.
+
+⚠️ **I 2B già generati non sono riparati**: il fix vale solo per i dati nuovi.
+Il lotto `portatile2_eg` esiste per questo. In un mix da ~2,7B pesa ~0,2%:
+abbondante per i 1024 pesi di output di quel bucket, ma il salto vero è da
+*zero* a *qualcosa*.
+
+**Verifica finale, dopo A3**: `KQvK` deve smettere di valere 0 cp.
 
 ### B2. A/B nodi/mossa (§3)
 
