@@ -168,7 +168,7 @@ Quello che invece È testabile è la **policy** sul 3-fold:
 
 Opzioni: (a) riparare i test sostituendo le API morte (`Evaluator::evaluate`, via i guardrail
 material-delta); (b) potare i test HCE-era e tenere solo board/movegen/mate — decisione utente.
-Finché non si fa, il protocollo resta «make + bench, MAI make test» (già in CLAUDE.md).
+Finché non si fa, il protocollo resta «make + bench, MAI make test» (già nelle note di progetto).
 
 ## 7. Emerso durante l'audit, NON HCE (nota a margine, decisioni separate)
 

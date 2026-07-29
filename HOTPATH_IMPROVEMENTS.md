@@ -24,7 +24,7 @@ board doMove/undoMove/inCheck), evaluator escluso (futuro NNUE). Ordinata per cr
 - [x] **2. Riposizionare il prefetch TT dopo `doMove`** — Elo atteso: **+2–5** (NPS)
   ✅ 2026-07-03, node-identico (vedi #1 per l'NPS combinato).
   `handleSearchPrelude` fa `prefetch(hashKey)` seguito subito da `probe(hashKey)` sulla
-  stessa chiave: latenza zero nascosta (CLAUDE.md dice "2 nodes ahead" ma il codice non lo fa).
+  stessa chiave: latenza zero nascosta (le note di progetto dicono "2 nodes ahead" ma il codice non lo fa).
   Spostare in `searchMoves` e nel loop qsearch subito dopo `b.doMove()`:
   `tt->prefetch(b.getHash())` — la latenza si nasconde dietro enterNode+draw-check+eval del figlio.
   Node-identico.

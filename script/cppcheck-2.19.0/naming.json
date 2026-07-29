@@ -1,9 +1,0 @@
-{
-    "script": "addons/naming.py",
-    "args": [
-        "--private-member-variable=m[A-Z].*",
-        "--var=[_a-z].*",
-        "--const=[_a-zA-Z].*",
-        "--function=[a-zA-Z].*"
-    ]
-}

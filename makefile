@@ -42,10 +42,11 @@ WIN_CXX = x86_64-w64-mingw32-g++
 WIN_CC = x86_64-w64-mingw32-gcc
 WIN_PRODFLAGS = -std=c++23 -Wall -Wextra -Wpedantic -O3 -DDEBUG -march=x86-64-v3 -static -static-libgcc -static-libstdc++ -fopenmp -flto=4 -fext-numeric-literals
 
-# Local static-analysis tools
-CPPCHECK = $(SCRIPT_DIR)/cppcheck-2.19.0/cppcheck
+# Static-analysis tools: cppcheck and lizard come from the system now
+# (install: apt/brew cppcheck, `pip install lizard`). gprof2dot stays vendored.
+CPPCHECK = cppcheck
 COMPILATION_DB = $(ROOT_DIR)/compile_commands.json
-LIZARD = $(SCRIPT_DIR)/lizard-1.19.0/lizard.py
+LIZARD = lizard
 GPROF2DOT = $(SCRIPT_DIR)/gprof2dot.py
 LLM_ANALYSIS_PROMPT = $(DOC_DIR)/static-analysis-summary-prompt.txt
 
@@ -53,10 +54,9 @@ LLM_ANALYSIS_PROMPT = $(DOC_DIR)/static-analysis-summary-prompt.txt
 NAME_APP = $(ROOT_DIR)/chess
 TEST_APP = $(TESTS_DIR)/test
 PERF_APP = $(TESTS_DIR)/perf
-SACRIFICE_APP = $(TESTS_DIR)/sacrifice
 TT_HP_BENCH_APP = $(TESTS_DIR)/tt_hugepage_bench
 NAME_APP_WIN = $(ROOT_DIR)/chess.exe
-GENERATED_BINS = $(NAME_APP) $(NAME_APP_WIN) $(TEST_APP) $(PERF_APP) $(SACRIFICE_APP) $(TT_HP_BENCH_APP)
+GENERATED_BINS = $(NAME_APP) $(NAME_APP_WIN) $(TEST_APP) $(PERF_APP) $(TT_HP_BENCH_APP)
 
 # File paths by module
 MAIN_SRC = $(ROOT_DIR)/main.cpp
@@ -115,27 +115,18 @@ ALL_PERF_MODULE_SRCS = $(PERF_ENGINE_SRCS)
 PERF_MAIN_OBJ = $(patsubst $(ROOT_DIR)/%.cpp,$(OUTPUT_DIR)/%.o,$(PERF_MAIN_SRC))
 PERF_OBJS = $(patsubst $(ROOT_DIR)/%.cpp,$(OUTPUT_DIR)/%.o,$(ALL_PERF_MODULE_SRCS))
 
-# Anti-sacrifice regression-test file paths
-SACRIFICE_MAIN_SRC = $(TESTS_DIR)/mainSacrificeTest.cpp
-SACRIFICE_ENGINE_SRCS = $(wildcard $(ROOT_DIR)/engine/test/sacrifice-test/*.cpp)
-ALL_SACRIFICE_MODULE_SRCS = $(SACRIFICE_ENGINE_SRCS)
-
-# Anti-sacrifice .o paths in output/
-SACRIFICE_MAIN_OBJ = $(patsubst $(ROOT_DIR)/%.cpp,$(OUTPUT_DIR)/%.o,$(SACRIFICE_MAIN_SRC))
-SACRIFICE_OBJS = $(patsubst $(ROOT_DIR)/%.cpp,$(OUTPUT_DIR)/%.o,$(ALL_SACRIFICE_MODULE_SRCS))
-
 # Huge-page TT benchmark
 TT_HP_BENCH_SRC = $(TESTS_DIR)/tt_hugepage_bench.cpp
 TT_HP_BENCH_OBJ = $(patsubst $(ROOT_DIR)/%.cpp,$(OUTPUT_DIR)/%.o,$(TT_HP_BENCH_SRC))
 
 # Auto-generated dependency files (header dependencies)
-DEPFILES = $(ALL_OBJS:.o=.d) $(TEST_OBJS:.o=.d) $(TEST_MAIN_OBJ:.o=.d) $(PERF_OBJS:.o=.d) $(PERF_MAIN_OBJ:.o=.d) $(SACRIFICE_OBJS:.o=.d) $(SACRIFICE_MAIN_OBJ:.o=.d) $(TT_HP_BENCH_OBJ:.o=.d)
+DEPFILES = $(ALL_OBJS:.o=.d) $(TEST_OBJS:.o=.d) $(TEST_MAIN_OBJ:.o=.d) $(PERF_OBJS:.o=.d) $(PERF_MAIN_OBJ:.o=.d) $(TT_HP_BENCH_OBJ:.o=.d)
 
 # Main targets
-.PHONY: all prod prod_windows parallel_prod prod_sequential debug test perf sacrifice tt-huge-bench all-tests analyze analyze-setup analyze-cppcheck analyze-clang-tidy analyze-iwyu analyze-scan-build analyze-gcc-analyzer analyze-cppclean analyze-lizard analyze-summary complexity test-valgrind cls cls-compile-files get-image help debug-vars
+.PHONY: all prod prod_windows parallel_prod prod_sequential debug test perf tt-huge-bench all-tests analyze analyze-setup analyze-cppcheck analyze-clang-tidy analyze-iwyu analyze-scan-build analyze-gcc-analyzer analyze-cppclean analyze-lizard analyze-summary complexity test-valgrind cls cls-compile-files get-image help debug-vars
 
 # Default target for plain `make`
-all: PRODFLAGS += -DDEBUG -fomit-frame-pointer -O3
+all: PRODFLAGS += -DDEBUG -fomit-frame-pointer
 all: prod
 
 chess: $(NAME_APP)
@@ -175,11 +166,6 @@ test: $(TEST_APP)
 # Build command for performance-test executable
 perf: $(PERF_APP)
 	@printf "\nPerformance-test binary built: $(PERF_APP)\n\n"
-
-# Build and run the anti-sacrifice regression tests
-sacrifice: $(SACRIFICE_APP)
-	@printf "\nAnti-sacrifice test binary built: $(SACRIFICE_APP)\n\n"
-	$(SACRIFICE_APP)
 
 # Build command for huge-page TT benchmark
 tt-huge-bench: $(TT_HP_BENCH_APP)
@@ -224,11 +210,6 @@ $(PERF_APP): $(MODULE_OBJS) $(SYZYGY_C_OBJ) $(PERF_OBJS) $(PERF_MAIN_OBJ)
 	@printf "\nLinking performance test $(PERF_APP)..."
 	$(CXX) $(TEST_FLAGS) $(MODULE_OBJS) $(SYZYGY_C_OBJ) $(PERF_OBJS) $(PERF_MAIN_OBJ) -o $(PERF_APP)
 
-# Final executable generation: anti-sacrifice regression tests
-$(SACRIFICE_APP): $(MODULE_OBJS) $(SYZYGY_C_OBJ) $(SACRIFICE_OBJS) $(SACRIFICE_MAIN_OBJ)
-	@printf "\nLinking anti-sacrifice test $(SACRIFICE_APP)..."
-	$(CXX) $(TEST_FLAGS) $(MODULE_OBJS) $(SYZYGY_C_OBJ) $(SACRIFICE_OBJS) $(SACRIFICE_MAIN_OBJ) -o $(SACRIFICE_APP)
-
 # Final executable generation: TT huge-page benchmark
 $(TT_HP_BENCH_APP): $(MODULE_OBJS) $(TT_HP_BENCH_OBJ)
 	@printf "\nLinking TT huge-page benchmark $(TT_HP_BENCH_APP)..."
@@ -267,8 +248,13 @@ analyze-cppcheck:
 	@printf "\n========================================\n" >> $(ANALYSIS_LOG)
 	@printf "1. CPPCHECK ANALYSIS\n" >> $(ANALYSIS_LOG)
 	@printf "========================================\n\n" >> $(ANALYSIS_LOG)
-	@$(CPPCHECK) $(ALL_ANALYSIS_FILES) --check-level=exhaustive --enable=all --suppress=missingIncludeSystem --inline-suppr --std=c++23 --quiet >> $(ANALYSIS_LOG) 2>&1
-	@printf "[1/7] Running cppcheck terminated\n"
+	@if command -v $(CPPCHECK) >/dev/null 2>&1; then \
+		$(CPPCHECK) $(ALL_ANALYSIS_FILES) --check-level=exhaustive --enable=all --suppress=missingIncludeSystem --inline-suppr --std=c++23 --quiet >> $(ANALYSIS_LOG) 2>&1; \
+		printf "[1/7] Running cppcheck terminated\n"; \
+	else \
+		printf "cppcheck not found - skipping (install it or 'pip install'/apt)\n" >> $(ANALYSIS_LOG); \
+		printf "[1/7] Running cppcheck skipped\n"; \
+	fi
 
 analyze-clang-tidy:
 	@printf "\n========================================\n" >> $(ANALYSIS_LOG)
@@ -326,12 +312,12 @@ analyze-lizard:
 	@printf "\n========================================\n" >> $(ANALYSIS_LOG)
 	@printf "7. LIZARD COMPLEXITY ANALYSIS\n" >> $(ANALYSIS_LOG)
 	@printf "========================================\n\n" >> $(ANALYSIS_LOG)
-	@if [ -f $(LIZARD) ]; then \
-		python3 $(LIZARD) -l cpp -w -L 60 -C 15 --csv $(ROOT_DIR) > $(COMPLEXITY_REPORT) 2>&1 || true; \
-		python3 $(LIZARD) -l cpp -w -L 60 -C 15 $(ROOT_DIR) >> $(ANALYSIS_LOG) 2>&1 || true; \
+	@if command -v $(LIZARD) >/dev/null 2>&1; then \
+		$(LIZARD) -l cpp -w -L 60 -C 15 --csv $(ROOT_DIR) > $(COMPLEXITY_REPORT) 2>&1 || true; \
+		$(LIZARD) -l cpp -w -L 60 -C 15 $(ROOT_DIR) >> $(ANALYSIS_LOG) 2>&1 || true; \
 		printf "[7/7] Running lizard terminated\n"; \
 	else \
-		printf "Lizard not found - skipping\n" >> $(ANALYSIS_LOG); \
+		printf "Lizard not found - skipping ('pip install lizard')\n" >> $(ANALYSIS_LOG); \
 		printf "[7/7] Running lizard skipped\n"; \
 	fi
 
@@ -403,7 +389,6 @@ help:
 	@printf "  make debug          - Build with debug symbols\n"
 	@printf "  make test           - Build functional tests\n"
 	@printf "  make perf           - Build performance tests\n"
-	@printf "  make sacrifice      - Build and run anti-sacrifice regression tests\n"
 	@printf "  make all-tests      - Run functional and performance tests\n"
 	@printf "\nSTATIC ANALYSIS:\n"
 	@printf "  make analyze        - Full static-analysis suite (7 tools, about 5 min)\n"

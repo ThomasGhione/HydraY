@@ -8,7 +8,6 @@ namespace chess {
 // ------------------------------------------------------------
 __attribute__((hot))
 void Board::doMove(const Move& m, MoveState& st) noexcept {
-    //FIXME Eliminare costati magiche
     const uint8_t fromIndex = m.from;
     const uint8_t toIndex   = m.to;
 
@@ -18,7 +17,7 @@ void Board::doMove(const Move& m, MoveState& st) noexcept {
     const uint8_t destBefore  = get(toIndex);
 
     prepareMoveState(st, moving, destBefore);
-    st.moveKind          = classifyMoveKind(movingType, movingColor, fromIndex, toIndex, destBefore, st.prevEnPassant);
+    st.moveKind = classifyMoveKind(movingType, movingColor, fromIndex, toIndex, destBefore, st.prevEnPassant);
 
     uint64_t newHash = currentHash;
     if (st.prevEpHashFile < 8) {
@@ -146,7 +145,6 @@ void Board::undoMove(const Move& m, const MoveState& st) noexcept {
 
 __attribute__((hot))
 void Board::doNullMove(MoveState& st) noexcept {
-    //FIXME Eliminare costati magiche
     prepareNullMoveState(st);
     uint64_t newHash = currentHash;
     if (st.prevEpHashFile < 8) {

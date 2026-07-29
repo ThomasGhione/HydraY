@@ -20,14 +20,11 @@ bool Board::isLegalPseudoMove(uint8_t fromIndex, uint8_t toIndex, uint8_t fromPi
     const uint8_t fromType = fromPiece & MASK_PIECE_TYPE;
     const uint8_t movingColor = fromPiece & MASK_COLOR;
 
-    //FIXME Aggiungere this
     const uint8_t destPiece = get(toIndex);
 
-    //FIXME convertire codizione in funzione helper private inline bool per avere piu' leggibilita' sulla codizione
     if (destPiece != EMPTY && (destPiece & MASK_COLOR) == movingColor) [[unlikely]]
         return false;
 
-    //FIXME Convertire switch in funzione helper
     const uint64_t toBit = Board::BIT_MASKS[toIndex];
     switch (fromType) {
         case PAWN: {
@@ -105,7 +102,6 @@ inline bool Board::pseudoMoveLegalByType(uint8_t fromIndex, uint8_t toIndex, uin
     const uint8_t oppColor = oppositeColor(movingColor);
     const int diff = static_cast<int>(toIndex) - fromIndex;
 
-    //FIXME Eliminare numeri magici
     // Castling moves are uniquely identified by a destination offset of +2 or -2.
     // Normal king moves have offsets of +/-1, +/-7, +/-8, +/-9, so they cannot clash.
     if (diff == 2 || diff == -2) [[unlikely]] {
@@ -129,30 +125,24 @@ inline bool Board::pseudoMoveLegalByType(uint8_t fromIndex, uint8_t toIndex, uin
     uint8_t fromIndex,
     bool isKingside
 ) const noexcept {
-    //FIXME Eliminare numeri magici
-    //FIXME Aggiungere this alle chiamate
     const uint8_t side = isWhite ^ 1; // 0 for White, 1 for Black
     const uint8_t oppColor = isWhite ? BLACK : WHITE;
     
     // Check castling rights
     const uint8_t rightBit = (!isWhite << 1) | !isKingside;
     
-    //FIXME Rendere funzione helper per la codizione
     if ((castle & (1u << rightBit)) == 0u) return false;
     
     // Setup indices based on direction
     const int8_t direction = isKingside ? 1 : -1;
-    //FIXME Dare nomi piu' significativi di sq1/2
     const uint8_t sq1 = fromIndex + direction;
     const uint8_t sq2 = fromIndex + 2 * direction;
     const uint8_t rookIdx = isKingside ? (fromIndex + 3) : (fromIndex - 4);
     
-    //FIXME i controlli IF vero -> return false possono andare dentro una funzione helper
     // Check empty squares (always check 2, for queenside check 3rd)
     if (get(sq1) != EMPTY || get(sq2) != EMPTY)
         return false;
     
-    //FIXME Fare helper per codizione con nome significativo
     if (!isKingside && get(fromIndex - 3) != EMPTY)
         return false;
     
@@ -180,13 +170,11 @@ bool Board::isSquareAttacked(uint8_t targetIndex, uint8_t byColor, uint8_t exclu
                                 rooks_bb[side], queens_bb[side], kings_bb[side]);
 }
 
-//FIXME Controllare questa funzione, ha tanti parametri
 // Helper: check if king at kingSq is attacked using custom bitboards
 // Used internally to avoid code duplication when simulating moves
 bool Board::isKingAttackedCustom(uint8_t kingSq, uint8_t bySide, uint64_t occ,
                                  uint64_t pawns, uint64_t knights, uint64_t bishops,
                                  uint64_t rooks, uint64_t queens, uint64_t kings) noexcept {
-    //FIXME i controlli IF vero -> return vero possono andare dentro una funzione helper
     if (pieces::PAWN_ATTACKERS_TO[bySide][kingSq] & pawns) return true;
     if (pieces::KNIGHT_ATTACKS[kingSq] & knights) return true;
     if (pieces::KING_ATTACKS[kingSq] & kings) return true;
@@ -239,7 +227,6 @@ bool Board::hasLegalMovesForPieceType(
 
 
 bool Board::hasAnyLegalMove(uint8_t color) const noexcept {
-    //FIXME Funzione troppo alta, usare helper per ridurre blocchi di logica.
     const int side = colorToIndex(color);
     const int oppSide = side ^ 1;
     
@@ -298,7 +285,6 @@ bool Board::hasAnyLegalMove(uint8_t color) const noexcept {
         }
     }
 
-    //FIXME Scrivere funzione post codizione per unica uscita
     if (hasLegalMovesForPieceType<BISHOP>(bishops_bb[side], ownOcc, enemyOcc, color))
         return true;
 
@@ -313,7 +299,6 @@ bool Board::hasAnyLegalMove(uint8_t color) const noexcept {
 
 void Board::recomputeHashAndEp() noexcept {
     currentHash = zobrist::computeHashKey(*this);
-    //FIXME Eliminare numero magico
     epHashFile = 0xFF;
     if (zobrist::hasPseudoLegalEnPassantCapture(*this, getEnPassant()))
         epHashFile = chess::file(getEnPassant());
@@ -347,7 +332,6 @@ int Board::countRepetitions() const noexcept {
 }
 
 bool Board::hasInsufficientMaterialDraw() const noexcept {
-    //FIXME Scrivere delle funzioni helper per le codizioni in if e return
     if (pawns_bb[0] || pawns_bb[1] || rooks_bb[0] || rooks_bb[1] || queens_bb[0] || queens_bb[1]) return false;
     const uint64_t wMinors = knights_bb[0] | bishops_bb[0];
     const uint64_t bMinors = knights_bb[1] | bishops_bb[1];

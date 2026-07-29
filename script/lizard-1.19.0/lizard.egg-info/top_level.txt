@@ -1,3 +1,0 @@
-lizard
-lizard_ext
-lizard_languages

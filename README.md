@@ -6,7 +6,7 @@ interface and full UCI support for GUIs, bots, and automated testing.
 It is built around bitboards with magic sliding-piece attacks, an iterative
 deepening alpha-beta/PVS search with Lazy SMP parallelism, a cache-friendly
 transposition table, Syzygy tablebase probing, and a neural network evaluator
-(768->256 dual-perspective, embedded in the binary). The handcrafted evaluator
+(768->512 dual-perspective, embedded in the binary). The handcrafted evaluator
 was removed in 2.0.0 — evaluation strength now improves by training better
 nets, not by editing C++. Development and testing happen mainly on Linux/WSL;
 a MinGW target exists for Windows builds.
@@ -16,10 +16,12 @@ a MinGW target exists for Windows builds.
 - `g++` with C++23 support
 - GNU `make`
 - OpenMP (`-fopenmp`)
-- x86-64 CPU; AVX2 strongly recommended (the NNUE forward pass has a scalar
-  fallback, but it is much slower)
-- Optional analysis tools: `valgrind`, `clang-tidy`, `scan-build`,
-  `include-what-you-use`, `cppclean`, `lizard`, `perf`
+- x86-64 CPU with **BMI2 (PEXT)** — a hard requirement: sliding-piece attacks
+  use PEXT indexing and the build fails outright without it (`-march=native` or
+  `-march=x86-64-v3` provide it). AVX2 is strongly recommended on top: the NNUE
+  forward pass has a scalar fallback, but it is much slower
+- Optional analysis tools: `valgrind`, `cppcheck`, `clang-tidy`, `scan-build`,
+  `include-what-you-use`, `cppclean`, `lizard` (`pip install lizard`), `perf`
 - Optional for Windows builds: `mingw-w64`
 - Optional for tuning/testing: `chess-tuning-tools`, `cutechess-cli`,
   `fastchess`, and `ordo`
@@ -67,6 +69,14 @@ NNUE-specific modes (see the NNUE section below):
 ./chess nnue-selftest <net.nnue>                                # verify accumulator correctness
 ```
 
+Move-generation diagnostics (see Testing below):
+
+```sh
+./chess perft <depth> [fen]          # leaf count of the legal-move tree
+./chess perft divide <depth> [fen]   # per-root-move breakdown, for bisecting
+./chess perft suite [maxdepth]       # standard positions vs published counts
+```
+
 ## Build Targets
 
 ```sh
@@ -85,7 +95,6 @@ Production builds use `-O3 -march=native`, OpenMP, and LTO. Object files go to
 ```sh
 make test            # functional tests -> ./tests/test
 make perf            # performance tests -> ./tests/perf
-make sacrifice       # anti-sacrifice regression suite -> ./tests/sacrifice
 make all-tests       # build and run functional + performance tests
 make test-valgrind   # run functional tests under valgrind
 ```
@@ -100,6 +109,29 @@ printf 'position startpos\ngo depth 12\nquit\n' | ./chess uci
 
 Functional tests alone do **not** catch search/eval strength regressions —
 use SPRT for that.
+
+### Perft (move-generation correctness)
+
+Perft ("performance test") counts the leaf nodes of the legal-move tree at a
+fixed depth. The counts for the standard positions are published, so a single
+wrong number proves a defect in move generation, legality, or make/unmake —
+with no evaluation or search involved.
+
+```sh
+./chess perft suite              # 7 standard positions, depths 1-4 (~11M nodes)
+./chess perft suite 6            # every published depth (~626M nodes, seconds)
+./chess perft 5 "<fen>"          # one position
+./chess perft divide 3 "<fen>"   # per-root-move counts
+```
+
+`suite` exits non-zero on any mismatch and also runs inside `make test` at
+depth 4. When a count is wrong, `divide` narrows it down: compare each root
+move against a reference, descend into the branch that differs, and repeat
+until the depth-1 mismatch names the offending move.
+
+Unlike the search benches, perft is deterministic and load-independent, so it
+stays trustworthy on a busy machine. Run it after any change to move
+generation, `doMove`/`undoMove`, or the square/bitboard conventions.
 
 ### SPRT (is the change really stronger?)
 
@@ -157,11 +189,12 @@ opponent, `TC=4+0.04`, `CONCURRENCY`, `THREADS`.
 
 ## NNUE Evaluation
 
-The evaluator is a quantised neural network: (768->256)*2 dual-perspective
-accumulator with SCReLU activation, trained with
-[bullet](https://github.com/jw1912/bullet) on self-play data. The v1 net was
-trained on 121M self-play positions and measured **+662 Elo** against the old
-handcrafted evaluator (SPRT, LOS 100%).
+The evaluator is a quantised neural network: (768->512)*2 dual-perspective
+accumulator with SCReLU activation and 8 output buckets, trained with
+[bullet](https://github.com/jw1912/bullet) on self-play data. The first net
+(768->256, 121M self-play positions) measured **+662 Elo** against the old
+handcrafted evaluator (SPRT, LOS 100%); later nets are validated against the
+previous release instead.
 
 - The net ships **embedded in the binary** (`nnue/net/hydray.nnue` via
   `.incbin`) and is activated at startup. To ship a new net, replace that file
@@ -236,8 +269,6 @@ Hash                 spin,   default 64 (MB, 1–4096)
 EvalFile             string, external .nnue net (default: embedded net)
 SyzygyPath           string, tablebase directory
 SyzygyProbeDepth     spin,   default 1
-BookFile             string, default engine/komodo.bin
-Opening              check,  default true (use the opening book)
 SearchApiMutexGuard  check,  default true
 ```
 
@@ -332,7 +363,7 @@ Reports are written to files such as `analysis.log`, `scan-build-report/`, and
 
 ```txt
 board/         board representation, FEN, move execution, legality, bitboards
-engine/        engine runtime, opening book, time management
+engine/        engine runtime, evaluation seam, perft, time management
 engine/search/ iterative deepening, alpha-beta/PVS, pruning, search constants
 engine/sort/   move generation, move ordering, SEE
 engine/syzygy/ Syzygy tablebase probing (fathom-based)

@@ -15,7 +15,6 @@ ut::suite performanceEngineSuite = [] {
 
   "performance searchPosition depth 11"_test = []{
     engine::Engine e = engine::Engine();
-    e.openingEnabled.store(false, std::memory_order_relaxed);
     constexpr int depth = 11;
 
     auto start = std::chrono::high_resolution_clock::now();
@@ -30,7 +29,6 @@ ut::suite performanceEngineSuite = [] {
     
   "avg performance searchPosition depth 10 over 20 runs"_test = []{
     engine::Engine e = engine::Engine();
-    e.openingEnabled.store(false, std::memory_order_relaxed);
     constexpr int depth = 10;
 
     constexpr int runs = 20;

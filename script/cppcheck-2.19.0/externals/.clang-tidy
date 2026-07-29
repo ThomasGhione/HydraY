@@ -1,5 +1,0 @@
----
-Checks:          '-*,misc-definitions-in-headers'
-WarningsAsErrors: '*'
-CheckOptions:
-  - { key: HeaderFileExtensions,          value: "x" }

@@ -2,6 +2,7 @@
 #include "../board/board.hpp"
 #include "../board/piece.hpp"
 #include "../engine/evaluator.hpp"
+#include "../engine/perft.hpp"
 #include "../engine/search/searcher.hpp"
 #include "../nnue/nnue.hpp"
 
@@ -33,8 +34,7 @@ void testQuiescenceScoresThreefoldAsDrawBeforeStaticEval() {
         engine::Searcher::NEG_INF,
         engine::Searcher::POS_INF,
         0,
-        nullptr,
-        false);
+        nullptr);
 
     assert(qScore < 0);
 }
@@ -61,6 +61,17 @@ void testBoardMoveRejectsWrongSideToMove() {
     assert(!board.move({chess::parseSquare("d2"), chess::parseSquare("d4")}));
 }
 
+// Exhaustive move-generation check: the standard perft positions against their
+// published node counts. Depth 4 is ~11M nodes (well under a second) and
+// already covers castling, en passant, promotions, pins and evasions; deeper
+// runs are available on demand via `./chess perft suite <depth>`.
+void testPerftStandardPositions() {
+    // Called outside the assert so the check survives a -DNDEBUG build.
+    const bool passed = engine::runPerftSuite(4, /*verbose=*/false);
+    assert(passed);
+    (void)passed;
+}
+
 } // namespace
 
 int main(){
@@ -68,6 +79,7 @@ int main(){
     // (no Engine), so nobody else activates the evaluator for them.
     pieces::initMagicBitboards();
     if (!NNUE::activateEmbedded()) return 1;
+    testPerftStandardPositions();
     testQuiescenceScoresThreefoldAsDrawBeforeStaticEval();
     testRootDrawTerminalDoesNotSearchFallbackMove();
     testBoardMoveRejectsWrongSideToMove();

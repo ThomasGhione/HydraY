@@ -6,6 +6,7 @@
 #include "../../board/board.hpp"
 #include "../../tt/tt.hpp"
 #include "../syzygy/syzygy.hpp"
+#include "corrhist.hpp"
 #include "search_constants.hpp"
 
 namespace engine {
@@ -41,12 +42,8 @@ struct SearchRuntime {
     // far sharper than a plain prevTo->curTo table. The ~49x cell growth is worth
     // it: a 24-position fixed-depth bench dropped ~6% nodes vs the old layout.
     int16_t  contHist[2][CONT_HIST_PIECE_TYPES][64][CONT_HIST_PIECE_TYPES][64] {};
-    // Correction history: (search - static eval) residual keyed by a board
-    // sub-structure. Pawn structure plus minor (N+B) and major (R+Q) skeletons
-    // give three semi-independent signals blended into the static eval.
-    int16_t  pawnCorrHist[2][PAWN_CORR_HISTORY_SIZE] {};
-    int16_t  minorCorrHist[2][PAWN_CORR_HISTORY_SIZE] {};
-    int16_t  majorCorrHist[2][PAWN_CORR_HISTORY_SIZE] {};
+    // Correction history: see corrhist.hpp for the design.
+    CorrectionHistory corrHist {};
     // evalStack is thread_local in searchPosition — NOT here: Lazy-SMP races
     // on a shared array would corrupt the `improving` hard-prune heuristic.
 

@@ -52,7 +52,7 @@ ut::suite boardSuite = [] {
     
     const std::string FEN_TEST = "r1bqkbnr/pp1ppppp/2n5/2p5/4P3/5N2/PPPP1PPP/RNBQKB1R w KQkq - 2 3";
 
-    b.fromFenToBoard(FEN_TEST);
+    b.fenToBoard(FEN_TEST);
 
     std::array<uint8_t, 64> expectPos = {wrook, wknight, wbishop, wqueen, wking, wbishop, empty, wrook,
                                         wpawn, wpawn, wpawn, wpawn, empty, wpawn, wpawn, wpawn,
@@ -71,7 +71,7 @@ ut::suite boardSuite = [] {
     
     const std::string FEN_TEST = "r3kb1r/pp1n1ppp/1qpp4/8/2P2B2/2Q2BP1/PP2P2P/R3K2R b KQkq - 5 15";
 
-    b.fromFenToBoard(FEN_TEST);
+    b.fenToBoard(FEN_TEST);
     
     std::array<uint8_t, 64> expectPos = {wrook, empty, empty, empty, wking, empty, empty, wrook,
                               wpawn, wpawn, empty, empty, wpawn, empty, empty, wpawn,
@@ -90,7 +90,7 @@ ut::suite boardSuite = [] {
     
     const std::string FEN_TEST = "r3kb1r/pp1n1ppp/2p1bq2/8/2Pp4/5PP1/PP1BP1BP/2RQK1NR b Kkq - 4 11";
 
-    b.fromFenToBoard(FEN_TEST);
+    b.fenToBoard(FEN_TEST);
     
     std::array<uint8_t, 64> expectPos = {empty, empty, wrook, wqueen, wking, empty, wknight, wrook,
                               wpawn, wpawn, empty, wbishop, wpawn, empty, wbishop, wpawn,
@@ -109,7 +109,7 @@ ut::suite boardSuite = [] {
     
     const std::string FEN_TEST = "r2qk2r/1bpnbpp1/pp1p3p/3Pp3/P1B1P3/2N1nN2/1PPQ1PPP/R4RK1 w kq - 0 12";
 
-    b.fromFenToBoard(FEN_TEST);
+    b.fenToBoard(FEN_TEST);
 
     std::array<uint8_t, 64> expectPos = {wrook, empty, empty, empty, empty, wrook, wking, empty,
                                      empty, wpawn, wpawn, wqueen, empty, wpawn, wpawn, wpawn,
@@ -128,7 +128,7 @@ ut::suite boardSuite = [] {
     
     const std::string FEN_TEST = "r4rk1/1b3p1p/p2b1p2/1pp5/8/1BP3N1/PP3PPP/R4RK1 w - - 0 18";
 
-    b.fromFenToBoard(FEN_TEST);
+    b.fenToBoard(FEN_TEST);
 
     std::array<uint8_t, 64> expectPos = {wrook, empty, empty, empty, empty, wrook, wking, empty,
                                     wpawn, wpawn, empty, empty, empty, wpawn, wpawn, wpawn,
@@ -146,7 +146,7 @@ ut::suite boardSuite = [] {
     
     const std::string FEN_TEST = "r3kb1r/pp1n1ppp/2p1bq2/8/2Pp4/5PP1/PP1BP1BP/2RQK1NR b Kkq - 4 11";
 
-    b.fromFenToBoard(FEN_TEST);
+    b.fenToBoard(FEN_TEST);
     
     std::array<uint8_t, 64> expectPos = { empty, empty, wrook, wqueen, wking, empty, wknight, wrook,
                                     wpawn, wpawn, empty, wbishop, wpawn, empty, wbishop, wpawn,
@@ -160,42 +160,42 @@ ut::suite boardSuite = [] {
     controlExpect(b, expectPos);
   };
 
-  "fromBoardToFen_starting_position"_test = []{
+  "boardToFen_starting_position"_test = []{
     chess::Board b{}; // default ctor loads the starting FEN
     const std::string expected = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1";
-    expect(b.fromBoardToFen() == expected) 
-      << "Current fen: " << b.fromBoardToFen() << "\n" 
+    expect(b.boardToFen() == expected) 
+      << "Current fen: " << b.boardToFen() << "\n" 
       << "expected fen: " << expected << "\n";
   };
   
-  "fromBoardToFen_roundtrip_examples_1"_test = []{
+  "boardToFen_roundtrip_examples_1"_test = []{
     chess::Board b{};
     const std::string expected = "r1bqkbnr/pp1ppppp/2n5/2p5/4P3/5N2/PPPP1PPP/RNBQKB1R w KQkq - 2 3";
-    b.fromFenToBoard(expected);
-    expect(b.fromBoardToFen() == expected) 
-      << "Current fen: " << b.fromBoardToFen() << "\n" 
+    b.fenToBoard(expected);
+    expect(b.boardToFen() == expected) 
+      << "Current fen: " << b.boardToFen() << "\n" 
       << "expected fen: " << expected << "\n";
   };
   
-  "fromBoardToFen_roundtrip_examples_2"_test = []{
+  "boardToFen_roundtrip_examples_2"_test = []{
     chess::Board b{};
     const std::string expected = "r3kb1r/pp1n1ppp/1qpp4/8/2P2B2/2Q2BP1/PP2P2P/R3K2R b KQkq - 5 15";
-    b.fromFenToBoard(expected);
-    expect(b.fromBoardToFen() == expected);
+    b.fenToBoard(expected);
+    expect(b.boardToFen() == expected);
   };
 
 
-  "fromBoardToFen_roundtrip_with_enpassant"_test = []{
+  "boardToFen_roundtrip_with_enpassant"_test = []{
     chess::Board b{};
     // Includes en passant square and maintains active color and clocks
     const std::string expected = "rnbqkbnr/pppppppp/8/8/4P3/8/PPPP1PPP/RNBQKBNR b KQkq e4 0 1";
-    b.fromFenToBoard(expected);
-    expect(b.fromBoardToFen() == expected);
+    b.fenToBoard(expected);
+    expect(b.boardToFen() == expected);
   };
 
   "knight_check_on_c2_is_not_false_mate"_test = []{
     chess::Board b{};
-    b.fromFenToBoard("r1b1kb1r/ppp1qppp/8/8/4Q3/8/PPnN1PPP/R1B1KB1R w KQkq - 0 2");
+    b.fenToBoard("r1b1kb1r/ppp1qppp/8/8/4Q3/8/PPnN1PPP/R1B1KB1R w KQkq - 0 2");
     const chess::Square kingFrom = chess::parseSquare("e1");
     const chess::Square escapeSq = chess::parseSquare("d1");
 

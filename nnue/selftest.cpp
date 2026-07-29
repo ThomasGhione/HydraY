@@ -26,7 +26,7 @@ bool accumulatorMatchesScratch(chess::Board& b, const char* context, int game, i
     b.refreshNnueAccumulator(); // overwrites with the from-scratch values
     if (std::memcmp(&incremental, &b.nnueAccumulator, sizeof(Accumulator)) != 0) {
         std::cout << "MISMATCH (" << context << ") game " << game << " ply " << ply
-                  << "\n  fen: " << b.fromBoardToFen() << "\n";
+                  << "\n  fen: " << b.boardToFen() << "\n";
         return false;
     }
     return true;

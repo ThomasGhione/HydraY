@@ -51,7 +51,6 @@ class Board {
 public:
     // --- Enums ---
 
-    //FIXME Spostare enum in classi enum
     enum CastlingBits : uint8_t {
         WHITE_KINGSIDE  = 0,
         WHITE_QUEENSIDE = 1,
@@ -214,8 +213,8 @@ public:
     inline void        ensureNnueAccumulatorClean() const noexcept;
 
     // --- FEN ---
-    void        fromFenToBoard(const std::string& fen);
-    std::string fromBoardToFen() const;
+    void        fenToBoard(const std::string& fen);
+    std::string boardToFen() const;
 
     // --- Public bitboards (direct access for eval/search hot paths) ---
     std::array<uint64_t, 2> pawns_bb   = {0ULL, 0ULL};
@@ -289,7 +288,6 @@ private:
     inline void    copyFromBoard(const Board& other) noexcept;
 
     // --- Private data ---
-    //FIXME Dentro board abbiamo board?
     board    chessboard;
     uint64_t currentHash = 0ULL;
     std::array<uint64_t, REPETITION_HISTORY_CAPACITY> repetitionHistory{};

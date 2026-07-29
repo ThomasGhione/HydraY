@@ -3,7 +3,8 @@
 #include <string>
 #include <string_view>
 #include <cstdint>
-#include <cctype>
+
+#include "../ascii_utils.hpp"
 
 namespace chess {
 
@@ -23,7 +24,7 @@ inline constexpr Square squareFrom(uint8_t f, uint8_t r) noexcept {
 inline Square parseSquare(std::string_view input) noexcept {
     if (input.length() != 2) [[unlikely]] return NO_SQUARE;
 
-    const char fileChar = static_cast<char>(std::tolower(static_cast<unsigned char>(input[0])));
+    const char fileChar = ascii::toLower(input[0]);
     const char rankChar = input[1];
 
     if (fileChar < 'a' || fileChar > 'h' || rankChar < '1' || rankChar > '8') [[unlikely]]

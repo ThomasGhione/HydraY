@@ -19,7 +19,7 @@ namespace engine {
 // ===================================================
 inline constexpr int32_t  MAX_PLY                = 64;
 inline constexpr int32_t  CAPTURE_HISTORY_SLOTS  = 2;
-inline constexpr int32_t  PAWN_CORR_HISTORY_SIZE = 1 << 14;
+inline constexpr int32_t  CORR_HISTORY_SIZE      = 1 << 14;
 inline constexpr int DEFAULT_DEPTH               = 11;
 
 // Scores within MATE_BOUND of ±INF encode a forced mate at a ply distance and
@@ -105,19 +105,12 @@ inline constexpr int32_t CORR_TOTAL_CAP    = CORR_HIST_LIMIT / CORR_HIST_DIVISOR
 // QUIESCENCE SEARCH
 // ===================================================
 inline constexpr uint8_t MAX_QSEARCH_DEPTH = 48;
-inline constexpr int32_t QSEARCH_PAWN_PROMO_DELTA          = 150;
-// Stand-pat (NNUE static eval) thresholds widening the delta-pruning margin
-// when the side to move is already losing.
-inline constexpr int32_t QSEARCH_STANDPAT_BAD              = -400;
-inline constexpr int32_t QSEARCH_STANDPAT_WORSE            = -200;
-inline constexpr int32_t QSEARCH_STANDPAT_BAD_DELTA        = 150;
-inline constexpr int32_t QSEARCH_STANDPAT_WORSE_DELTA      = 75;
-inline constexpr int32_t QSEARCH_DEPTH_REDUCTION_THRESHOLD = 5;
-inline constexpr int32_t QSEARCH_DEPTH_REDUCTION_PER_5     = 50;
-inline constexpr int32_t QSEARCH_DELTAMARGIN_MIN           = 960; // == QUEEN_VALUE
-// Near-promotion pawn masks (7th rank for each side).
-inline constexpr uint64_t WHITE_NEAR_PROMO_PAWNS = 0x00FF000000000000ULL;
-inline constexpr uint64_t BLACK_NEAR_PROMO_PAWNS = 0x000000000000FF00ULL;
+// Delta pruning: a qsearch node fails low when no capture can lift the stand-pat
+// past alpha even allowing for the heaviest piece plus a cushion. One margin,
+// deliberately: a second position-scaled one (near-promotion pawns, stand-pat
+// thresholds, depth taper) sat behind this and fired 2 times in 4.6M nodes,
+// because each of its widenings pushed the margin above this value.
+inline constexpr int32_t QSEARCH_DELTA_MARGIN = 1010; // == QUEEN_VALUE + 50
 
 // ===================================================
 // ASPIRATION WINDOW
