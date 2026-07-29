@@ -146,8 +146,11 @@ fn main() {
     for (label, fen) in [
         ("startpos (w)", "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w - - 0 1"),
         ("startpos (b)", "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR b - - 0 1"),
-        ("wN e4 extra (w)", "rnbqkbnr/pppppppp/8/8/4N3/8/PPPPPPPP/RNBQKBNR w - - 0 1"),
-        ("bN e5 extra (b) [mirror of previous]", "rnbqkbnr/pppppppp/8/4n3/8/8/PPPPPPPP/RNBQKBNR b - - 0 1"),
+        // Knight developed off b1/b8 rather than added: an extra piece leaves
+        // the side with 17 men, which bullet's FEN parser rejects with a panic
+        // that killed the whole sanity block after training had finished.
+        ("wN on e4 (w)", "rnbqkbnr/pppppppp/8/8/4N3/8/PPPPPPPP/R1BQKBNR w - - 0 1"),
+        ("bN on e5 (b) [mirror of previous]", "r1bqkbnr/pppppppp/8/4n3/8/8/PPPPPPPP/RNBQKBNR b - - 0 1"),
         ("stm up a queen (w)", "rnb1kbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w - - 0 1"),
         ("stm down a queen (w)", "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNB1KBNR w - - 0 1"),
     ] {

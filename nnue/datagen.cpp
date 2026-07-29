@@ -1,6 +1,7 @@
 #include "datagen.hpp"
 
 #include <algorithm>
+#include <array>
 #include <atomic>
 #include <chrono>
 #include <cmath>
@@ -51,10 +52,49 @@ constexpr uint64_t TARGET_POSITIONS         = 5'000'000'000; // v4 target (ETA l
 // are always safe; decisive ones are trusted only below this clock.
 constexpr int      DECISIVE_TB_ADJ_MAX_HMC  = 60;
 
+// Endgame seeding — DATAGEN_QUALITY_PLAN.md §5. Output bucket 0 covers 2..5
+// men and was left at its initial weights by every dataset so far: the v3 net
+// scored KQvK at -13 cp, and the 768 net trained on the 2B v4 data still
+// scores it at 0. Three filters had to be lifted together, which is why
+// seeding alone (the original §5 proposal) would not have fixed it:
+//   1. Syzygy adjudication ends a game the moment it enters TB range, so a
+//      <=5-man position is never reached in normal play;
+//   2. a won endgame produces a mate score, which MAX_RECORD_SCORE_CP then
+//      discards — KQvK could not be recorded even with the tables unloaded;
+//   3. MIN_RECORD_PLY skips the first 16 plies, and a seeded endgame is
+//      usually decided before that.
+// Seeded games therefore record from ply 0, keep out-of-range scores by
+// clamping instead of discarding, and skip TB adjudication so the position
+// gets observed before the tables end the game.
+// Overridable via CHESS_DATAGEN_EG_EVERY (same convention as
+// CHESS_TT_HUGEPAGE). The default mixes ~12% seeded games into a normal run;
+// setting it to 1 seeds every game, which is how a short dedicated batch is
+// produced. Mixed runs are slow at filling bucket 0 — the seven ordinary games
+// around each seeded one contribute ~30 records each and dilute it to ~1.4% —
+// so a dedicated pass is worth far more per hour than a longer mixed one.
+constexpr int      ENDGAME_SEED_EVERY_DEFAULT = 8;
+int                g_endgameSeedEvery = ENDGAME_SEED_EVERY_DEFAULT;
+constexpr int      ENDGAME_SEED_MIN_MEN = 3; // K+K plus one man
+constexpr int      ENDGAME_SEED_MAX_MEN = 6; // kept inside bucket 0 (2-5 men) plus one
+constexpr int      ENDGAME_SEED_TRIES = 64;
+// Giving each man an independent colour yields balanced material, and balanced
+// low-piece positions are almost all draws: a first run came out 70% draws with
+// 96% of bucket-0 records under 100 cp, which teaches "everything is equal" —
+// barely better than the zero the bucket learns today. Most seeds therefore
+// hand every extra man to one side, producing the KQvK / KRvK cases that are
+// the whole point.
+constexpr int      ENDGAME_SEED_LOPSIDED_PCT = 65;
+// A decided endgame is adjudicated after WIN_ADJ_PLIES and contributes a
+// handful of records, while a drawn one runs to the fifty-move rule and
+// contributes dozens. Without a cap the drawn positions drown out the decisive
+// ones no matter how the material is seeded.
+constexpr size_t   ENDGAME_SEED_MAX_RECORDS = 8;
+
 std::atomic<bool>     g_stop{false};
 std::atomic<uint64_t> g_totalPositions{0};
 std::atomic<uint64_t> g_totalGames{0};
 std::atomic<uint64_t> g_totalTbAdjudications{0};
+std::atomic<uint64_t> g_totalEndgameSeeded{0};
 
 // Shared, read-only after load; pyrrhic WDL probes are thread-safe post-init
 // (the search already probes from concurrent Lazy SMP threads).
@@ -80,13 +120,94 @@ struct WorkerContext {
     }
 };
 
+// Builds a random legal position with 3..8 men for the endgame seeding above,
+// or an empty string if ENDGAME_SEED_TRIES attempts all produced an illegal or
+// dead-drawn one. The positions are deliberately unnatural: bucket 0 needs
+// coverage of material configurations that self-play never reaches, not
+// realistic play. Squares are 0 = a8 .. 63 = h1, so writing them in order
+// already yields FEN rank order.
+std::string randomEndgameFen(std::mt19937_64& rng) {
+    using chess::Board;
+    // Weighted towards the pieces that actually decide endgames, while still
+    // producing the heavy-piece cases (KQvK) that expose the empty bucket.
+    static constexpr char POOL[] = "PPPPPRRRNNBBQ";
+    static constexpr int  POOL_SIZE = static_cast<int>(sizeof(POOL)) - 1;
+
+    for (int attempt = 0; attempt < ENDGAME_SEED_TRIES; ++attempt) {
+        std::array<char, 64> sq;
+        sq.fill('.');
+
+        const int wk = static_cast<int>(rng() % 64);
+        const int bk = static_cast<int>(rng() % 64);
+        const int fileGap = std::abs((wk % 8) - (bk % 8));
+        const int rankGap = std::abs((wk / 8) - (bk / 8));
+        if (fileGap <= 1 && rankGap <= 1) continue; // kings touching (or equal)
+        sq[static_cast<size_t>(wk)] = 'K';
+        sq[static_cast<size_t>(bk)] = 'k';
+
+        const int men = ENDGAME_SEED_MIN_MEN
+            + static_cast<int>(rng() % (ENDGAME_SEED_MAX_MEN - ENDGAME_SEED_MIN_MEN + 1));
+        const bool lopsided = (rng() % 100) < ENDGAME_SEED_LOPSIDED_PCT;
+        const bool strongIsWhite = (rng() & 1) != 0;
+        for (int placed = 0; placed < men - 2; ++placed) {
+            const char piece = POOL[rng() % static_cast<uint64_t>(POOL_SIZE)];
+            const bool white = lopsided ? strongIsWhite : ((rng() & 1) != 0);
+            // Pawns cannot stand on the first or last rank.
+            const int lo = (piece == 'P') ? 8 : 0;
+            const int hi = (piece == 'P') ? 56 : 64;
+            for (int probe = 0; probe < 32; ++probe) {
+                const int s = lo + static_cast<int>(rng() % static_cast<uint64_t>(hi - lo));
+                if (sq[static_cast<size_t>(s)] != '.') continue;
+                sq[static_cast<size_t>(s)] = white
+                    ? piece : static_cast<char>(piece - 'A' + 'a');
+                break;
+            }
+        }
+
+        std::string fen;
+        fen.reserve(80);
+        for (int r = 0; r < 8; ++r) {
+            int empty = 0;
+            for (int f = 0; f < 8; ++f) {
+                const char c = sq[static_cast<size_t>(r * 8 + f)];
+                if (c == '.') { ++empty; continue; }
+                if (empty != 0) { fen += static_cast<char>('0' + empty); empty = 0; }
+                fen += c;
+            }
+            if (empty != 0) fen += static_cast<char>('0' + empty);
+            if (r != 7) fen += '/';
+        }
+        // No castling rights and no en passant: both would be unsound on a
+        // position assembled at random, and TB probes assume the former.
+        fen += ((rng() & 1) != 0) ? " w - - 0 1" : " b - - 0 1";
+
+        const Board b{fen};
+        // A position where the side that just moved is left in check is illegal.
+        if (b.inCheck(Board::oppositeColor(b.getActiveColor()))) continue;
+        // Dead draws (K vs K, K vs KN/KB) end before recording anything.
+        if (b.hasInsufficientMaterialDraw()) continue;
+        return fen;
+    }
+    return {};
+}
+
 // Plays one self-play game; returns the number of positions written
 // (0 = game discarded: unbalanced opening, dead-end opening, or stop request).
-uint64_t playOneGame(WorkerContext& w, uint64_t nodesPerMove) {
+uint64_t playOneGame(WorkerContext& w, uint64_t nodesPerMove, bool endgameSeed) {
     using chess::Board;
 
-    Board b{};
-    const int openingPlies = OPENING_PLIES_MIN + static_cast<int>(w.rng() & 1);
+    std::string seedFen;
+    if (endgameSeed) {
+        seedFen = randomEndgameFen(w.rng);
+        if (seedFen.empty()) return 0;
+    }
+    Board b = endgameSeed ? Board{seedFen} : Board{};
+
+    // A seeded game starts from its position: there is no random opening walk
+    // to skip, so it records from ply 0 (MIN_RECORD_PLY exists only to drop
+    // the noise of that walk).
+    const int openingPlies = endgameSeed
+        ? 0 : OPENING_PLIES_MIN + static_cast<int>(w.rng() & 1);
     for (int i = 0; i < openingPlies; ++i) {
         const MoveList ml = engine::MoveGenerator::generateLegalMoves(b);
         if (ml.is_empty()) return 0;
@@ -125,7 +246,10 @@ uint64_t playOneGame(WorkerContext& w, uint64_t nodesPerMove) {
         // far gets a perfect outcome label and the game ends sooner. Tables
         // assume no castling rights (guard below); cursed wins / blessed
         // losses are draws under the 50-move rule and map to draw here.
-        if (g_syzygy.isLoaded() && g_syzygy.inTBRange(b)
+        // Skipped for seeded games: adjudicating here would end them before a
+        // single <=5-man position had been recorded, which is the whole reason
+        // bucket 0 is empty. Their result comes from the win/draw streaks below.
+        if (!endgameSeed && g_syzygy.isLoaded() && g_syzygy.inTBRange(b)
             && !(b.getCastle(0) || b.getCastle(1) || b.getCastle(2) || b.getCastle(3))) {
             if (const auto wdl = g_syzygy.probeWDL(b)) {
                 const bool stmWin  = (*wdl == syzygy::WDL::Win);
@@ -160,7 +284,10 @@ uint64_t playOneGame(WorkerContext& w, uint64_t nodesPerMove) {
         const int32_t stmScore = res.bestScore;
         const int32_t whiteScore = (active == Board::WHITE) ? stmScore : -stmScore;
 
-        if (ply == openingPlies && std::abs(whiteScore) > OPENING_MAX_IMBALANCE_CP) {
+        // Seeded endgames are lopsided by construction, so the balance filter
+        // would throw away nearly all of them.
+        if (!endgameSeed && ply == openingPlies
+            && std::abs(whiteScore) > OPENING_MAX_IMBALANCE_CP) {
             return 0;
         }
 
@@ -168,9 +295,19 @@ uint64_t playOneGame(WorkerContext& w, uint64_t nodesPerMove) {
             || ((b.get(best.from) & Board::MASK_PIECE_TYPE) == Board::PAWN
                 && best.to == b.getEnPassant());
         const bool isTactical = isCapture || best.promotionType != 0;
-        if (searchOk && ply >= MIN_RECORD_PLY && !isTactical && !b.inCheck(active)
-            && std::abs(whiteScore) <= MAX_RECORD_SCORE_CP) {
-            pending.push_back(packPosition(b, static_cast<int16_t>(whiteScore)));
+        // A won endgame is scored as a mate, so the range filter that keeps
+        // normal games clean is exactly what kept KQvK out of every dataset so
+        // far. Seeded games clamp instead of discarding: "completely winning"
+        // is the correct target for these positions, and a bucket trained on
+        // nothing scores them at zero.
+        const bool inScoreRange = std::abs(whiteScore) <= MAX_RECORD_SCORE_CP;
+        const bool seedQuotaLeft =
+            !endgameSeed || pending.size() < ENDGAME_SEED_MAX_RECORDS;
+        if (searchOk && ply >= (endgameSeed ? 0 : MIN_RECORD_PLY) && !isTactical
+            && !b.inCheck(active) && (inScoreRange || endgameSeed) && seedQuotaLeft) {
+            const int32_t target =
+                std::clamp(whiteScore, -MAX_RECORD_SCORE_CP, MAX_RECORD_SCORE_CP);
+            pending.push_back(packPosition(b, static_cast<int16_t>(target)));
         }
 
         whiteWinStreak = (whiteScore >=  WIN_ADJ_CP) ? whiteWinStreak + 1 : 0;
@@ -205,6 +342,7 @@ uint64_t playOneGame(WorkerContext& w, uint64_t nodesPerMove) {
 
     g_totalPositions.fetch_add(flat.size(), std::memory_order_relaxed);
     g_totalGames.fetch_add(1, std::memory_order_relaxed);
+    if (endgameSeed) g_totalEndgameSeeded.fetch_add(1, std::memory_order_relaxed);
     return flat.size();
 }
 
@@ -220,8 +358,13 @@ void workerLoop(int threadId, const std::string& outPath, uint64_t nodesPerMove)
         g_stop.store(true, std::memory_order_release);
         return;
     }
+    uint64_t gameIndex = 0;
     while (!g_stop.load(std::memory_order_acquire)) {
-        playOneGame(w, nodesPerMove);
+        // Deterministic 1-in-N cadence rather than a random draw: the seeded
+        // share stays exact per thread regardless of how long a run lives.
+        playOneGame(w, nodesPerMove,
+                    gameIndex % static_cast<uint64_t>(g_endgameSeedEvery) == 0);
+        ++gameIndex;
     }
 }
 
@@ -289,6 +432,12 @@ int runDatagen(int argc, char* argv[]) {
         ? std::max<uint64_t>(std::strtoull(argv[4], nullptr, 10), 256)
         : DEFAULT_NODES_PER_MOVE;
 
+    if (const char* egEvery = std::getenv("CHESS_DATAGEN_EG_EVERY")) {
+        // Clamped rather than rejected: a typo that silently disabled seeding
+        // would only surface days later as an empty bucket 0 again.
+        g_endgameSeedEvery = std::clamp(std::atoi(egEvery), 1, 1000);
+    }
+
     // Labeler network: an explicit path when given, the embedded net
     // otherwise. Fail hard on a bad path: silently falling back to a
     // different net would poison days of generation with unintended labels.
@@ -335,6 +484,13 @@ int runDatagen(int argc, char* argv[]) {
               << "  threads: " << threads << "  nodes/move: " << nodesPerMove << "\n"
               << "  filters: ply>=" << MIN_RECORD_PLY << ", not in check, quiet bestmove, |cp|<="
               << MAX_RECORD_SCORE_CP << "\n"
+              << "  endgame: " << (g_endgameSeedEvery == 1
+                     ? std::string("EVERY game")
+                     : std::string("1 game in ") + std::to_string(g_endgameSeedEvery))
+              << " seeded from a random "
+              << ENDGAME_SEED_MIN_MEN << "-" << ENDGAME_SEED_MAX_MEN
+              << "-man position (fills output bucket 0)"
+              << (g_endgameSeedEvery == 1 ? "  [DEDICATED BATCH]" : "") << "\n"
               << "  syzygy : " << (tbOn
                      ? std::string("adjudication ON (") + tbPath + ", "
                        + std::to_string(g_syzygy.maxPieces()) + "-man)"
@@ -375,6 +531,8 @@ int runDatagen(int argc, char* argv[]) {
                   << " (+" << fmtCount(generated) << " run)"
                   << "  games " << fmtCount(meta.games)
                   << "  tb-adj " << fmtCount(meta.tbAdjudications)
+                  << "  eg-seed "
+                  << fmtCount(g_totalEndgameSeeded.load(std::memory_order_relaxed))
                   << "  pos/s " << static_cast<uint64_t>(rate)
                   << "  ETA(5B) " << std::round(etaDays * 10.0) / 10.0 << " days\n" << std::flush;
     }
