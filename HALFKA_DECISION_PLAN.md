@@ -87,7 +87,49 @@ sparsi, che è la proprietà utile per l'SGD.
 ⚠️ **Non cancellare i `.bin` grezzi**: lo shuffle è globale e non appendibile,
 quindi l'arrivo dei 700M della terza macchina impone un rimerge dai sorgenti.
 
-### A1. Confronto a budget pari ← **PROSSIMO PASSO**
+### A1. Confronto a budget pari — ✅ **FATTO** (2026-07-29): HalfKA vince
+
+**Esito: +68,6 Elo per HalfKA**, 453/760 (59,6%), IC 95% ≈ ±22 — il limite
+inferiore resta sopra +45. SPRT fermato a 760 partite per scelta: il gate era
+superato con ampio margine e i core servivano per A2.
+
+⚠️ **Non usare 68,6 come stima dell'effetto reale.** È gonfiata dall'arresto
+opzionale ed è il confronto fra due reti **sotto-addestrate**; non predice il
+guadagno a budget pieno. Ciò che A1 stabilisce è **l'ordinamento**, ed è
+inequivocabile.
+
+Questo **ribalta lo shakedown** (−40/−70 Elo) e conferma la diagnosi: il difetto
+era il regime a 2,1 epoche su 466M con ×4 parametri, non l'architettura.
+
+Segnali concordanti a budget identico:
+
+| | 768 | HalfKA |
+|---|---|---|
+| running loss (10 SB) | 0,014430 | **0,014238** |
+| sanity startpos | 42 cp | 41 cp |
+| mirror (wN e4 / bN e5) | 805 = 805 | 765 = 765 |
+
+**Parità di search ottenuta, non stimata.** HalfKA tocca solo `board/` e `nnue/`
+— zero righe in `engine/search/` — e `dev` aveva modificato quei file per 15
+righe. Il merge di `dev` in `halfka` (branch `halfka-a1`) è passato senza
+conflitti e `git diff dev halfka-a1 -- engine/ uci/ tt/` è **vuoto**. L'unica
+variabile è l'architettura NNUE.
+
+Nota di build: ogni binario deve avere il **proprio** net embedded.
+`embeddedNetwork()` fa un reinterpret senza controllo di dimensione, quindi il
+binario HalfKA col net 768 da 803 KB leggerebbe 3,1 MB fuori dai limiti.
+`nnue-selftest` sul binario HalfKA: **41.577 posizioni, incremental ≡ scratch**.
+
+### A1-bis. Il bucket 0 è vuoto in entrambe le reti
+
+`KQvK` (3 pezzi) vale **−47 cp** su HalfKA e **0 cp** sulla 768: donna contro re
+nudo valutata zero. Stesso quadro su `active kings endgame` (4 pezzi) e
+`KRPvKR` (5 pezzi). È il bucket di output 0 affamato dall'adjudication Syzygy,
+che chiude le partite proprio a ≤5 pezzi. Difetto **dei dati**, identico per le
+due architetture: non falsa A1, ma è Elo perso adesso in entrambe le direzioni.
+Lo risolve **B1** (§5 di `DATAGEN_QUALITY_PLAN.md`).
+
+### A1-storico. Impostazione del confronto
 
 Addestrare l'architettura **attuale** (768→512 + 8 ob) e **HalfKA** con lo
 **stesso numero di superbatch** sullo **stesso dataset unito ~2B**.
@@ -139,17 +181,22 @@ git switch halfka && make prod
 - HalfKA perde **nettamente** (>30 Elo) a budget pari → l'architettura non
   rende su questo motore; passare direttamente a **A5**.
 
-### A2. F5 — FinnyTable e misura NPS
+### A2. F5 — FinnyTable e misura NPS — ✅ **FATTO** (2026-07-29)
 
-Serve a **separare** l'architettura dalla penalità di velocità: finché non è
-misurata, ogni SPRT confonde le due cose.
+Le Finny table erano già implementate sul branch (`c7abccb`, F5). Restava la
+misura. bench6 a profondità 12, 3 giri interleaved a macchina quieta:
 
-1. Misurare l'NPS di HalfKA senza Finny contro `dev`, A/B interleaved a macchina
-   quieta (`script/engine_driver.sh bench6` per la node-identity, tempi per l'NPS).
-2. Implementare le Finny table (cache per bucket/flip).
-3. **`./chess nnue-selftest`** obbligatorio dopo: la cache è il punto fragile,
-   il selftest incremental≡scratch è l'unica difesa contro i bug silenziosi.
-4. Ri-misurare l'NPS: atteso quasi-pari con Finny.
+| | nodi | tempo | NPS |
+|---|---|---|---|
+| 768 | 3.826.701 | 1,18 s | 3,23 M |
+| HalfKA | 3.650.818 | 1,18 s | 3,10 M |
+
+**Penalità NPS: solo −4,2%**, e HalfKA cerca **−4,6% di nodi** per raggiungere la
+stessa profondità: i due effetti si annullano e il **time-to-depth è identico**.
+
+Conseguenza per A1: i +68,6 Elo **non hanno penalità di velocità da scontare**.
+La preoccupazione che motivava A2 — "ogni SPRT confonde architettura e
+velocità" — non si applica, perché la velocità è alla pari.
 
 ### A3. Confronto definitivo a budget pieno (= F6)
 
