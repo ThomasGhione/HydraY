@@ -66,7 +66,14 @@ constexpr int      DECISIVE_TB_ADJ_MAX_HMC  = 60;
 // Seeded games therefore record from ply 0, keep out-of-range scores by
 // clamping instead of discarding, and skip TB adjudication so the position
 // gets observed before the tables end the game.
-constexpr int      ENDGAME_SEED_EVERY = 8;   // ~12% of games
+// Overridable via CHESS_DATAGEN_EG_EVERY (same convention as
+// CHESS_TT_HUGEPAGE). The default mixes ~12% seeded games into a normal run;
+// setting it to 1 seeds every game, which is how a short dedicated batch is
+// produced. Mixed runs are slow at filling bucket 0 — the seven ordinary games
+// around each seeded one contribute ~30 records each and dilute it to ~1.4% —
+// so a dedicated pass is worth far more per hour than a longer mixed one.
+constexpr int      ENDGAME_SEED_EVERY_DEFAULT = 8;
+int                g_endgameSeedEvery = ENDGAME_SEED_EVERY_DEFAULT;
 constexpr int      ENDGAME_SEED_MIN_MEN = 3; // K+K plus one man
 constexpr int      ENDGAME_SEED_MAX_MEN = 6; // kept inside bucket 0 (2-5 men) plus one
 constexpr int      ENDGAME_SEED_TRIES = 64;
@@ -355,7 +362,8 @@ void workerLoop(int threadId, const std::string& outPath, uint64_t nodesPerMove)
     while (!g_stop.load(std::memory_order_acquire)) {
         // Deterministic 1-in-N cadence rather than a random draw: the seeded
         // share stays exact per thread regardless of how long a run lives.
-        playOneGame(w, nodesPerMove, gameIndex % ENDGAME_SEED_EVERY == 0);
+        playOneGame(w, nodesPerMove,
+                    gameIndex % static_cast<uint64_t>(g_endgameSeedEvery) == 0);
         ++gameIndex;
     }
 }
@@ -424,6 +432,12 @@ int runDatagen(int argc, char* argv[]) {
         ? std::max<uint64_t>(std::strtoull(argv[4], nullptr, 10), 256)
         : DEFAULT_NODES_PER_MOVE;
 
+    if (const char* egEvery = std::getenv("CHESS_DATAGEN_EG_EVERY")) {
+        // Clamped rather than rejected: a typo that silently disabled seeding
+        // would only surface days later as an empty bucket 0 again.
+        g_endgameSeedEvery = std::clamp(std::atoi(egEvery), 1, 1000);
+    }
+
     // Labeler network: an explicit path when given, the embedded net
     // otherwise. Fail hard on a bad path: silently falling back to a
     // different net would poison days of generation with unintended labels.
@@ -470,9 +484,13 @@ int runDatagen(int argc, char* argv[]) {
               << "  threads: " << threads << "  nodes/move: " << nodesPerMove << "\n"
               << "  filters: ply>=" << MIN_RECORD_PLY << ", not in check, quiet bestmove, |cp|<="
               << MAX_RECORD_SCORE_CP << "\n"
-              << "  endgame: 1 game in " << ENDGAME_SEED_EVERY << " seeded from a random "
+              << "  endgame: " << (g_endgameSeedEvery == 1
+                     ? std::string("EVERY game")
+                     : std::string("1 game in ") + std::to_string(g_endgameSeedEvery))
+              << " seeded from a random "
               << ENDGAME_SEED_MIN_MEN << "-" << ENDGAME_SEED_MAX_MEN
-              << "-man position (fills output bucket 0)\n"
+              << "-man position (fills output bucket 0)"
+              << (g_endgameSeedEvery == 1 ? "  [DEDICATED BATCH]" : "") << "\n"
               << "  syzygy : " << (tbOn
                      ? std::string("adjudication ON (") + tbPath + ", "
                        + std::to_string(g_syzygy.maxPieces()) + "-man)"
