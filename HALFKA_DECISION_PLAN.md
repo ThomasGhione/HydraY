@@ -198,7 +198,36 @@ Conseguenza per A1: i +68,6 Elo **non hanno penalità di velocità da scontare**
 La preoccupazione che motivava A2 — "ogni SPRT confonde architettura e
 velocità" — non si applica, perché la velocità è alla pari.
 
-### A3. Confronto definitivo a budget pieno (= F6)
+### A3. Confronto definitivo a budget pieno — ✅ **FATTO** (2026-07-30): HalfKA vince
+
+**Esito: +26,45 ±11,23 Elo per HalfKA**, LOS 100%, nElo +33,47, PairsRatio 1,34,
+2316 partite — e l'**SPRT si è chiuso da solo** (LLR 2,95, H1 accettata). È la
+differenza che rende questo risultato affidabile dove quello di A1 non lo era:
+nessun arresto discrezionale.
+
+**Il budget era la variabile nascosta.** Un primo giro si era fermato a 20
+superbatch per il disco pieno di Colab, e aveva dato HalfKA **perdente** a
+−11,3 ±8,7 su 4000 partite. Lo schedule dimezza l'LR a `superbatches/2`: avendo
+lanciato con `40`, fermarsi a 20 congelava entrambe le reti **un attimo prima
+della fase di rifinitura**. Completandolo il verdetto si ribalta.
+
+| esperimento | budget | Elo |
+|---|---|---|
+| A1 | 10 SB su 1B, fermato a 760 partite | +68,6 (inaffidabile) |
+| A3 pre-decay | 20 SB, LR mai sceso | −11,3 ±8,7 |
+| **A3 completo** | **40 SB su 1,18B, schedule intero** | **+26,45 ±11,23, H1** |
+
+La loss lo anticipava: appaiate a 20 SB (0,014533 vs 0,014547), **−1,8% a favore
+di HalfKA** a 40 (0,014085 vs 0,013830).
+
+⚠️ **Vincolo di piattaforma da ricordare.** Il runtime T4 ha ~66 GB liberi e il
+mount di Drive **tiene in cache locale tutto ciò che legge**: leggere 128 GB in
+40 superbatch riempie il disco intorno al superbatch 28. La soluzione è copiare
+un prefisso su `/content` a pezzi (ogni `dd` è un processo separato, la cache si
+libera all'uscita) e addestrare da disco locale — niente cache, e l'I/O locale
+porta un braccio da ~38 a ~29 minuti. Usato: prefisso da 1,18B = 3,4 epoche.
+
+### A3-storico. Impostazione originale
 
 Solo se A1 non ha già chiuso la questione. Prima **rebasare `halfka` su `dev`**
 così l'unica differenza è la rete (i 31 commit sono neutri, ma il rebase
