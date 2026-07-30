@@ -23,7 +23,7 @@
 // Usage: cargo run -r --bin sanity -- <quantised.bin> [fen]...
 
 const HIDDEN: usize = 512;
-const INPUT_BUCKETS: usize = 4;
+const INPUT_BUCKETS: usize = 8;
 const OUTPUT_BUCKETS: usize = 8;
 const QA: i32 = 255;
 const QB: i32 = 64;
@@ -33,14 +33,14 @@ const SCALE: i32 = 400;
 // 32 entries: files a-d per rank, rank 1 first; e-h mirror onto d-a.
 #[rustfmt::skip]
 const BUCKET_LAYOUT: [usize; 32] = [
-    0, 0, 1, 1,
-    2, 2, 2, 2,
-    3, 3, 3, 3,
-    3, 3, 3, 3,
-    3, 3, 3, 3,
-    3, 3, 3, 3,
-    3, 3, 3, 3,
-    3, 3, 3, 3,
+    0, 1, 2, 3,
+    4, 4, 5, 5,
+    6, 6, 6, 6,
+    6, 6, 6, 6,
+    7, 7, 7, 7,
+    7, 7, 7, 7,
+    7, 7, 7, 7,
+    7, 7, 7, 7,
 ];
 
 // bullet ChessBucketsMirrored::new expansion: 64-square map from the 32-entry

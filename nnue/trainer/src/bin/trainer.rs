@@ -1,6 +1,6 @@
 // HydraY NNUE v4 trainer (HALFKA_PLAN.md: HalfKA + king bucket).
 //
-// Architecture: (768x4kb_hm -> 512)x2 -> 8ob — 4 mirrored king buckets on the
+// Architecture: (768x8kb_hm -> 512)x2 -> 8ob — 8 mirrored king buckets on the
 // inputs (bullet ChessBucketsMirrored: feature = 768*bucket[ksq] + (feat768 ^
 // flip), flip = 7 iff file(ksq) > d), material-count output buckets as in the
 // ob cycle, SCReLU, QA=255/QB=64. Input-layer factoriser l0f (shared 768xH
@@ -40,14 +40,14 @@ const QB: i16 = 64;
 // 32 entries: files a-d per rank, rank 1 first; e-h mirror onto d-a.
 #[rustfmt::skip]
 const BUCKET_LAYOUT: [usize; 32] = [
-    0, 0, 1, 1,
-    2, 2, 2, 2,
-    3, 3, 3, 3,
-    3, 3, 3, 3,
-    3, 3, 3, 3,
-    3, 3, 3, 3,
-    3, 3, 3, 3,
-    3, 3, 3, 3,
+    0, 1, 2, 3,
+    4, 4, 5, 5,
+    6, 6, 6, 6,
+    6, 6, 6, 6,
+    7, 7, 7, 7,
+    7, 7, 7, 7,
+    7, 7, 7, 7,
+    7, 7, 7, 7,
 ];
 const INPUT_BUCKETS: usize = get_num_buckets(&BUCKET_LAYOUT);
 
