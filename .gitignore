@@ -33,11 +33,15 @@
 /tuning/.tuning_state/
 /tuning/plots/
 /tuning/chess_baseline
+/tuning/chess_halfka_a3
 /tuning/sprt_*.pgn
 # Gauntlet artifacts: on-demand reference binaries and per-run outputs
 /tuning/chess_ref_*
 /tuning/gauntlet_*.pgn
 /tuning/gauntlet_*.txt
+
+# Stockfish-calibration artifacts (run_sf_calibration.sh)
+/tuning/sfcal_*
 
 # NNUE training data (datagen output, GB-sized)
 /nnue/data/
