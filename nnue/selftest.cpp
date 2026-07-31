@@ -18,6 +18,10 @@ namespace NNUE {
 namespace {
 
 bool accumulatorMatchesScratch(chess::Board& b, const char* context, int game, int ply) {
+    // HalfKA laziness: a perspective whose king crossed bucket/flip is dirty
+    // until the next evaluate(); settle it before comparing (this is exactly
+    // the state evaluate() would see).
+    b.ensureNnueAccumulatorClean();
     const Accumulator incremental = b.nnueAccumulator;
     b.refreshNnueAccumulator(); // overwrites with the from-scratch values
     if (std::memcmp(&incremental, &b.nnueAccumulator, sizeof(Accumulator)) != 0) {
@@ -54,6 +58,12 @@ int runSelfTest(int argc, char* argv[]) {
         {"middlegame ~24 pieces (w)", "r1bq1rk1/pp3ppp/2n1pn2/3p4/3P4/2NBPN2/PP3PPP/R1BQ1RK1 w - - 0 1"},
         {"KRPvKR (w)", "8/8/4k3/8/2r5/2K5/4P3/3R4 w - - 0 1"},
         {"KQvK (w)", "8/8/8/4k3/8/8/8/KQ6 w - - 0 1"},
+        // King-placement refs: exercise INPUT buckets and the mirror fold.
+        // Keep in sync with trainer/src/bin/sanity.rs.
+        {"both castled short (w)", "r4rk1/ppp2ppp/2n1bn2/2bpp3/4P3/2NP1N2/PPP1BPPP/R1BQ1RK1 w - - 0 1"},
+        {"white long castle vs e8 king (w)", "r3kb1r/ppp2ppp/2n1bn2/3qp3/8/2NP1N2/PPPBQPPP/2KR3R w kq - 0 1"},
+        {"kings on 2nd rank (w)", "8/1k3ppp/1p6/p1p5/P1P5/1P4P1/1K3P1P/8 w - - 0 1"},
+        {"active kings endgame (w)", "8/8/3k4/8/2p5/2P1K3/8/8 w - - 0 1"},
     };
     int32_t mirrorPair[2] = {0, 0};
     for (size_t i = 0; i < std::size(refs); ++i) {

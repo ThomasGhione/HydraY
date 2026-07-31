@@ -206,6 +206,11 @@ public:
     // From-scratch NNUE accumulator recompute (no-op when no net is loaded).
     // Incremental maintenance happens in addPieceToBB/removePieceFromBB.
     inline void        refreshNnueAccumulator() noexcept;
+    // HalfKA lazy refresh: rebuilds any perspective marked dirty by an
+    // own-king bucket/flip crossing. Must be called with the Board in a
+    // consistent state (NNUE::evaluate and the selftest do); const because
+    // the accumulator is a cache of board-derived state.
+    inline void        ensureNnueAccumulatorClean() const noexcept;
 
     // --- FEN ---
     void        fenToBoard(const std::string& fen);
@@ -222,7 +227,9 @@ public:
     // NNUE dual-perspective accumulator; kept in sync with the bitboards by
     // the same add/remove piece functions whenever a network is loaded.
     // Contains garbage until the first refreshNnueAccumulator() after load.
-    NNUE::Accumulator nnueAccumulator;
+    // mutable: ensureNnueAccumulatorClean() settles the HalfKA lazy state
+    // from const evaluation paths — it is a cache, not board state.
+    mutable NNUE::Accumulator nnueAccumulator;
 
 private:
     // --- Private helpers: move execution ---
