@@ -4,10 +4,9 @@
 #include <cstdint>
 #include <limits>
 
-// All tunable search + move-ordering parameters, centralized here the same way
-// eval_constants.hpp centralizes evaluation weights. These are compile-time
-// constants (not UCI options): the search relies on several of them for array
-// dimensions, so they are constexpr rather than mutable inline globals.
+// All tunable search + move-ordering parameters, centralized here. Most are
+// compile-time constants; the plain (non-constexpr) globals are exposed as
+// UCI spins for the tuning campaigns (see kSpinOptions in uci/uci.cpp).
 //
 // Purely structural constants that are tied to a specific local data structure
 // (SEE cache size, history flat-array cell counts, tracked-quiet buffer sizes,
@@ -20,7 +19,7 @@ namespace engine {
 // ===================================================
 inline constexpr int32_t  MAX_PLY                = 64;
 inline constexpr int32_t  CAPTURE_HISTORY_SLOTS  = 2;
-inline constexpr int32_t  PAWN_CORR_HISTORY_SIZE = 1 << 14;
+inline constexpr int32_t  CORR_HISTORY_SIZE      = 1 << 14;
 inline constexpr int DEFAULT_DEPTH               = 11;
 
 // Scores within MATE_BOUND of ±INF encode a forced mate at a ply distance and
@@ -42,26 +41,21 @@ inline int32_t NMP_EVAL_DIV = 150;
 inline int32_t NMP_EVAL_MAX = 4;
 // Reverse futility pruning margin per remaining ply.
 inline int32_t RFP_MARGIN_PER_DEPTH = 90;
-// Futility margin generators: mid row = MID_STEP*d, endgame row =
-// EG_BASE + EG_STEP*(d-1). FUTILITY_MARGINS[isLateEndgame][depth] is the
-// derived table consumed by the move loop (gated to depth 1..6).
+// Futility margin generator: FUTILITY_MARGINS[depth] = MID_STEP*d, consumed
+// by the move loop (gated to depth 1..6). The HCE-era endgame row (phase split
+// on nonPawnMajors) was removed — see HCE_RESIDUE_AUDIT.md section 1b.
 inline int32_t FUTILITY_MID_STEP = 260;
-inline int32_t FUTILITY_EG_BASE  = 170;
-inline int32_t FUTILITY_EG_STEP  = 180;
-inline int32_t FUTILITY_MARGINS[2][7] = {
-    {0, 260, 520, 780, 1040, 1300, 1560},
-    {0, 170, 350, 530,  710,  890, 1070},
-};
-// LMP_THRESHOLDS[improving][isLateEndgame][depth]: higher = more permissive.
+inline int32_t FUTILITY_MARGINS[7] = {0, 260, 520, 780, 1040, 1300, 1560};
+// LMP_THRESHOLDS[improving][depth]: higher = more permissive.
 // Gated to depth 1..4. Derived: base table scaled by LMP_SCALE_PCT[improving].
-inline constexpr int LMP_BASE_THRESHOLDS[2][2][5] = {
-    {{0, 12, 20, 30, 42}, {0, 16, 26, 38, 52}},
-    {{0, 16, 26, 38, 52}, {0, 20, 32, 46, 62}},
+inline constexpr int LMP_BASE_THRESHOLDS[2][5] = {
+    {0, 12, 20, 30, 42},
+    {0, 16, 26, 38, 52},
 };
 inline int32_t LMP_SCALE_PCT[2] = {100, 100};
-inline int LMP_THRESHOLDS[2][2][5] = {
-    {{0, 12, 20, 30, 42}, {0, 16, 26, 38, 52}},
-    {{0, 16, 26, 38, 52}, {0, 20, 32, 46, 62}},
+inline int LMP_THRESHOLDS[2][5] = {
+    {0, 12, 20, 30, 42},
+    {0, 16, 26, 38, 52},
 };
 // History-based quiet pruning: skip quiet moves with very negative history.
 // Indexed by depth (0..3); depth 0 unused.
@@ -111,17 +105,12 @@ inline constexpr int32_t CORR_TOTAL_CAP    = CORR_HIST_LIMIT / CORR_HIST_DIVISOR
 // QUIESCENCE SEARCH
 // ===================================================
 inline constexpr uint8_t MAX_QSEARCH_DEPTH = 48;
-inline constexpr int32_t QSEARCH_PAWN_PROMO_DELTA          = 150;
-inline constexpr int32_t QSEARCH_MATERIAL_BAD              = -400;
-inline constexpr int32_t QSEARCH_MATERIAL_WORSE            = -200;
-inline constexpr int32_t QSEARCH_MATERIAL_BAD_DELTA        = 150;
-inline constexpr int32_t QSEARCH_MATERIAL_WORSE_DELTA      = 75;
-inline constexpr int32_t QSEARCH_DEPTH_REDUCTION_THRESHOLD = 5;
-inline constexpr int32_t QSEARCH_DEPTH_REDUCTION_PER_5     = 50;
-inline constexpr int32_t QSEARCH_DELTAMARGIN_MIN           = 960; // == QUEEN_VALUE
-// Near-promotion pawn masks (7th rank for each side).
-inline constexpr uint64_t WHITE_NEAR_PROMO_PAWNS = 0x00FF000000000000ULL;
-inline constexpr uint64_t BLACK_NEAR_PROMO_PAWNS = 0x000000000000FF00ULL;
+// Delta pruning: a qsearch node fails low when no capture can lift the stand-pat
+// past alpha even allowing for the heaviest piece plus a cushion. One margin,
+// deliberately: a second position-scaled one (near-promotion pawns, stand-pat
+// thresholds, depth taper) sat behind this and fired 2 times in 4.6M nodes,
+// because each of its widenings pushed the margin above this value.
+inline constexpr int32_t QSEARCH_DELTA_MARGIN = 1010; // == QUEEN_VALUE + 50
 
 // ===================================================
 // ASPIRATION WINDOW
@@ -132,10 +121,7 @@ inline constexpr int     MAX_ASP_RESEARCHES = 6;
 // ===================================================
 // DRAW / CONTEMPT SCORING
 // ===================================================
-inline constexpr int32_t DRAW_SCORE_MATERIAL_WEIGHT_PERCENT = 40;
-inline constexpr int32_t DRAW_SCORE_EVAL_WEIGHT_PERCENT     = 60;
-inline constexpr int32_t DRAW_SCORE_WEIGHT_DENOMINATOR      = 100;
-inline constexpr int32_t REPETITION_CONTEMPT                = 80; // ~0.8 pawn
+inline constexpr int32_t REPETITION_CONTEMPT = 80; // ~0.8 pawn
 
 // ===================================================
 // PARALLELISM (Lazy SMP)

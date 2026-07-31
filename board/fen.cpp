@@ -1,4 +1,5 @@
 #include "board.hpp"
+#include "../ascii_utils.hpp"
 #include <algorithm>
 #include <charconv>
 #include <sstream>
@@ -12,7 +13,7 @@ uint8_t Board::safeParseInt(const std::string& section, int min, int max, int de
     return (res.ec == std::errc{} && res.ptr == section.data() + section.size()) ? std::clamp(v, min, max) : defaultValue;
 }
 
-void Board::fromFenToBoard(const std::string& fen) {
+void Board::fenToBoard(const std::string& fen) {
     std::istringstream fenStream(fen);
     std::string board, active, castling, ep, half, full;
     if (!(fenStream >> board >> active >> castling >> ep >> half >> full)) return;
@@ -22,7 +23,7 @@ void Board::fromFenToBoard(const std::string& fen) {
         int rank = 7, file = 0;
         for (char c : board) {
             if (c == '/') { --rank; file = 0; }
-            else if (std::isdigit(static_cast<unsigned char>(c))) file += c - '0';
+            else if (ascii::isDigit(c)) file += c - '0';
             else {
                 if (rank < 0 || file > 7) return;
                 const uint8_t p = CHAR_TO_PIECE_TYPE[static_cast<uint8_t>(c)];
@@ -41,8 +42,7 @@ void Board::fromFenToBoard(const std::string& fen) {
         if (const auto i = std::string_view("KQkq").find(c); i != std::string_view::npos)
             castle |= uint8_t(1 << i);
 
-    enPassant = (ep.size() == 2 && ep[0] >= 'a' && ep[0] <= 'h' && ep[1] >= '1' && ep[1] <= '8')
-        ? squareFrom(ep[0] - 'a', '8' - ep[1]) : NO_SQUARE;
+    enPassant = parseSquare(ep);
     halfMoveClock = safeParseInt(half, 0, 255, 0);
     fullMoveClock = safeParseInt(full, 1, 255, 1);
 
@@ -50,7 +50,7 @@ void Board::fromFenToBoard(const std::string& fen) {
     rebuildRepetitionHistory();
 }
 
-std::string Board::fromBoardToFen() const {
+std::string Board::boardToFen() const {
     constexpr std::array<char, 8> pieceChar = {'.', 'P', 'N', 'B', 'R', 'Q', 'K', '?'};
     std::string fen;
     for (int rank = 7; rank >= 0; --rank) {
@@ -71,7 +71,7 @@ std::string Board::fromBoardToFen() const {
         if (castle & (1 << i)) fen += "KQkq"[i];
     if (fen.size() == castleStart) fen += '-';
     if (!isValidSquare(enPassant)) fen += " -";
-    else { fen += ' '; fen += char('a' + chess::file(enPassant)); fen += char('8' - chess::rank(enPassant)); }
+    else { fen += ' '; fen += squareToString(enPassant); }
     fen += ' ';
     fen += std::to_string(halfMoveClock);
     fen += ' ';

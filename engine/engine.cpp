@@ -65,12 +65,6 @@ Engine::Engine() {
 
     bindSearchRuntime();
     this->tt.clear();
-    // The path is relative to the working directory; UCI clients can still
-    // override at runtime via `setoption name BookFile value <path>`.
-    if (!this->openingBook.load("engine/komodo.bin")) {
-        std::cerr << "info string BookFile error: could not load 'engine/komodo.bin'"
-                     " at startup (cwd-relative). Use 'setoption name BookFile value <path>' to override.\n";
-    }
     this->ponderingThread = std::thread([this] { this->ponderWorkerLoop(); });
 }
 
@@ -136,19 +130,12 @@ void Engine::clearSearchStopFlags() noexcept {
     this->searchInterrupted.store(false, std::memory_order_relaxed);
 }
 
-// Book move when the opening book is enabled, else nullopt. Keeps the search
-// entry points from repeating the enabled-then-probe dance.
-std::optional<chess::Move> Engine::probeOpeningBook() noexcept {
-    if (!this->openingEnabled.load(std::memory_order_relaxed)) return std::nullopt;
-    return this->openingBook.probe(this->board);
-}
-
-// A move available without a full search: a usable ponder result first, then
-// the opening book. nullopt means the caller must actually search.
+// A move available without a full search: a usable ponder result, if any.
+// nullopt means the caller must actually search.
 std::optional<chess::Move> Engine::tryInstantMove(int targetDepth) noexcept {
     chess::Move ponderMove{};
     if (this->tryUsePonderResult(targetDepth, ponderMove)) return ponderMove;
-    return probeOpeningBook();
+    return std::nullopt;
 }
 
 // Stores `candidate` as bestMove (normalising an out-of-bounds search result

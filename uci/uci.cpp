@@ -1,5 +1,6 @@
 #include "uci.hpp"
 
+#include "../ascii_utils.hpp"
 #include "../engine/engine.hpp"
 #include "../nnue/nnue.hpp"
 
@@ -13,12 +14,12 @@ namespace {
 
     static string_view trimLeft(string_view s) noexcept {
         size_t i = 0;
-        while (i < s.size() && std::isspace(s[i])) ++i;
+        while (i < s.size() && ascii::isSpace(s[i])) ++i;
         return s.substr(i);
     }
 
     static string_view trimRight(string_view s) noexcept {
-        while (!s.empty() && std::isspace(s.back())) s.remove_suffix(1);
+        while (!s.empty() && ascii::isSpace(s.back())) s.remove_suffix(1);
         return s;
     }
 
@@ -27,7 +28,7 @@ namespace {
         normalized.reserve(optionName.size());
         for (const char c : optionName) {
             if (c == ' ' || c == '_' || c == '-') continue;
-            normalized.push_back(static_cast<char>(std::tolower(c)));
+            normalized.push_back(ascii::toLower(c));
         }
         return normalized;
     }
@@ -41,8 +42,8 @@ namespace {
                 upperNext = true;
                 continue;
             }
-            display.push_back(upperNext ? static_cast<char>(std::toupper(c))
-                                        : static_cast<char>(std::tolower(c)));
+            display.push_back(upperNext ? ascii::toUpper(c)
+                                        : ascii::toLower(c));
             upperNext = false;
         }
         return display;
@@ -79,9 +80,6 @@ namespace {
     }
 
     static SpinOption kSpinOptions[] = {
-        {"STALEMATE_DRAW_PENALTY_MAJOR", &engine::STALEMATE_DRAW_PENALTY_MAJOR, false, 0, 0},
-        {"STALEMATE_DRAW_PENALTY_MINOR", &engine::STALEMATE_DRAW_PENALTY_MINOR, false, 0, 0},
-        {"STALEMATE_MATERIAL_THRESHOLD", &engine::STALEMATE_MATERIAL_THRESHOLD, false, 0, 0},
         // --- Search constants (SMAC3 campaign, HOTPATH #9). Generators of the
         // derived tables set refreshSearchTables so LMR/futility/LMP rebuild.
         {"RFP_MARGIN_PER_DEPTH", &engine::RFP_MARGIN_PER_DEPTH,        true,     30,  250},
@@ -95,8 +93,6 @@ namespace {
         {"HISTORY_PRUNE_D2",     &engine::HISTORY_PRUNE_THRESHOLD[2],  true, -16384,    0},
         {"HISTORY_PRUNE_D3",     &engine::HISTORY_PRUNE_THRESHOLD[3],  true, -16384,    0},
         {"FUTILITY_MID_STEP",    &engine::FUTILITY_MID_STEP,           true,     80,  600, true},
-        {"FUTILITY_EG_BASE",     &engine::FUTILITY_EG_BASE,            true,     40,  500, true},
-        {"FUTILITY_EG_STEP",     &engine::FUTILITY_EG_STEP,            true,     40,  500, true},
         {"LMP_SCALE_STD_PCT",    &engine::LMP_SCALE_PCT[0],            true,     40,  250, true},
         {"LMP_SCALE_IMP_PCT",    &engine::LMP_SCALE_PCT[1],            true,     40,  250, true},
         {"LMR_C_PERCENT",        &engine::LMR_C_PERCENT,               true,    150,  600, true},
@@ -119,7 +115,7 @@ namespace {
         text = trimLeft(text);
         if (text.empty()) return {};
         size_t end = 0;
-        while (end < text.size() && !std::isspace(text[end])) ++end;
+        while (end < text.size() && !ascii::isSpace(text[end])) ++end;
         const string_view token = text.substr(0, end);
         text.remove_prefix(end);
         return token;
@@ -147,7 +143,7 @@ namespace {
             args = {};
             return true;
         }
-        if (!std::isspace(command[name.size()])) return false;
+        if (!ascii::isSpace(command[name.size()])) return false;
         args = trimLeft(command.substr(name.size()));
         return true;
     }
@@ -156,8 +152,8 @@ namespace {
         size_t pos = text.find(word);
         while (pos != string_view::npos) {
             const size_t end = pos + word.size();
-            const bool leftOk = (pos == 0) || std::isspace(text[pos - 1]);
-            const bool rightOk = (end == text.size()) || std::isspace(text[end]);
+            const bool leftOk = (pos == 0) || ascii::isSpace(text[pos - 1]);
+            const bool rightOk = (end == text.size()) || ascii::isSpace(text[end]);
             if (leftOk && rightOk) return pos;
             pos = text.find(word, pos + 1);
         }
@@ -228,10 +224,8 @@ namespace uci {
 
     void UCI::uci() noexcept {
         std::cout
-            << "id name HydraY 2.1.0\n"
+            << "id name HydraY 3.0.0\n"
             << "id author Thomas Ghione, Daniele Ferretti, Simone Tomasella\n"
-            << "option name BookFile type string default engine/komodo.bin\n"
-            << "option name Opening type check default true\n"
             << "option name SyzygyPath type string default <empty>\n"
             << "option name SyzygyProbeDepth type spin default 1 min 1 max 100\n"
             << "option name SearchApiMutexGuard type check default true\n"
@@ -273,16 +267,6 @@ namespace uci {
 
         if (optionName.empty()) return;
         const std::string normalizedName = normalizedOptionName(optionName);
-        if (normalizedName == "bookfile") {
-            const std::string path(optionValue);
-            if (engine.openingBook.load(path)) {
-                std::cout << "info string BookFile loaded: " << path << "\n";
-            } else {
-                std::cout << "info string BookFile error: could not load '" << path << "'\n";
-            }
-            return;
-        }
-
         if (normalizedName == "evalfile") {
             const std::string path(optionValue);
             if (NNUE::loadNetwork(path)) {
@@ -347,7 +331,7 @@ namespace uci {
             return;
         }
 
-        if (normalizedName != "opening" && normalizedName != "searchapimutexguard") {
+        if (normalizedName != "searchapimutexguard") {
             for (auto& option : kSpinOptions) {
                 if (normalizedName != normalizedOptionName(option.key)) continue;
                 int parsedValue = 0;
@@ -379,13 +363,6 @@ namespace uci {
             return;
         }
 
-        if (normalizedName == "opening") {
-            engine.openingEnabled.store(enabled, std::memory_order_relaxed);
-            std::cout << "info string Opening "
-                      << (enabled ? "enabled" : "disabled") << '\n';
-            return;
-        }
-
         engine.setSearchApiMutexEnabled(enabled);
         std::cout << "info string SearchApiMutexGuard "
                   << (engine.isSearchApiMutexEnabled() ? "enabled" : "disabled")
@@ -396,11 +373,11 @@ namespace uci {
         stopSearch(false);
         string_view moves;
 
-        if (command.starts_with("startpos") && (command.size() == 8 || std::isspace(command[8]))) {
+        if (command.starts_with("startpos") && (command.size() == 8 || ascii::isSpace(command[8]))) {
             engine.board = chess::Board{};
             const size_t movesPos = findWord(command, "moves");
             if (movesPos != string_view::npos) moves = command.substr(movesPos);
-        } else if (command.starts_with("fen") && (command.size() == 3 || std::isspace(command[3]))) {
+        } else if (command.starts_with("fen") && (command.size() == 3 || ascii::isSpace(command[3]))) {
             string_view fenPayload = trimLeft(command.substr(3));
             const size_t movesPos = findWord(fenPayload, "moves");
             if (movesPos == string_view::npos) {
@@ -514,7 +491,7 @@ namespace uci {
             const chess::Square to = chess::parseSquare(move.substr(2, 2));
             if (!chess::isValidSquare(from) || !chess::isValidSquare(to)) continue;
 
-            const char promo = (move.size() > 4) ? static_cast<char>(std::tolower(move[4])) : '\0';
+            const char promo = (move.size() > 4) ? ascii::toLower(move[4]) : '\0';
             engine.movePiece(from, to, promo);
         }
     }

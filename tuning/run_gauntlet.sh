@@ -19,14 +19,14 @@
 #
 # ---------------------------------------------------------------------------
 # TUNABLE KNOBS (env vars; sensible defaults below)
-#   REF_TAGS    space-separated git tags to use as fixed anchors  (default "1.2.0")
+#   REF_TAGS    space-separated git tags to use as fixed anchors  (default "2.0.0")
 #               NOTE: tag 1.1.0 (and older) has BROKEN time management — it
 #               ignores wtime/btime/movetime and dumps ~3s on every move, so it
 #               flags instantly at any real TC. Always time-sanity-check a new
 #               anchor tag first:  printf 'position startpos\ngo wtime 4000 winc 40\n'
 #               | ./tuning/chess_ref_<tag> -uci   should return in ~100ms, not seconds.
 #   ANCHOR_TAG  which REF_TAG ordo pins to ANCHOR_ELO             (default: first of REF_TAGS)
-#   ANCHOR_ELO  fixed internal Elo for the anchor (yardstick, NOT (default 2000)
+#   ANCHOR_ELO  fixed internal Elo for the anchor (yardstick, NOT (default 3000)
 #               a CCRL rating — only consistency across runs matters)
 #   GAMES       games played PER reference opponent               (default 400)
 #   TC          time control "moves/sec+inc" or "sec+inc"         (default 4+0.04)
@@ -52,10 +52,13 @@ export PATH="${HOME}/.local/bin:${PATH}"
 new_bin="${repo_root}/chess"
 
 # --- knobs --------------------------------------------------------------------
-REF_TAGS="${REF_TAGS:-1.2.0}"
+# Scale: 2.0.0 = 3000 (since 2026-07-10; chained to the old 1.2.0=2000 scale
+# via 2.0.0's SPRT +662 vs HCE ≈ 1.3.0 ≈ 2366). 1.2.0/1.3.0 are saturated —
+# only anchor on them to rate pre-2.0.0 tags.
+REF_TAGS="${REF_TAGS:-2.0.0}"
 read -ra ref_tag_arr <<< "${REF_TAGS}"
 ANCHOR_TAG="${ANCHOR_TAG:-${ref_tag_arr[0]}}"
-ANCHOR_ELO="${ANCHOR_ELO:-2000}"
+ANCHOR_ELO="${ANCHOR_ELO:-3000}"
 GAMES="${GAMES:-400}"
 TC="${TC:-4+0.04}"
 THREADS="${THREADS:-1}"

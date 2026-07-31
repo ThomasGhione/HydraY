@@ -1,6 +1,7 @@
 #include "nnue.hpp"
 
 #include <algorithm>
+#include <bit>
 #include <cstdint>
 #include <cstring>
 #include <fstream>
@@ -48,7 +49,7 @@ const char* validateNetworkBlob(const unsigned char* data, size_t size) noexcept
         }
     }
     constexpr size_t OW_OFFSET = offsetof(Network, outputWeights);
-    for (size_t i = 0; i < 2 * static_cast<size_t>(HIDDEN); ++i) {
+    for (size_t i = 0; i < static_cast<size_t>(OUTPUT_BUCKETS) * 2 * HIDDEN; ++i) {
         const auto w = static_cast<int16_t>(
             static_cast<uint16_t>(data[OW_OFFSET + 2 * i])
             | (static_cast<uint16_t>(data[OW_OFFSET + 2 * i + 1]) << 8));
@@ -144,13 +145,21 @@ bool networkLoaded() noexcept {
 
 int32_t evaluate(const chess::Board& b) noexcept {
     const Network& net = *activeNetwork;
+    // HalfKA laziness: settle any perspective dirtied by a king bucket/flip
+    // crossing before reading the accumulator (board is consistent here).
+    b.ensureNnueAccumulatorClean();
     const NNUE::Accumulator& acc = b.nnueAccumulator;
     const int stm = chess::Board::colorToIndex(b.getActiveColor()); // 0 = white
 
-    int32_t out = forwardHalf(acc.v[stm], net.outputWeights[0])
-                + forwardHalf(acc.v[stm ^ 1], net.outputWeights[1]);
+    // Material-count output bucket; must match bullet's MaterialCount<8>
+    // (and sanity.rs): (popcount - 2) / ceil(32/8). Kings are always on the
+    // board, so popcount is in [2, 32] and the bucket in [0, 7].
+    const int bucket = (std::popcount(b.getPiecesBitMap()) - 2) / 4;
+
+    int32_t out = forwardHalf(acc.v[stm], net.outputWeights[bucket][0])
+                + forwardHalf(acc.v[stm ^ 1], net.outputWeights[bucket][1]);
     out /= QA;
-    out += net.outputBias;
+    out += net.outputBias[bucket];
     return out * SCALE / (QA * QB);
 }
 

@@ -6,6 +6,7 @@
 #include "../../board/board.hpp"
 #include "../../tt/tt.hpp"
 #include "../syzygy/syzygy.hpp"
+#include "corrhist.hpp"
 #include "search_constants.hpp"
 
 namespace engine {
@@ -19,9 +20,12 @@ struct SearchRuntime {
     int32_t  eval          = 0;
     int      maxThreads    = 1;
     bool     emitUciInfo   = false;
+    // Lazy SMP helper thread: skips the Syzygy root probe (tb_probe_root is
+    // main-thread-only in Fathom) and never writes to stdout.
+    bool     isHelper      = false;
     // UCI `go nodes N`: 0 = unlimited. Checked per-node against
     // (runtime.nodesSearched + *counter), so the total across IDS iterations
-    // is bounded. In YBWC each worker also bounds itself by the same value;
+    // is bounded. Each Lazy SMP helper also bounds itself by the same value;
     // total nodes are at most ~maxNodes * threads in multi-threaded searches.
     uint64_t maxNodes      = 0;
 
@@ -38,12 +42,8 @@ struct SearchRuntime {
     // far sharper than a plain prevTo->curTo table. The ~49x cell growth is worth
     // it: a 24-position fixed-depth bench dropped ~6% nodes vs the old layout.
     int16_t  contHist[2][CONT_HIST_PIECE_TYPES][64][CONT_HIST_PIECE_TYPES][64] {};
-    // Correction history: (search - static eval) residual keyed by a board
-    // sub-structure. Pawn structure plus minor (N+B) and major (R+Q) skeletons
-    // give three semi-independent signals blended into the static eval.
-    int16_t  pawnCorrHist[2][PAWN_CORR_HISTORY_SIZE] {};
-    int16_t  minorCorrHist[2][PAWN_CORR_HISTORY_SIZE] {};
-    int16_t  majorCorrHist[2][PAWN_CORR_HISTORY_SIZE] {};
+    // Correction history: see corrhist.hpp for the design.
+    CorrectionHistory corrHist {};
     // evalStack is thread_local in searchPosition — NOT here: Lazy-SMP races
     // on a shared array would corrupt the `improving` hard-prune heuristic.
 

@@ -8,7 +8,6 @@
 #include <cstddef>
 #include <cstring>
 
-#include "../engine/eval_constants.hpp"
 #include "../nnue/accumulator.hpp"
 #include "./coords.hpp"
 #include "./piece.hpp"
@@ -52,7 +51,6 @@ class Board {
 public:
     // --- Enums ---
 
-    //FIXME Spostare enum in classi enum
     enum CastlingBits : uint8_t {
         WHITE_KINGSIDE  = 0,
         WHITE_QUEENSIDE = 1,
@@ -145,13 +143,6 @@ public:
         return table;
     }();
 
-    inline static std::array<int32_t, 8> MATERIAL_VALUES = {
-        0,
-        engine::PAWN_VALUE, engine::KNIGHT_VALUE, engine::BISHOP_VALUE,
-        engine::ROOK_VALUE, engine::QUEEN_VALUE,  engine::KING_VALUE,
-        0
-    };
-
     // --- Constructors ---
     Board() noexcept;
     explicit Board(const std::string& fen);
@@ -215,16 +206,15 @@ public:
     // From-scratch NNUE accumulator recompute (no-op when no net is loaded).
     // Incremental maintenance happens in addPieceToBB/removePieceFromBB.
     inline void        refreshNnueAccumulator() noexcept;
-
-    // --- Incremental search-heuristic accessors ---
-    // White-minus-black material in centipawns (stalemate scoring in search).
-    constexpr int32_t getIncrementalMaterialDelta() const noexcept     { return incrementalMaterialDelta; }
-    // Unweighted count of {N, B, R, Q} across both sides (used by search heuristics).
-    constexpr int32_t getIncrementalNonPawnMajorCount() const noexcept { return incrementalNonPawnMajorCount; }
+    // HalfKA lazy refresh: rebuilds any perspective marked dirty by an
+    // own-king bucket/flip crossing. Must be called with the Board in a
+    // consistent state (NNUE::evaluate and the selftest do); const because
+    // the accumulator is a cache of board-derived state.
+    inline void        ensureNnueAccumulatorClean() const noexcept;
 
     // --- FEN ---
-    void        fromFenToBoard(const std::string& fen);
-    std::string fromBoardToFen() const;
+    void        fenToBoard(const std::string& fen);
+    std::string boardToFen() const;
 
     // --- Public bitboards (direct access for eval/search hot paths) ---
     std::array<uint64_t, 2> pawns_bb   = {0ULL, 0ULL};
@@ -237,7 +227,9 @@ public:
     // NNUE dual-perspective accumulator; kept in sync with the bitboards by
     // the same add/remove piece functions whenever a network is loaded.
     // Contains garbage until the first refreshNnueAccumulator() after load.
-    NNUE::Accumulator nnueAccumulator;
+    // mutable: ensureNnueAccumulatorClean() settles the HalfKA lazy state
+    // from const evaluation paths — it is a cache, not board state.
+    mutable NNUE::Accumulator nnueAccumulator;
 
 private:
     // --- Private helpers: move execution ---
@@ -274,13 +266,11 @@ private:
                                       uint64_t pawns, uint64_t knights, uint64_t bishops,
                                       uint64_t rooks, uint64_t queens, uint64_t kings) noexcept;
 
-    // --- Private helpers: bitboards & incremental eval ---
+    // --- Private helpers: bitboards & incremental counters ---
     template<uint8_t PieceType, bool Add>
-    inline void updatePieceTypeBB(uint8_t color, uint64_t bit, uint8_t index) noexcept;
+    inline void updatePieceTypeBB(uint8_t color, uint64_t bit) noexcept;
     template<bool Add>
-    inline void dispatchPieceBBUpdate(uint8_t pieceType, uint8_t color, uint64_t bit, uint8_t index) noexcept;
-    template<uint8_t PieceType, bool Add>
-    inline void updateIncrementalEvalForPiece(uint8_t color, uint8_t index) noexcept;
+    inline void dispatchPieceBBUpdate(uint8_t pieceType, uint8_t color, uint64_t bit) noexcept;
 
     // --- Private helpers: move classification ---
     [[nodiscard]] static constexpr bool     isCaptureKind(MoveKind kind) noexcept;
@@ -298,14 +288,10 @@ private:
     inline void    copyFromBoard(const Board& other) noexcept;
 
     // --- Private data ---
-    //FIXME Dentro board abbiamo board?
     board    chessboard;
     uint64_t currentHash = 0ULL;
     std::array<uint64_t, REPETITION_HISTORY_CAPACITY> repetitionHistory{};
     uint64_t occupancy   = 0ULL;
-
-    int32_t incrementalMaterialDelta    = 0;
-    int32_t incrementalNonPawnMajorCount = 0;
 
     uint8_t  halfMoveClock       = 0;
     uint8_t  fullMoveClock       = 1;

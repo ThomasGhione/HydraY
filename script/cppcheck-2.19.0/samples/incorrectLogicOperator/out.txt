@@ -1,3 +1,0 @@
-samples\incorrectLogicOperator\bad.c:3:16: warning: Logical disjunction always evaluates to true: x >= 0 || x <= 10. [incorrectLogicOperator]
-    if (x >= 0 || x <= 10) {}
-               ^

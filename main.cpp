@@ -2,6 +2,7 @@
 #include <string_view>
 
 #include "./engine/engine.hpp"
+#include "./engine/perft.hpp"
 #include "./driver/driver.hpp"
 #include "./uci/uci.hpp"
 #include "./nnue/datagen.hpp"
@@ -50,6 +51,11 @@ int main(int argc, char *argv[]) {
         std::cerr << "fatal: embedded NNUE network failed validation - rebuild with a valid nnue/net/hydray.nnue\n";
         return 1;
     }
+
+    // Perft needs no TT, book or ponder thread, but Board's constructor fills
+    // the NNUE accumulator, so it is dispatched after the net is activated.
+    if (argc >= 2 && std::string_view(argv[1]) == "perft")
+        return engine::runPerftCommand(argc, argv);
 
     Engine engine;
 

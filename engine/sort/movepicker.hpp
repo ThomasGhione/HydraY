@@ -94,7 +94,7 @@ struct MovePicker {
         return {};
     }
 
-    // Full descending insertion sort over [0, moves.size). Used by root search (YBWC).
+    // Full descending insertion sort over [0, moves.size). Used by the root search.
     inline void fullSort() noexcept {
         for (int i = 0; i < moves.size; ++i) finalizeSee(i); // resolve deferred SEE before sorting
         for (int i = 1; i < moves.size; ++i) {

@@ -1,15 +1,27 @@
-// HydraY NNUE v2 trainer (NNUE_PLAN.md, ciclo v2).
+// HydraY NNUE v4 trainer (HALFKA_PLAN.md: HalfKA + king bucket).
 //
-// Architecture: (768 -> 512)x2 -> 1, dual perspective, SCReLU, QA=255/QB=64 —
-// adapted from bullet's examples/simple.rs (same API, pinned bullet rev in
-// Cargo.toml). Data: bulletformat produced by `./chess datagen`.
+// Architecture: (768x4kb_hm -> 512)x2 -> 8ob — 4 mirrored king buckets on the
+// inputs (bullet ChessBucketsMirrored: feature = 768*bucket[ksq] + (feat768 ^
+// flip), flip = 7 iff file(ksq) > d), material-count output buckets as in the
+// ob cycle, SCReLU, QA=255/QB=64. Input-layer factoriser l0f (shared 768xH
+// component summed onto every bucket) — merged into l0w at save time via
+// SavedFormat::transform, so quantised.bin needs no factoriser awareness.
+// Weight clipping tightened to ±0.99 on l0w/l0f: the SAVED weight is the sum
+// of the two, and |sum| must stay <= ~1.98 for i16 quantisation at QA=255.
+// Adapted from bullet's examples/progression/3_input_buckets.rs (pinned rev).
 //
 // Usage: cargo run -r --bin trainer --features cuda -- <data.bin> [superbatches] [net_id]
 //   shakedown: ~10 superbatches; full run: ~40.
 
 use bullet_lib::{
-    game::inputs::Chess768,
-    nn::optimiser::AdamW,
+    game::{
+        inputs::{get_num_buckets, ChessBucketsMirrored},
+        outputs::MaterialCount,
+    },
+    nn::{
+        optimiser::{AdamW, AdamWParams},
+        InitSettings, Shape,
+    },
     trainer::{
         save::SavedFormat,
         schedule::{lr, wdl, TrainingSchedule, TrainingSteps},
@@ -19,9 +31,25 @@ use bullet_lib::{
 };
 
 const HIDDEN_SIZE: usize = 512;
+const OUTPUT_BUCKETS: usize = 8;
 const SCALE: i32 = 400;
 const QA: i16 = 255;
 const QB: i16 = 64;
+
+// Keep in sync with nnue/network.hpp KING_BUCKET_MAP and sanity.rs.
+// 32 entries: files a-d per rank, rank 1 first; e-h mirror onto d-a.
+#[rustfmt::skip]
+const BUCKET_LAYOUT: [usize; 32] = [
+    0, 0, 1, 1,
+    2, 2, 2, 2,
+    3, 3, 3, 3,
+    3, 3, 3, 3,
+    3, 3, 3, 3,
+    3, 3, 3, 3,
+    3, 3, 3, 3,
+    3, 3, 3, 3,
+];
+const INPUT_BUCKETS: usize = get_num_buckets(&BUCKET_LAYOUT);
 
 fn main() {
     let args: Vec<String> = std::env::args().collect();
@@ -33,30 +61,49 @@ fn main() {
     let net_id = args
         .get(3)
         .cloned()
-        .unwrap_or_else(|| "hydray-v1-shakedown".to_string());
+        .unwrap_or_else(|| "hydray-halfka-shakedown".to_string());
 
     let mut trainer = ValueTrainerBuilder::default()
         .dual_perspective()
         .optimiser(AdamW)
-        .inputs(Chess768)
+        .inputs(ChessBucketsMirrored::new(BUCKET_LAYOUT))
+        .output_buckets(MaterialCount::<OUTPUT_BUCKETS>)
         // Quantised layout consumed by sanity.rs and the engine loader:
-        // l0w (768xH col-major, QA) | l0b (H, QA) | l1w (2H, QB) | l1b (1, QA*QB)
+        // l0w (4x768 cols x H, QA, factoriser merged) | l0b (H, QA) |
+        // l1w (OBx2H, QB, transposed: each bucket contiguous) | l1b (OB, QA*QB)
         .save_format(&[
-            SavedFormat::id("l0w").round().quantise::<i16>(QA),
+            SavedFormat::id("l0w")
+                .transform(|store, weights| {
+                    let factoriser = store.get("l0f").values.f32().repeat(INPUT_BUCKETS);
+                    weights.into_iter().zip(factoriser).map(|(a, b)| a + b).collect()
+                })
+                .round()
+                .quantise::<i16>(QA),
             SavedFormat::id("l0b").round().quantise::<i16>(QA),
-            SavedFormat::id("l1w").round().quantise::<i16>(QB),
+            SavedFormat::id("l1w").round().quantise::<i16>(QB).transpose(),
             SavedFormat::id("l1b").round().quantise::<i16>(QA * QB),
         ])
         .loss_fn(|output, target| output.sigmoid().squared_error(target))
-        .build(|builder, stm_inputs, ntm_inputs| {
-            let l0 = builder.new_affine("l0", 768, HIDDEN_SIZE);
-            let l1 = builder.new_affine("l1", 2 * HIDDEN_SIZE, 1);
+        .build(|builder, stm_inputs, ntm_inputs, output_buckets| {
+            let l0f = builder.new_weights("l0f", Shape::new(HIDDEN_SIZE, 768), InitSettings::Zeroed);
+            let expanded_factoriser = l0f.repeat(INPUT_BUCKETS);
+
+            let mut l0 = builder.new_affine("l0", 768 * INPUT_BUCKETS, HIDDEN_SIZE);
+            l0.weights = l0.weights + expanded_factoriser;
+
+            let l1 = builder.new_affine("l1", 2 * HIDDEN_SIZE, OUTPUT_BUCKETS);
 
             let stm_hidden = l0.forward(stm_inputs).screlu();
             let ntm_hidden = l0.forward(ntm_inputs).screlu();
             let hidden_layer = stm_hidden.concat(ntm_hidden);
-            l1.forward(hidden_layer)
+            l1.forward(hidden_layer).select(output_buckets)
         });
+
+    // Saved l0 weight = l0w + l0f: clip both to ±0.99 so the merged value
+    // stays inside the i16-safe ±1.98 at QA=255.
+    let stricter = AdamWParams { max_weight: 0.99, min_weight: -0.99, ..Default::default() };
+    trainer.optimiser.set_params_for_weight("l0w", stricter);
+    trainer.optimiser.set_params_for_weight("l0f", stricter);
 
     let schedule = TrainingSchedule {
         net_id,
@@ -99,8 +146,11 @@ fn main() {
     for (label, fen) in [
         ("startpos (w)", "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w - - 0 1"),
         ("startpos (b)", "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR b - - 0 1"),
-        ("wN e4 extra (w)", "rnbqkbnr/pppppppp/8/8/4N3/8/PPPPPPPP/RNBQKBNR w - - 0 1"),
-        ("bN e5 extra (b) [mirror of previous]", "rnbqkbnr/pppppppp/8/4n3/8/8/PPPPPPPP/RNBQKBNR b - - 0 1"),
+        // Knight developed off b1/b8 rather than added: an extra piece leaves
+        // the side with 17 men, which bullet's FEN parser rejects with a panic
+        // that killed the whole sanity block after training had finished.
+        ("wN on e4 (w)", "rnbqkbnr/pppppppp/8/8/4N3/8/PPPPPPPP/R1BQKBNR w - - 0 1"),
+        ("bN on e5 (b) [mirror of previous]", "r1bqkbnr/pppppppp/8/4n3/8/8/PPPPPPPP/RNBQKBNR b - - 0 1"),
         ("stm up a queen (w)", "rnb1kbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w - - 0 1"),
         ("stm down a queen (w)", "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNB1KBNR w - - 0 1"),
     ] {

@@ -23,3 +23,11 @@ required-features = ["train"]
 [[bin]]
 name = "sanity"
 path = "src/bin/sanity.rs"
+
+[[bin]]
+name = "datastats"
+path = "src/bin/datastats.rs"
+
+[[bin]]
+name = "datashuffle"
+path = "src/bin/datashuffle.rs"

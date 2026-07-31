@@ -5,6 +5,7 @@
 
 #include "../../board/board.hpp"
 #include "../../tt/tt.hpp"
+#include "../eval_constants.hpp"
 #include "../movelist.hpp"
 #include "../search/search_constants.hpp"
 #include "movepicker.hpp"

@@ -30,9 +30,8 @@ public:
     // Returns empty when probe fails or position not in TB.
     std::vector<RootMove> probeRoot(const chess::Board& board) const;
 
-    // Convert a WDL result to a search score (side-to-move relative).
-    // Uses MATE_SCORE to encode wins/losses, 0/1 for draws.
-    // probeDepth: passed to skip expensive WDL probes at shallow nodes.
+    // Convert a WDL result to a search score (side-to-move relative):
+    // ply-anchored TB_WIN_SCORE/TB_LOSS_SCORE for wins/losses, 0 for draws.
     static int32_t wdlToScore(WDL wdl, int ply) noexcept;
 
     // Returns true if the position's piece count is within TB range.

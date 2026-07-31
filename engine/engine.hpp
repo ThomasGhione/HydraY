@@ -16,7 +16,6 @@
 
 #include "search/searcher.hpp"
 #include "time/time_manager.hpp"
-#include "opening/opening_book.hpp"
 #include "syzygy/syzygy.hpp"
 
 namespace engine {
@@ -81,10 +80,6 @@ public:
     static constexpr size_t MOVE_HISTORY_MAX_BYTES = MOVE_HISTORY_MAX_PLIES * MOVE_HISTORY_ENTRY_MAX_LEN;
     std::string moveHistory {};
 
-    // Opening book
-    opening::OpeningBook openingBook;
-    std::atomic<bool> openingEnabled {true};
-
     // Syzygy tablebases
     syzygy::SyzygyProber syzygyProber;
 
@@ -127,7 +122,6 @@ private:
     bool playMoveOnBoard(const chess::Move& move) noexcept;
     void clearPonderResult() noexcept;
     void clearSearchStopFlags() noexcept;
-    std::optional<chess::Move> probeOpeningBook() noexcept;
     std::optional<chess::Move> tryInstantMove(int targetDepth) noexcept;
     chess::Move commitSearchResult(const chess::Move& candidate) noexcept;
     std::unique_lock<std::mutex> acquireSearchApiLock() noexcept;

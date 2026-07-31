@@ -15,9 +15,7 @@ namespace engine {
 
 namespace {
 
-// PAWN_VALUE is a runtime-mutable eval global, so this stays a (non-constexpr)
-// local; every other search parameter lives in search_constants.hpp.
-const int32_t REPETITION_DRAW_ADVANTAGE_THRESHOLD = PAWN_VALUE / 2;
+constexpr int32_t REPETITION_DRAW_ADVANTAGE_THRESHOLD = PAWN_VALUE / 2;
 
 // Precomputed LMR reductions: LMR_TABLE[depth][moveIndex], capped at depth-3.
 // Avoids two std::log() calls per LMR candidate in the hot search loop.
@@ -47,48 +45,15 @@ static LMRTable LMR_REDUCTION_TABLE;
 void rebuildSearchDerivedTables() noexcept {
     LMR_REDUCTION_TABLE.rebuild();
     for (int d = 1; d <= 6; ++d) {
-        FUTILITY_MARGINS[0][d] = FUTILITY_MID_STEP * d;
-        FUTILITY_MARGINS[1][d] = FUTILITY_EG_BASE + FUTILITY_EG_STEP * (d - 1);
+        FUTILITY_MARGINS[d] = FUTILITY_MID_STEP * d;
     }
     for (int improving = 0; improving < 2; ++improving) {
-        for (int lateEndgame = 0; lateEndgame < 2; ++lateEndgame) {
-            for (int d = 1; d <= 4; ++d) {
-                LMP_THRESHOLDS[improving][lateEndgame][d] =
-                    LMP_BASE_THRESHOLDS[improving][lateEndgame][d]
-                    * LMP_SCALE_PCT[improving] / 100;
-            }
+        for (int d = 1; d <= 4; ++d) {
+            LMP_THRESHOLDS[improving][d] =
+                LMP_BASE_THRESHOLDS[improving][d] * LMP_SCALE_PCT[improving] / 100;
         }
     }
 }
-
-namespace {
-
-inline size_t corrHistIndex(uint64_t a, uint64_t c) noexcept {
-    const uint64_t k = a * 0x9E3779B97F4A7C15ULL + c * 0xD6E8FEB86659FD93ULL;
-    return static_cast<size_t>(k >> 48) & (PAWN_CORR_HISTORY_SIZE - 1);
-}
-
-inline size_t pawnCorrIndex(const chess::Board& b) noexcept {
-    return corrHistIndex(b.pawns_bb[0], b.pawns_bb[1]);
-}
-inline size_t minorCorrIndex(const chess::Board& b) noexcept {
-    return corrHistIndex(b.knights_bb[0] | b.bishops_bb[0],
-                         b.knights_bb[1] | b.bishops_bb[1]);
-}
-inline size_t majorCorrIndex(const chess::Board& b) noexcept {
-    return corrHistIndex(b.rooks_bb[0] | b.queens_bb[0],
-                         b.rooks_bb[1] | b.queens_bb[1]);
-}
-
-inline int32_t evalCorrection(const SearchRuntime& runtime, const chess::Board& b) noexcept {
-    const int side = chess::Board::colorToIndex(b.getActiveColor());
-    const int32_t c = runtime.pawnCorrHist[side][pawnCorrIndex(b)]  / CORR_HIST_DIVISOR
-                    + runtime.minorCorrHist[side][minorCorrIndex(b)] / CORR_HIST_DIVISOR
-                    + runtime.majorCorrHist[side][majorCorrIndex(b)] / CORR_HIST_DIVISOR;
-    return std::clamp(c, -CORR_TOTAL_CAP, CORR_TOTAL_CAP);
-}
-
-} // namespace
 
 
 constexpr int32_t Searcher::saturatingAdd32(int32_t lhs, int32_t rhs) noexcept {
@@ -176,16 +141,19 @@ bool Searcher::checkDrawTerminalConditions(
     int32_t& outScore,
     bool atRoot) noexcept {
     // A repetition needs at least 4 reversible plies (each side out and back;
-    // null moves preserve side-to-move parity so they cannot shorten the cycle),
-    // so the O(historySize) scan is skipped below that threshold. In quiescence
-    // nearly every move is a capture/promotion that resets the clock, so this
-    // guard removes the scan from most of the tree.
+    // this guard removes the scan from most of the tree.
     if (b.getHalfMoveClock() >= 4) {
         const int repCount = b.countRepetitions();
 
-        // Third repetition: forced draw — apply full contempt penalty.
+        // Third repetition: forced draw, apply full contempt penalty.
         if (repCount >= 3) {
-            outScore = repetitionDrawScore(b);
+            // Modest fixed contempt below: enough that the engine prefers to
+            // keep playing when winning, but smaller than any meaningful
+            // material amount so it won't trade a piece to avoid the draw.
+            const int32_t staticEval = Evaluator::evaluate(b);
+            outScore = (std::abs(staticEval) <= REPETITION_DRAW_ADVANTAGE_THRESHOLD)
+                ? 0
+                : (staticEval > 0 ? -REPETITION_CONTEMPT : REPETITION_CONTEMPT);
             return true;
         }
 
@@ -195,7 +163,7 @@ bool Searcher::checkDrawTerminalConditions(
         //
         // This is an INTERIOR-NODE heuristic only. At the root the current position
         // is not a draw under FIDE rules until it actually occurs a third time, so
-        // returning here would abandon the search and play moves[0] — a random legal
+        // returning here would abandon the search and play moves[0] - a random legal
         // move that, as observed, can hang the queen. At the root we must search.
         if (!atRoot && repCount >= 2) {
             outScore = 0;
@@ -216,49 +184,6 @@ bool Searcher::checkDrawTerminalConditions(
     return false;
 }
 
-
-int32_t Searcher::stalemateScoreFromMaterialDelta(int32_t matDelta) noexcept {
-    if (std::abs(matDelta) <= STALEMATE_MATERIAL_THRESHOLD) return 0;
-    const int32_t advantage = std::abs(matDelta);
-    const int32_t scaledPenalty =
-        STALEMATE_DRAW_PENALTY_MINOR + (advantage - STALEMATE_MATERIAL_THRESHOLD) / 2;
-    const int32_t stalematePenalty = std::clamp<int32_t>(
-        scaledPenalty, STALEMATE_DRAW_PENALTY_MINOR, STALEMATE_DRAW_PENALTY_MAJOR);
-    return (matDelta > 0) ? -stalematePenalty : stalematePenalty;
-}
-
-bool Searcher::tryStalemateScore(const chess::Board& b, const SearchNodeState& node, int32_t& outScore) noexcept {
-    if (b.hasAnyLegalMove(node.activeColor)) return false;
-    const int32_t md = b.getIncrementalMaterialDelta();
-    outScore = stalemateScoreFromMaterialDelta((node.activeColor == chess::Board::WHITE) ? md : -md);
-    return true;
-}
-
-int32_t Searcher::drawAdvantageScore(const chess::Board& b) noexcept {
-    // Negamax: make the white-centric material delta side-to-move relative;
-    // Evaluator::evaluate() is already STM-relative.
-    const int32_t mdWhite = b.getIncrementalMaterialDelta();
-    const int32_t materialDelta =
-        (b.getActiveColor() == chess::Board::WHITE) ? mdWhite : -mdWhite;
-    const int32_t staticEval = Evaluator::evaluate(b);
-    const int64_t blendedScore =
-        static_cast<int64_t>(materialDelta) * DRAW_SCORE_MATERIAL_WEIGHT_PERCENT
-        + static_cast<int64_t>(staticEval) * DRAW_SCORE_EVAL_WEIGHT_PERCENT;
-
-    return static_cast<int32_t>(std::clamp<int64_t>(blendedScore / DRAW_SCORE_WEIGHT_DENOMINATOR, NEG_INF, POS_INF));
-}
-
-int32_t Searcher::repetitionDrawScore(const chess::Board& b) noexcept {
-    const int32_t drawDelta = drawAdvantageScore(b);
-    if (std::abs(drawDelta) <= REPETITION_DRAW_ADVANTAGE_THRESHOLD) {
-        return 0;
-    }
-
-    // Modest fixed contempt: enough that the engine prefers to keep playing
-    // when winning, but smaller than any meaningful material amount so it
-    // won't trade a piece just to avoid the repetition.
-    return (drawDelta > 0) ? -REPETITION_CONTEMPT : REPETITION_CONTEMPT;
-}
 
 void Searcher::updateMinMax(
     int32_t score,
@@ -286,7 +211,10 @@ struct HelperSlot {
     chess::Board board;
     std::atomic<bool> interrupted{false};
 
-    HelperSlot() noexcept { runtime.searchInterrupted = &interrupted; }
+    HelperSlot() noexcept {
+        runtime.searchInterrupted = &interrupted;
+        runtime.isHelper = true;
+    }
 };
 
 std::vector<std::unique_ptr<HelperSlot>> helperSlots;
@@ -297,9 +225,7 @@ chess::Move Searcher::searchBestMove(
     chess::Board& board,
     SearchRuntime& runtime,
     int requestedDepth) noexcept {
-    const int targetDepth = (requestedDepth == 0)
-        ? DEFAULT_DEPTH
-        : requestedDepth;
+    const int targetDepth = (requestedDepth == 0) ? DEFAULT_DEPTH : requestedDepth;
 
     runtime.clearInterrupted();
 
@@ -310,8 +236,8 @@ chess::Move Searcher::searchBestMove(
     runtime.softResetHistory();
 
     // Lazy SMP: helpers run their own full iterative deepening on private
-    // Boards and runtimes, sharing only the TT — and through it move ordering
-    // and cutoff knowledge — with the main thread. Odd helpers start one ply
+    // Boards and runtimes, sharing only the TT, and through it move ordering
+    // and cutoff knowledge, with the main thread. Odd helpers start one ply
     // deeper so the pack doesn't lockstep over identical trees. The main
     // thread's result is authoritative; helpers stop the moment it returns.
     const int helperCount = std::clamp(runtime.maxThreads - 1, 0, MAX_HELPER_THREADS);
@@ -364,7 +290,6 @@ int32_t Searcher::searchRootMoveScore(
     SearchRuntime& runtime,
     int32_t alpha,
     int32_t beta,
-    bool allowTTWrite,
     bool allowHeuristicUpdates,
     uint64_t* nodeCounter) noexcept {
     chess::Board::MoveState state;
@@ -373,7 +298,7 @@ int32_t Searcher::searchRootMoveScore(
     const int childDepth = std::max(0, runtime.depth - 1);
     const int32_t score = -searchPosition(
         b, runtime, childDepth, -beta, -alpha, 1,
-        allowTTWrite, allowHeuristicUpdates, nullptr, nodeCounter);
+        allowHeuristicUpdates, nullptr, nodeCounter);
     b.undoMove(m, state);
     return score;
 }
@@ -386,7 +311,6 @@ bool Searcher::tryNullMovePruning(
     int32_t alpha,
     int32_t beta,
     int ply,
-    bool allowTTWrite,
     bool allowHeuristicUpdates,
     uint64_t* nodeCounter,
     int32_t& outScore) noexcept {
@@ -402,7 +326,7 @@ bool Searcher::tryNullMovePruning(
     // Negamax: after the null move it is the opponent to move.
     const int32_t nullScore = -searchPosition(
         b, runtime, depth - reduction, -beta, -alpha, ply + 1,
-        allowTTWrite, allowHeuristicUpdates, nullptr, nodeCounter, false);
+        allowHeuristicUpdates, nullptr, nodeCounter, false);
 
     b.undoNullMove(nullState);
 
@@ -415,16 +339,12 @@ bool Searcher::tryNullMovePruning(
         // Verification re-search of THIS node (same side to move): no negation.
         const int32_t verifyScore = searchPosition(
             b, runtime, depth - reduction, alpha, beta, ply,
-            allowTTWrite, allowHeuristicUpdates, nullptr, nodeCounter, false);
+            allowHeuristicUpdates, nullptr, nodeCounter, false);
         confirmedCutoff = isBetaCutoff(verifyScore, beta);
     }
 
     if (!confirmedCutoff) {
         return false;
-    }
-
-    if (tryStalemateScore(b, node, outScore)) {
-        return true;
     }
 
     // Fail-soft: return the null-search score (a heuristic lower bound), but
@@ -434,13 +354,12 @@ bool Searcher::tryNullMovePruning(
 }
 
 bool Searcher::tryReverseFutilityPruning(
-    const chess::Board& b,
     const SearchNodeState& node,
     int depth,
     int32_t beta,
     int32_t& outScore) noexcept {
     // Precondition (guaranteed by the only caller's canReverseFutilityPrune):
-    // !isPVNode && !inCheck && !isPawnEndgameForPruning && ply > 0 && depth <= 3.
+    // !isPVNode && !inCheck && ply > 0 && depth <= 3.
 
     // Negamax: staticEval is side-to-move relative; fail high if it beats
     // beta even after subtracting the margin.
@@ -448,10 +367,6 @@ bool Searcher::tryReverseFutilityPruning(
     const int32_t rfpScore = node.staticEval - rfpMargin;
     if (!isBetaCutoff(rfpScore, beta)) {
         return false;
-    }
-
-    if (tryStalemateScore(b, node, outScore)) {
-        return true;
     }
 
     outScore = node.staticEval;
@@ -517,8 +432,7 @@ Searcher::SearchMoveResult Searcher::searchMoves(
     int32_t alpha,
     int32_t beta,
     SearchRuntime& runtime,
-    bool allowHeuristicUpdates,
-    bool allowTTWrite) noexcept {
+    bool allowHeuristicUpdates) noexcept {
     int32_t best = NEG_INF;
     chess::Move bestMove{};
     bool searchedAnyMove = false;
@@ -533,16 +447,14 @@ Searcher::SearchMoveResult Searcher::searchMoves(
     CaptureEntry searchedCaptures[MAX_CAPTURES_TRACKED];
     int numSearchedCaptures = 0;
 
-    const int nonPawnMajorsForLMR = b.getIncrementalNonPawnMajorCount();
-    const bool isLateEndgame = (nonPawnMajorsForLMR <= 5);
+    // Interior non-PV node past the root: shared gate for futility, LMP, history pruning and SEE capture pruning below.
+    const bool interiorNonPv = !ctx.isPVNode && !ctx.inCheck && ctx.ply > 0;
 
-    const bool canFutilityPrune =
-        !ctx.isPVNode && !ctx.inCheck && ctx.ply > 0 && ctx.depth >= 1 && ctx.depth <= 6 && !ctx.improving;
-    const int32_t futilityMargin = canFutilityPrune ? FUTILITY_MARGINS[isLateEndgame][ctx.depth] : 0;
+    const bool canFutilityPrune = interiorNonPv && ctx.depth >= 1 && ctx.depth <= 6;
+    const int32_t futilityMargin = canFutilityPrune ? FUTILITY_MARGINS[ctx.depth] : 0;
 
-    const bool canLMP =
-        !ctx.isPVNode && !ctx.inCheck && ctx.ply > 0 && ctx.depth >= 1 && ctx.depth <= 4;
-    const int lmpThreshold = canLMP ? LMP_THRESHOLDS[ctx.improving][isLateEndgame][ctx.depth] : 999;
+    const bool canLMP = interiorNonPv && ctx.depth >= 1 && ctx.depth <= 4;
+    const int lmpThreshold = canLMP ? LMP_THRESHOLDS[ctx.improving][ctx.depth] : 999;
 
     const int usSide = chess::Board::colorToIndex(ctx.activeColor);
     const int oppKingSq = std::countr_zero(b.kings_bb[usSide ^ 1]);
@@ -593,8 +505,7 @@ Searcher::SearchMoveResult Searcher::searchMoves(
 
         // History-based quiet pruning: skip late quiet moves with very negative
         // history at low depth — they reliably fail to improve alpha.
-        if (isQuietMove && !ctx.isPVNode && !ctx.inCheck && ctx.ply > 0
-            && ctx.depth >= 1 && ctx.depth <= 3 && moveIndex > 0) {
+        if (isQuietMove && interiorNonPv && ctx.depth >= 1 && ctx.depth <= 3 && moveIndex > 0) {
             const int32_t histScore = runtime.history[usSide][m.from][m.to];
             if (histScore < HISTORY_PRUNE_THRESHOLD[ctx.depth]) {
                 continue;
@@ -604,8 +515,7 @@ Searcher::SearchMoveResult Searcher::searchMoves(
         // SEE pruning: skip clearly losing captures at shallow non-PV nodes.
         // Move 0 (a winning or hash capture) is always searched; the margin
         // scales with depth so deeper nodes tolerate slightly worse trades.
-        if (wasCapture && !isPromotionCandidate && moveIndex > 0
-            && !ctx.isPVNode && !ctx.inCheck && ctx.ply > 0 && ctx.depth <= 3
+        if (wasCapture && !isPromotionCandidate && moveIndex > 0 && interiorNonPv && ctx.depth <= 3
             && Sorter::staticExchangeEvaluation(b, m) < -SEE_CAPTURE_MARGIN * ctx.depth) {
             continue;
         }
@@ -625,19 +535,13 @@ Searcher::SearchMoveResult Searcher::searchMoves(
             && !isPromotionCandidate;
 
         const bool forcingCandidate = (wasCapture || isPromotionCandidate || moveIndex < 3);
-        const bool needsCheckInfo =
-            (ctx.depth >= 2 && ctx.depth <= 4 && forcingCandidate) || lmrStructuralCandidate;
+        const bool needsCheckInfo = ctx.depth >= 2 && ctx.depth <= 4 && forcingCandidate;
         const bool givesCheck = needsCheckInfo ? b.inCheck(oppColor) : false;
 
         const bool shouldCheckExtend = givesCheck && forcingCandidate && ctx.depth >= 2 && ctx.depth <= 4;
         const int childDepth = ctx.depth - 1 + (shouldCheckExtend ? 1 : 0)
                              + (isFirstMove ? ctx.singularExtension : 0);
-        const auto& km0 = runtime.killerMoves[ctx.ply][0];
-        const auto& km1 = runtime.killerMoves[ctx.ply][1];
-        const bool isKiller = m.sameFromTo(km0) || m.sameFromTo(km1);
-        const bool canReduce = lmrStructuralCandidate
-                           && !givesCheck
-                           && !isKiller;
+        const bool canReduce = lmrStructuralCandidate;
 
         // Negamax PVS scout window: full [alpha,beta] for the first move,
         // null window [alpha, alpha+1] for the rest.
@@ -672,15 +576,15 @@ Searcher::SearchMoveResult Searcher::searchMoves(
 
             const int reducedDepth = std::max(1, childDepth - reduction);
             score = -searchPosition(b, runtime, reducedDepth, -scoutBeta, -scoutAlpha, ctx.ply + 1,
-                                    allowTTWrite, allowHeuristicUpdates, &m, ctx.nodeCounter);
+                                    allowHeuristicUpdates, &m, ctx.nodeCounter);
 
             if (shouldResearchPVS(score, scoutAlpha)) {
                 score = -searchPosition(b, runtime, childDepth, -scoutBeta, -scoutAlpha, ctx.ply + 1,
-                                        allowTTWrite, allowHeuristicUpdates, &m, ctx.nodeCounter);
+                                        allowHeuristicUpdates, &m, ctx.nodeCounter);
             }
         } else { // can't reduce, regular PVS search
             score = -searchPosition(b, runtime, childDepth, -scoutBeta, -scoutAlpha, ctx.ply + 1,
-                                    allowTTWrite, allowHeuristicUpdates, &m, ctx.nodeCounter);
+                                    allowHeuristicUpdates, &m, ctx.nodeCounter);
         }
 
         // Wide-window PV re-search, shared by both paths above. It only carries
@@ -690,7 +594,7 @@ Searcher::SearchMoveResult Searcher::searchMoves(
         // duplicate node. (In the reduce path !isFirstMove always holds.)
         if (ctx.isPVNode && !isFirstMove && shouldResearchPVS(score, scoutAlpha)) {
             score = -searchPosition(b, runtime, childDepth, -beta, -alpha, ctx.ply + 1,
-                                    allowTTWrite, allowHeuristicUpdates, &m, ctx.nodeCounter);
+                                    allowHeuristicUpdates, &m, ctx.nodeCounter);
         }
 
         b.undoMove(m, state);
@@ -760,7 +664,6 @@ int32_t Searcher::searchPosition(
     int32_t alpha,
     int32_t beta,
     int ply,
-    bool allowTTWrite,
     bool allowHeuristicUpdates,
     const chess::Move* previousMove,
     uint64_t* nodeCounter,
@@ -782,14 +685,15 @@ int32_t Searcher::searchPosition(
     }
 
     // Actual draw terminals must be recognized before qsearch. Otherwise a
-    // horizon node that completes a repetition is scored by static material.
+    // horizon node that completes a repetition is scored by the static eval
+    // instead of as a draw.
     int32_t drawScore = 0;
     if (checkDrawTerminalConditions(b, drawScore)) {
         return drawScore;
     }
 
     if (depth <= 0) {
-        return quiescenceSearch(b, runtime, alpha, beta, ply, counter, allowTTWrite);
+        return quiescenceSearch(b, runtime, alpha, beta, ply, counter);
     }
 
     // TB WDL probe (in-search): only return Draw as exact. Returning Win or
@@ -851,8 +755,6 @@ int32_t Searcher::searchPosition(
     const uint64_t checkers = b.checkersTo(node.activeColor);
     node.inCheck = (checkers != 0ULL);
     node.isPVNode = isPVNode;
-    node.isPawnEndgameForPruning =
-        ((b.pawns_bb[0] | b.pawns_bb[1]) != 0ULL) && (b.getIncrementalNonPawnMajorCount() <= 4);
 
     // Compute static eval at every ply (including the root) so that the
     // `improving` heuristic can compare evalStack[ply-2] vs current eval
@@ -871,7 +773,7 @@ int32_t Searcher::searchPosition(
             }
         }
         // Nudge the static eval by the learned correction-history signal.
-        node.staticEval = std::clamp(node.staticEval + evalCorrection(runtime, b),
+        node.staticEval = std::clamp(node.staticEval + runtime.corrHist.correction(b),
                                      -MATE_BOUND + 1, MATE_BOUND - 1);
     }
 
@@ -909,12 +811,12 @@ int32_t Searcher::searchPosition(
             const int32_t ttSeScore = scoreFromTT(tte.score, ply);
             const int32_t seBeta = ttSeScore - SE_BETA_MARGIN * depth;
 
-            // allowTTWrite stays on for the probe's DESCENDANTS (normal
-            // positions the main search revisits right after); only this
-            // node's own store is suppressed, via hasExcludedMove.
+            // The probe's DESCENDANTS store normally (they are ordinary
+            // positions the main search revisits right after); only this node's
+            // own store is suppressed, and seExcluded below is what does it.
             const int32_t seScore = searchPosition(
                 b, runtime, depth / 2 - 1, seBeta - 1, seBeta, ply,
-                allowTTWrite, allowHeuristicUpdates,
+                allowHeuristicUpdates,
                 previousMove, counter, false, seExcluded);
 
             if (seScore < seBeta - SE_DOUBLE_MARGIN) {
@@ -927,35 +829,31 @@ int32_t Searcher::searchPosition(
         }
     }
 
+    // Interior non-PV node past the root: shared gate for NMP, reverse futility and probcut.
+    const bool interiorNonPv = !node.isPVNode && !node.inCheck && ply > 0;
+
     // Negamax NMP gate: allow a null move when the static eval is within
     // ~100cp of beta (giving the opponent a free move likely still fails high).
     const int32_t nmpEvalGate = node.staticEval + 100;
-    const bool canNullMove = allowNullMove
-        && !node.isPVNode
-        && !node.inCheck
-        && ply > 0
-        && depth >= 4
-        && nonPawnMajors >= 2
-        && isBetaCutoff(nmpEvalGate, beta);
+    const bool canNullMove = allowNullMove && interiorNonPv
+        && depth >= 4 && nonPawnMajors >= 2 && isBetaCutoff(nmpEvalGate, beta);
 
     if (canNullMove
         && tryNullMovePruning(b, node, runtime, depth, alpha, beta, ply,
-                              allowTTWrite, allowHeuristicUpdates,
+                              allowHeuristicUpdates,
                               counter, score)) {
         return score;
     }
 
-    const bool canReverseFutilityPrune =
-        !node.isPVNode && !node.inCheck && !node.isPawnEndgameForPruning && ply > 0 && depth <= 3;
-    if (canReverseFutilityPrune
-        && tryReverseFutilityPruning(b, node, depth, beta, score)) {
+    if (interiorNonPv && depth <= 3
+        && tryReverseFutilityPruning(node, depth, beta, score)) {
         return score;
     }
 
     // Probcut (negamax): if a winning capture, searched shallow with a null
     // window above beta+margin, still beats beta+margin, this node likely
     // fails high. SEE is side-to-move relative so the filter is one-sided.
-    if (!node.isPVNode && !node.inCheck && depth >= PROBCUT_MIN_DEPTH && ply > 0
+    if (interiorNonPv && depth >= PROBCUT_MIN_DEPTH
         && std::abs(beta) < POS_INF - 1000) {
         const int32_t probcutBound = saturatingAdd32(beta, PROBCUT_MARGIN);
         const int32_t pcAlpha = probcutBound - 1;
@@ -969,7 +867,7 @@ int32_t Searcher::searchPosition(
             b.doMove(mc, pcState);
             // Negamax child: negate result and swap/negate the scout window.
             const int32_t pcScore = -searchPosition(b, runtime, depth - 4, -pcBeta, -pcAlpha,
-                ply + 1, allowTTWrite, false, &mc, counter, false);
+                ply + 1, false, &mc, counter, false);
             b.undoMove(mc, pcState);
             if (pcScore >= probcutBound) return beta;
         }
@@ -991,10 +889,9 @@ int32_t Searcher::searchPosition(
         ? engine::MoveGenerator::generateLegalEvasions(b, checkers)
         : engine::MoveGenerator::generateLegalMoves(b, /*knownNotInCheck=*/true);
     if (moves.is_empty()) {
-        const int32_t mdW = b.getIncrementalMaterialDelta();
         return node.inCheck
             ? (NEG_INF + ply)  // side to move is checkmated (negamax)
-            : stalemateScoreFromMaterialDelta((node.activeColor == chess::Board::WHITE) ? mdW : -mdW);
+            : 0;               // stalemate
     }
 
     bool hasHashMove = false;
@@ -1015,35 +912,28 @@ int32_t Searcher::searchPosition(
     }
 
     SearchMoveResult result = searchMoves(
-        b, movePicker, ctx, alpha, beta, runtime, allowHeuristicUpdates, allowTTWrite);
+        b, movePicker, ctx, alpha, beta, runtime, allowHeuristicUpdates);
     const int32_t best = result.score;
 
     if (runtime.isInterrupted()) {
         return Evaluator::evaluate(b);
     }
 
-    // Pawn correction history: learn the (search - corrected static eval) residual,
+    // Correction history: learn the (search - corrected static eval) residual,
     // but only from TRUSTWORTHY nodes — deep enough, quiet best move, non-mate, and
     // the search must genuinely contradict the static eval rather than merely confirm
-    // a cutoff bound. Deeper nodes weigh more; shallow noise is suppressed.
+    // a cutoff bound.
     const bool corrLearn = (best > node.staticEval)
                         || (best < node.staticEval && best < beta);
     if (corrLearn && !node.inCheck && !hasExcludedMove && depth >= 3
         && std::abs(best) < MATE_BOUND && chess::isValidSquare(result.move.from)
         && (b.get(result.move.to) & chess::Board::MASK_PIECE_TYPE) == chess::Board::EMPTY) {
-        const int32_t residual = std::clamp(best - node.staticEval, -CORR_HIST_LIMIT, CORR_HIST_LIMIT);
-        const int w = std::min(depth, CORR_HIST_MAX_W);
-        auto blendCorr = [&](int16_t& cell) noexcept {
-            cell = static_cast<int16_t>((cell * (CORR_HIST_BLEND - w) + residual * w) / CORR_HIST_BLEND);
-        };
-        blendCorr(runtime.pawnCorrHist[side][pawnCorrIndex(b)]);
-        blendCorr(runtime.minorCorrHist[side][minorCorrIndex(b)]);
-        blendCorr(runtime.majorCorrHist[side][majorCorrIndex(b)]);
+        runtime.corrHist.update(b, best, node.staticEval, depth);
     }
 
     // hasExcludedMove suppresses only THIS node's store (its score reflects a
     // reduced move set under the same key); descendants store normally.
-    if (canUseTT && allowTTWrite && !hasExcludedMove) {
+    if (canUseTT && !hasExcludedMove) {
         runtime.transpositionTable->store(
             hashKey, static_cast<uint8_t>(ctx.depth),
             scoreToTT(best, ctx.ply),
@@ -1060,8 +950,7 @@ int32_t Searcher::quiescenceSearch(
     int32_t alpha,
     int32_t beta,
     int ply,
-    uint64_t* nodeCounter,
-    bool allowTTWrite) noexcept {
+    uint64_t* nodeCounter) noexcept {
     uint64_t* counter = (nodeCounter != nullptr) ? nodeCounter : &runtime.nodesSearched;
     int32_t earlyScore = 0;
     if (enterNode(b, runtime, ply, counter, earlyScore)) return earlyScore;
@@ -1081,7 +970,6 @@ int32_t Searcher::quiescenceSearch(
     }
 
     const uint8_t activeColor = b.getActiveColor();
-    const bool usIsWhite = (activeColor == chess::Board::WHITE);
     const uint64_t checkers = b.checkersTo(activeColor);
     const bool inCheck = (checkers != 0ULL);
 
@@ -1106,11 +994,11 @@ int32_t Searcher::quiescenceSearch(
         }
         best = NEG_INF;
     } else {
-        const int32_t standPat = Evaluator::evaluate(b) + evalCorrection(runtime, b);
+        const int32_t standPat = Evaluator::evaluate(b) + runtime.corrHist.correction(b);
         if (isBetaCutoff(standPat, beta)) {
             // Bound-only store (bestMove 0 preserves any stored move): sibling
             // qsearch nodes can then cut on this stand-pat without re-evaluating.
-            if (canUseTT && allowTTWrite) {
+            if (canUseTT) {
                 runtime.transpositionTable->store(
                     b.getHash(), 0, scoreToTT(standPat, ply), TT::Entry::LOWERBOUND);
             }
@@ -1118,36 +1006,7 @@ int32_t Searcher::quiescenceSearch(
         }
         updateBound(standPat, alpha);
 
-        const int32_t EARLY_DELTA_MARGIN = QUEEN_VALUE + 50;
-        if (shouldDeltaPrune(standPat, EARLY_DELTA_MARGIN, alpha)) {
-            return alpha; // negamax delta-prune fail-low
-        }
-
-        int32_t deltaMargin = QUEEN_VALUE;
-        const int side = chess::Board::colorToIndex(activeColor);
-        const uint64_t ourPawns = b.pawns_bb[side];
-        
-        const uint64_t nearPromoPawns = usIsWhite
-            ? (ourPawns & WHITE_NEAR_PROMO_PAWNS)
-            : (ourPawns & BLACK_NEAR_PROMO_PAWNS);
-        if (nearPromoPawns) {
-            deltaMargin += QSEARCH_PAWN_PROMO_DELTA;
-        }
-
-        // standPat is already side-to-move relative (negamax eval).
-        if (standPat < QSEARCH_MATERIAL_BAD) {
-            deltaMargin += QSEARCH_MATERIAL_BAD_DELTA;
-        } else if (standPat < QSEARCH_MATERIAL_WORSE) {
-            deltaMargin += QSEARCH_MATERIAL_WORSE_DELTA;
-        }
-
-        const int qsearchDepth = std::max(0, ply - runtime.depth);
-        if (qsearchDepth > QSEARCH_DEPTH_REDUCTION_THRESHOLD) {
-            deltaMargin -= QSEARCH_DEPTH_REDUCTION_PER_5 * ((qsearchDepth - QSEARCH_DEPTH_REDUCTION_THRESHOLD) / 5);
-            deltaMargin = std::max(deltaMargin, QSEARCH_DELTAMARGIN_MIN);
-        }
-
-        if (shouldDeltaPrune(standPat, deltaMargin, alpha)) {
+        if (shouldDeltaPrune(standPat, QSEARCH_DELTA_MARGIN, alpha)) {
             return alpha; // negamax delta-prune fail-low
         }
 
@@ -1174,7 +1033,7 @@ int32_t Searcher::quiescenceSearch(
             runtime.transpositionTable->prefetch(b.getHash());
         }
         // Negamax: child is opponent to move -> negate + swap/negate window.
-        const int32_t score = -quiescenceSearch(b, runtime, -beta, -alpha, ply + 1, counter, allowTTWrite);
+        const int32_t score = -quiescenceSearch(b, runtime, -beta, -alpha, ply + 1, counter);
         b.undoMove(m, state);
 
         if (isBetter(score, best)) {
@@ -1187,7 +1046,7 @@ int32_t Searcher::quiescenceSearch(
         }
     }
 
-    if (!inCheck && canUseTT && allowTTWrite) {
+    if (!inCheck && canUseTT) {
         runtime.transpositionTable->store(
             b.getHash(), 0, scoreToTT(best, ply),
             static_cast<uint8_t>(determineFlag(best, alphaOrig, beta)));
@@ -1223,6 +1082,10 @@ chess::Move Searcher::getBestMove(
 
     const MoveList& rootMoves = orderedRootMoves.moves;
 
+    const auto scoreMove = [&](const chess::Move& mv, int32_t a, int32_t b) {
+        return searchRootMoveScore(rootBoard, mv, runtime, a, b, true, &localNodes);
+    };
+
     // Plain PVS root loop: full window for the first move, null-window scout
     // plus research for the rest. Parallelism lives in searchBestMove (Lazy
     // SMP helper threads run their own iterative deepening over a shared TT).
@@ -1237,13 +1100,10 @@ chess::Move Searcher::getBestMove(
 
         int32_t score;
         if (isFirst) {
-            score = searchRootMoveScore(rootBoard, m, runtime, alpha, beta, true, true, &localNodes);
+            score = scoreMove(m, alpha, beta);
         } else {
-            const int32_t nullBeta = saturatingAdd32(alpha, 1);
-            score = searchRootMoveScore(rootBoard, m, runtime, alpha, nullBeta, true, true, &localNodes);
-            if (shouldResearchPVS(score, alpha)) {
-                score = searchRootMoveScore(rootBoard, m, runtime, alpha, beta, true, true, &localNodes);
-            }
+            score = scoreMove(m, alpha, saturatingAdd32(alpha, 1));
+            if (shouldResearchPVS(score, alpha)) score = scoreMove(m, alpha, beta);
         }
 
         searchedAnyMove = true;
@@ -1389,7 +1249,12 @@ Searcher::IterativeSearchResult Searcher::runIterativeDeepening(
     // Sanity check: only play the TB move if it appears in HydraY's own
     // legal-move list. If somehow it doesn't (encoding mismatch, etc.),
     // skip the TB branch and let the normal search take over.
-    if (runtime.syzygyProber != nullptr && runtime.syzygyProber->isLoaded()
+    // Helpers skip the whole block: tb_probe_root is main-thread-only in
+    // Fathom, and a helper printing the info line below would interleave
+    // with the main thread's output and corrupt the UCI stream (seen live:
+    // a mangled `bestmove` hung lichess-bot in a tablebase-won endgame).
+    if (!runtime.isHelper
+        && runtime.syzygyProber != nullptr && runtime.syzygyProber->isLoaded()
         && runtime.syzygyProber->inTBRange(rootBoard)) {
         const auto tbMoves = runtime.syzygyProber->probeRoot(rootBoard);
         if (!tbMoves.empty()) {
@@ -1411,9 +1276,12 @@ Searcher::IterativeSearchResult Searcher::runIterativeDeepening(
                 result.bestMove  = tbBest;
                 result.bestScore = tbScore;
                 runtime.eval     = tbScore;
-                std::cout << "info depth 1 score cp " << tbScore
-                          << " tbrank " << bestRank
-                          << " pv " << tbBest.toUCIString() << "\n";
+                if (runtime.emitUciInfo) {
+                    std::cout << "info depth 1 score cp " << tbScore
+                              << " tbrank " << bestRank
+                              << " pv " << tbBest.toUCIString() << "\n";
+                    std::cout.flush();
+                }
                 return result;
             }
             // Fall through to search if the TB move isn't legal in our move list.

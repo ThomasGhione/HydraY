@@ -1,3 +1,0 @@
-samples\resourceLeak\bad.c:8:5: error: Resource leak: a [resourceLeak]
-    return 0;
-    ^

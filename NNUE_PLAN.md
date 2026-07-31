@@ -53,7 +53,10 @@ SPRT prima del merge. Obiettivo: 3000 Elo.
 - [x] SPRT vs 2.0.0 (binario ricongelato dal tag — il vecchio chess_baseline
       era un 1.3.0 stantio): in corso, **+41 a metà run**, trend H1.
       Log: `tuning/sprt_v2.log`.
-- [ ] Gauntlet assoluto **ancorato su 2.0.0** (1.2.0/1.3.0 sono saturi).
+- [x] Gauntlet assoluto **ancorato su 2.0.0** (1.2.0/1.3.0 sono saturi):
+      **2.1.0 = 3055 ±18** (1000 game TC 4+0.04, 2026-07-10). Nuova scala:
+      2.0.0 = 3000 fisso (agganciata via SPRT +662 vs HCE≈1.3.0≈2366);
+      la vecchia scala 1.2.0=2000 resta valida per i tag pre-2.0.0.
 - [x] Release 2.1.0 (tag su main, 2026-07-09), uci.cpp → 2.1.0.
 
 ---
@@ -70,11 +73,10 @@ In ordine di valore atteso; nessuno è bloccante per il ciclo v2:
       `[tbPath]` (default `engine/syzygy/files`); senza TB si disattiva da sola
       (il banner dice quale modalità è attiva); progress riporta `tb-adj`.
       ⚠️ I TB NON sono in git (939 MB): copiarli a mano sulle altre macchine.
-- [ ] **Nodi per mossa**: 8000 è il compromesso attuale. Con la v1 l'eval è
-      più forte a parità di nodi; salire a 10-12k migliora le etichette a
-      costo di ~25-40% di velocità. Da provare su UNA macchina e confrontare
-      (due dataset piccoli, due reti shakedown, SPRT) — non cambiarlo alla
-      cieca su tutte.
+- [x] **Nodi per mossa: RISOLTO 2026-07-11, si resta a 8000.** Il test da
+      manuale (parità di wall-clock, due shakedown, SPRT) ha dato 12k = −85
+      ±23 vs 8k: il −37% di posizioni non è ripagato dalle etichette
+      migliori. Dettagli nel Ciclo v3.
 - [ ] **Diversità aperture**: oggi 8-9 ply casuali con filtro |eval| ≤ 400.
       Alternativa: seed dal book `books/openings.pgn` + 2-4 ply casuali.
       Valore incerto, misurarlo solo se v2 mostra segni di overfitting
@@ -84,8 +86,43 @@ In ordine di valore atteso; nessuno è bloccante per il ciclo v2:
 
 ## Ciclo v3+ (dopo la v2)
 
-- [ ] **Datagen v3** con la rete v2 (loop di rinforzo, ormai standard).
-- [ ] **Architettura HalfKAv2 + king bucket** (input dipendenti dal re):
+- [x] **Output bucket (8, material-count)** — FATTO 2026-07-10, branch
+      `output-buckets` (13fd952 codice + 61e7ab3 rete): (768→512)x2→8,
+      bucket = (popcount(occ)−2)/4, l1w trasposto, cross-check C++≡sanity.rs
+      esatto. Rete `hydray-v3-ob512` (Colab 40 SB su dataset v2 366M):
+      startpos +39, **SPRT vs 2.1.0: +22,7 ±10,3 (nElo 29), LOS 100%, H1
+      @ 2710 game**. Nuovo baseline bench6: **5.230.424 @ d12**.
+      ⚠️ Scoperto bug LATENTE preesistente: ~0,1-0,2% di partite a TC 4+0.04
+      finiscono in 'connection stalls' (anche nello SPRT v2: 4+5 crash sui
+      DUE lati); non riproducibile in replay singolo — caccia dedicata da fare.
+- [x] **Datagen v3 COMPLETO 2026-07-14: 464.480.686 posizioni** (target 300M
+      superato), etichette ob, 8k nodi, 4 sorgenti: portatile2 122,4M +
+      fisso_v3 267,8M + fisso 40,3M (run con netPath esplicito, confermato
+      post-merge dall'utente) + fisso2 34,0M. Qualità (datastats): 0 azzerati,
+      0 code parziali, dup 1,74% (< soglia 5% → niente dedup, vedi
+      DATAGEN_QUALITY_PLAN), W/D/L 37/25/38. Merge = **shuffle globale a
+      shard** (`datashuffle.rs`, seed fisso; bullet-utils della rev pinnata
+      non ha più validate/interleave) → verifica identità sul merged →
+      `nnue/data/hydray_v3_464M_shuffled.bin.zst` pronto per Drive.
+      **A/B nodi/mossa DECISO 2026-07-11: si resta a 8k.** Test a parità di
+      tempo macchina (4h/braccio sul fisso, 14,6M pos @ 8k vs 9,2M @ 12k),
+      due shakedown ob da 10 SB, SPRT: **12k = −85 ±23 vs 8k, H0 in 822
+      game** — più posizioni > etichette migliori, senza appello.
+      (`tuning/run_nodes_ab.sh`; log `tuning/sprt_ab_nodes.log`.)
+- [x] **Rete v3 ADOTTATA 2026-07-14** (`hydray-v3-464M`, Colab 40 SB sul
+      dataset v3): sanity startpos +44, mirror esatta; selftest 41.577 pos;
+      bench6 nuovo baseline **4.911.596 @ d12**. SPRT vs ob: cap 4000 game
+      senza bound (LLR 1,74), **+11,5 ±9,5, LOS 99,1%** → adottata (swap di
+      rete a costo zero, il segno è certo al 99%).
+      ⚠️ Scoperta: **bucket materiale minimo affamato dall'adjudication** —
+      KQvK = −13 cp (!), le partite si chiudono via TB appena entrano in ≤5
+      pezzi e il bucket 0 (2-5 pezzi) non vede quasi esempi. In gioco lo
+      copre il probe Syzygy; fix dati al prossimo ciclo (quota di partite
+      seedate da finali — vedi DATAGEN_QUALITY_PLAN).
+- [ ] **Architettura HalfKA + king bucket** — design COMPLETO in
+      `HALFKA_PLAN.md` (2026-07-11): 768×4kb_hm → 512 → 8ob, mappa 4 bucket
+      mirrorata, factoriser, Finny in fase 2, sei fasi con validazioni.
+      Vecchia nota di contesto:
       richiede refresh accumulatore su mossa di re + FinnyTable (cache di
       accumulatori per bucket). Guadagno tipico +80-150 sull'arch semplice.
       Solo quando il pipeline v2 è rodato.
@@ -104,10 +141,11 @@ In ordine di valore atteso; nessuno è bloccante per il ciclo v2:
 
 ## Manutenzione / backlog
 
-- [ ] `.claude/commands/hydray.md` (skill /hydray) è ferma all'era HCE
-      (~2000 Elo, YBWC, evaluator handcrafted): riscriverla sullo stato 2.0.0.
+- [ ] Le note di lavoro locali sono ferme all'era HCE (~2000 Elo, YBWC,
+      evaluator handcrafted): riscriverle sullo stato 2.0.0.
 - [ ] `make test`: da riscrivere da zero (deciso 2026-07-06, non urgente).
-- [ ] Gauntlet: aggiornare la convenzione degli anchor a 2.0.0 nello script/uso.
+- [x] Gauntlet: convenzione anchor aggiornata a 2.0.0=3000 (default dello script,
+      2026-07-10).
 
 ---
 
@@ -116,8 +154,8 @@ In ordine di valore atteso; nessuno è bloccante per il ciclo v2:
 - **Bench NPS**: macchina quieta (stop datagen/match), run interleaved,
   preferire l'`nps` riportato dal motore al wall time. Sotto carico ±13-15%
   e guadagni fantasma.
-- **Node-identity**: `.claude/skills/run-hydray/driver.sh bench6` — baseline
-  2.0.0 = **4.735.578 @ d12**; ogni swap di rete stabilisce un baseline nuovo.
+- **Node-identity**: `script/engine_driver.sh bench6` — baseline 2.0.0 =
+  **4.735.578 @ d12**; ogni swap di rete stabilisce un baseline nuovo.
 - **Dati**: mai mischiare prefissi/etichettatori diversi nello stesso file;
   validare SEMPRE con bullet-utils prima e dopo l'interleave; i dati si
   spostano via scp/zip, MAI via git (`nnue/data` è gitignored).

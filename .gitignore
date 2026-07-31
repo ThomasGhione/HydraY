@@ -10,8 +10,9 @@
 *.png
 *.csv
 !auto_tuner.csv
-chess
-chess.exe
+# Built engine binaries at repo root (chess, chess_dev, chess.exe, chess_windows, ...).
+# git cannot ignore "all executables" by permission bit, so anchor the build names.
+/chess*
 /tests/test
 /tests/perf
 /tests/sacrifice
@@ -21,7 +22,6 @@ chess.exe
 /stockfish/
 /engine/syzygy/files/
 /cutechess/
-CLAUDE.md
 
 # Local tuning artifacts
 /tuning/engines.json
@@ -33,16 +33,22 @@ CLAUDE.md
 /tuning/.tuning_state/
 /tuning/plots/
 /tuning/chess_baseline
+/tuning/chess_halfka_a3
 /tuning/sprt_*.pgn
 # Gauntlet artifacts: on-demand reference binaries and per-run outputs
 /tuning/chess_ref_*
 /tuning/gauntlet_*.pgn
 /tuning/gauntlet_*.txt
 
+# Stockfish-calibration artifacts (run_sf_calibration.sh)
+/tuning/sfcal_*
 
-nodebench
 # NNUE training data (datagen output, GB-sized)
 /nnue/data/
 /nnue/trainer/target/
 # fastchess auto-generated resume configs
 config.json
+
+# Python bytecode (never track compiled caches)
+__pycache__/
+*.pyc

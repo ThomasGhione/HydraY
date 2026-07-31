@@ -66,8 +66,7 @@ void TimeManager::init(const Limits& limits, bool sideIsWhite, int movesPlayed,
 
     // Opening ramp: spend less on the first moves. Only applied WITHOUT an
     // increment: with an increment the clock is replenished every move, so
-    // there is no reason to under-think the opening (the engine has no
-    // opening book and plays it weakly when rushed). No increment => the
+    // there is no reason to under-think the opening. No increment => the
     // clock only ever shrinks, so the early-game discount still protects it.
     if (myInc <= 0 && movesPlayed < OPENING_MOVES) {
         const double r = OPENING_MIN_SCALE +
