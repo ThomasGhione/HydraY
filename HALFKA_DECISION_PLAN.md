@@ -255,7 +255,42 @@ Da fare **solo** se A3 dà HalfKA perdente o marginale. Addestrare HalfKA su
   davvero e il target volumetrico ha una base;
 - curva piatta → il collo di bottiglia non sono i dati.
 
-### A4-bis. Mappa a 8 bucket — ora è un candidato vicino, non "dopo"
+### A4-bis. Mappa a 8 bucket — ✅ **TESTATA** (2026-07-31): si tiene la mappa a 4
+
+**Testa a testa 8 vs 4 bucket: −12,37 ±9,34 per la mappa fitta** (3073 partite,
+LLR −2,38 = 81% verso H0, fermato). Branch `halfka8` (`8ca0508`); i due branch
+differiscono **solo** per `BUCKET_LAYOUT`/`INPUT_BUCKETS` nei tre file — `git
+diff halfka-a1 halfka8 -- engine/ uci/ tt/ board/` è vuoto.
+
+⚠️ **Il confronto contro la baseline comune NON poteva rispondere.** 8 bucket vs
+768 dava +18,8 ±11,9 contro il +26,45 ±11,2 dei 4 bucket: due misure
+indipendenti sulla stessa baseline, quindi l'incertezza sulla differenza è ~±16
+— più larga dei 7,7 Elo da misurare, e resterebbe ~±11 anche a 4000 partite.
+Solo il testa a testa la dimezza. **Vale per qualunque futuro A/B fra varianti.**
+
+**Perché perde: overfitting, non velocità.** Le due ipotesi di runtime sono
+smentite dalla misura (bench6 interleaved, macchina quieta):
+
+| | nodi | tempo | NPS |
+|---|---|---|---|
+| 8 bucket | 4.655.576 | 1,63 s | 2,857 M |
+| 4 bucket | 4.739.127 | 1,66 s | 2,860 M |
+
+NPS identico (−0,13%) e la mappa fitta cerca perfino **meno nodi** in **meno
+tempo**. Niente pressione di cache, niente refresh extra. Train loss migliore
+(0,013732 vs 0,013830), velocità pari, gioco peggiore → resta solo
+l'**overfitting**: ×2 parametri di input e 1/8 dei dati per bucket invece di 1/4.
+
+⚠️ **Quindi il verdetto è "8 bucket non funziona CON 1,18B", non in assoluto.**
+Il test è girato sul prefisso imposto dal disco di Colab, meno della metà dei
+2,75B disponibili. È il primo argomento *specifico* per generare più dati emerso
+in tutta l'indagine — prima erano tutti generici.
+
+**Manca lo strumento per vederlo**: il trainer ha `test_set: None`, quindi
+l'overfitting si deduce invece di misurarlo. Aggiungere una validation loss
+ripagherebbe al primo confronto fra architetture successivo.
+
+### A4-bis-storico. Motivazione originale
 
 `HALFKA_PLAN.md:41` ha scelto **4 bucket e non 8-13 perché il dataset era
 300-400M** («mappe più fitte sono data-hungry e si possono A/B-are DOPO»). Con
