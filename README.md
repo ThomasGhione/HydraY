@@ -6,7 +6,7 @@ interface and full UCI support for GUIs, bots, and automated testing.
 It is built around bitboards with magic sliding-piece attacks, an iterative
 deepening alpha-beta/PVS search with Lazy SMP parallelism, a cache-friendly
 transposition table, Syzygy tablebase probing, and a neural network evaluator
-(768->512 dual-perspective, embedded in the binary). The handcrafted evaluator
+(HalfKA king-bucketed, dual-perspective, embedded in the binary). The handcrafted evaluator
 was removed in 2.0.0 — evaluation strength now improves by training better
 nets, not by editing C++. Development and testing happen mainly on Linux/WSL;
 a MinGW target exists for Windows builds.
@@ -189,8 +189,11 @@ opponent, `TC=4+0.04`, `CONCURRENCY`, `THREADS`.
 
 ## NNUE Evaluation
 
-The evaluator is a quantised neural network: (768->512)*2 dual-perspective
-accumulator with SCReLU activation and 8 output buckets, trained with
+The evaluator is a quantised neural network: (768x4kb_hm -> 512)*2 dual-perspective
+accumulator with SCReLU activation and 8 output buckets. Inputs are king-bucketed
+and horizontally mirrored, so each perspective is indexed by its own king square;
+a king move crossing a bucket boundary triggers a lazy refresh of that
+perspective, absorbed by a thread-local Finny table. Trained with
 [bullet](https://github.com/jw1912/bullet) on self-play data. The first net
 (768->256, 121M self-play positions) measured **+662 Elo** against the old
 handcrafted evaluator (SPRT, LOS 100%); later nets are validated against the
