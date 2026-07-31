@@ -10,8 +10,39 @@
 // of the two, and |sum| must stay <= ~1.98 for i16 quantisation at QA=255.
 // Adapted from bullet's examples/progression/3_input_buckets.rs (pinned rev).
 //
-// Usage: cargo run -r --bin trainer --features cuda -- <data.bin> [superbatches] [net_id]
+// Usage: cargo run -r --bin trainer --features cuda -- <data.bin> [superbatches]
+//                                                       [net_id] [start_sb] [resume_ckpt]
 //   shakedown: ~10 superbatches; full run: ~40.
+//
+// STAGED TRAINING (start_sb + resume_ckpt) exists because the free Colab
+// runtime has ~66 GB of local disk while the full dataset is 88 GB, and the
+// Drive mount caches locally everything it reads — so streaming a 40-superbatch
+// run fills the disk around superbatch 28. Instead, train on one slice at a
+// time: each stage exits (releasing the cache), the local file is replaced with
+// the next slice, and training resumes from the checkpoint. The net ends up
+// having seen the whole dataset with no slice ever exceeding the disk.
+//
+// Stage boundaries must land on multiples of `save_rate` (10 below), since a
+// stage can only resume from a checkpoint that was actually written. Four
+// slices of a quarter of the dataset each therefore fit the 40-superbatch
+// schedule exactly, and 10 superbatches consume 1B samples against a 688M
+// slice — the same 1.45 epochs the whole run would do over the whole dataset:
+//
+//   stage 1:  <slice A> 40 hydray-x
+//   stage 2:  <slice B> 40 hydray-x 11 checkpoints/hydray-x-10
+//   stage 3:  <slice C> 40 hydray-x 21 checkpoints/hydray-x-20
+//   stage 4:  <slice D> 40 hydray-x 31 checkpoints/hydray-x-30
+//
+// Two properties of bullet make this sound, both verified in its source rather
+// than assumed: `Step::new` iterates from `start_superbatch`, so `StepLR` sees
+// ABSOLUTE indices and the learning-rate drop still lands where the schedule
+// says; and `load_from_checkpoint` restores `optimiser_state`, so AdamW's
+// moments carry across a stage boundary instead of restarting cold.
+//
+// TEST_PATH (env var) points at a held-out slice and turns on validation loss.
+// Without it only training loss is reported, which cannot show overfitting —
+// the 8-bucket map had a BETTER training loss than the 4-bucket one while
+// playing 12 Elo worse, and that was only diagnosable by elimination.
 
 use bullet_lib::{
     game::{
@@ -25,7 +56,7 @@ use bullet_lib::{
     trainer::{
         save::SavedFormat,
         schedule::{lr, wdl, TrainingSchedule, TrainingSteps},
-        settings::LocalSettings,
+        settings::{LocalSettings, TestDataset},
     },
     value::{loader, ValueTrainerBuilder},
 };
@@ -62,6 +93,11 @@ fn main() {
         .get(3)
         .cloned()
         .unwrap_or_else(|| "hydray-halfka-shakedown".to_string());
+    // Absolute index of the first superbatch of THIS stage; `superbatches` stays
+    // the total for the whole run so the learning-rate schedule is unchanged.
+    let start_superbatch: usize = args.get(4).and_then(|s| s.parse().ok()).unwrap_or(1);
+    let resume_from = args.get(5).cloned();
+    let test_path = std::env::var("TEST_PATH").ok();
 
     let mut trainer = ValueTrainerBuilder::default()
         .dual_perspective()
@@ -111,7 +147,7 @@ fn main() {
         steps: TrainingSteps {
             batch_size: 16_384,
             batches_per_superbatch: 6104, // ~100M samples per superbatch
-            start_superbatch: 1,
+            start_superbatch,
             end_superbatch: superbatches,
         },
         // NNUE_PLAN lambda = 0.7 on the search score; bullet's `wdl` weights the
@@ -129,12 +165,20 @@ fn main() {
 
     let settings = LocalSettings {
         threads: 2,
-        test_set: None,
+        test_set: test_path.as_deref().map(TestDataset::at),
         output_directory: "checkpoints",
         batch_queue_size: 64,
     };
 
     let data_loader = loader::DirectSequentialDataLoader::new(&[data_path.as_str()]);
+
+    // Resume before run(): load_from_checkpoint restores the optimiser state,
+    // so AdamW's moments survive the stage boundary. Loading after run() would
+    // silently train from scratch on this slice.
+    if let Some(ckpt) = &resume_from {
+        println!("resuming from {ckpt} at superbatch {start_superbatch}");
+        trainer.load_from_checkpoint(ckpt);
+    }
 
     trainer.run(&schedule, &settings, &data_loader);
 
