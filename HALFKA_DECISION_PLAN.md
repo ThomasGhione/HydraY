@@ -255,7 +255,36 @@ Da fare **solo** se A3 dà HalfKA perdente o marginale. Addestrare HalfKA su
   davvero e il target volumetrico ha una base;
 - curva piatta → il collo di bottiglia non sono i dati.
 
-### A4-bis. Mappa a 8 bucket — ✅ **TESTATA** (2026-07-31): si tiene la mappa a 4
+### A4-bis. Mappa a 8 bucket — ✅ **CHIUSA** (2026-08-01): 4 bucket, definitivamente
+
+Due SPRT ben potenziati e concordi, con l'ipotesi di riserva ora **esclusa**:
+
+| confronto | dati della 8 bucket | esito |
+|---|---|---|
+| 8 vs 4 | 1,18B contro 1,18B | −12,37 ±9,34 (3073 partite) |
+| 8 vs 4 (rete 3.0.0) | **2,75B** contro 1,18B | **−10,43 ±8,41** (4000, LOS 0,75%) |
+
+⚠️ **La spiegazione "overfitting per fame di dati" era SBAGLIATA.** Il secondo run
+dava alla mappa fitta 1,57B di dati **in più** dell'avversaria e ha spostato il
+risultato di 2 Elo — dentro il rumore. Se fosse stata fame di dati, raddoppiarli
+avrebbe recuperato gran parte del divario.
+
+**Resta da spiegare** il fatto anomalo: train loss migliore, NPS identico, meno
+nodi cercati, e gioco peggiore. Ipotesi superstiti, coi dati ormai esclusi:
+
+- la **loss di training non misura ciò che serve alla ricerca**: una eval può
+  predire meglio il WDL medio e ordinare peggio le mosse in posizioni concrete,
+  e l'albero alpha-beta è sensibile all'ordinamento, non all'accuratezza media;
+- la mappa fitta introduce **discontinuità**: caselle di re adiacenti cadono in
+  bucket con pesi indipendenti, quindi una mossa di re cambia la valutazione a
+  parità di struttura. La più plausibile, perché la suddivisione riguarda
+  proprio la **traversa 1** — dove il re sta quasi sempre, cioè il punto di
+  massimo traffico. Con 4 bucket i confini sono meno e più lontani dall'azione.
+
+Se un giorno si riprovasse, la leva NON è più dataset: è una mappa che tenga i
+confini lontani dalle case di arrocco, oppure più bucket a parità di traversa 1.
+
+### A4-bis-storico. Prima misura (2026-07-31)
 
 **Testa a testa 8 vs 4 bucket: −12,37 ±9,34 per la mappa fitta** (3073 partite,
 LLR −2,38 = 81% verso H0, fermato). Branch `halfka8` (`8ca0508`); i due branch
