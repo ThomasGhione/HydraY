@@ -262,22 +262,31 @@ Due SPRT ben potenziati e concordi, con l'ipotesi di riserva ora **esclusa**:
 | confronto | dati della 8 bucket | esito |
 |---|---|---|
 | 8 vs 4 | 1,18B contro 1,18B | −12,37 ±9,34 (3073 partite) |
-| 8 vs 4 (rete 3.0.0) | ~2,04B contro 1,18B (vedi sotto) | **−10,43 ±8,41** (4000, LOS 0,75%) |
+| 8 vs 4 (secondo run) | ~1,36B contro 1,18B (vedi sotto) | **−10,43 ±8,41** (4000, LOS 0,75%) |
 
-⚠️ **Il secondo run NON ha visto tutti i 2,75B.** La tappa 2 fu saltata: il
-trainer non si fermava al confine della tappa (corretto poi da `STAGE_END`,
-c125cc3), la tappa 1 tirò dritto fino al superbatch 20 sulla **sola fetta A**, e
-si riprese dalla tappa 3. Quindi la **fetta B non è mai entrata**: ~2,04B di
-posizioni distinte su tre fette, con la fetta A ripassata ~2,9 volte invece di
-~1,45. Il confronto resta 73% di dati in più contro l'avversaria, non 133%.
+⚠️ **Il secondo run NON ha visto i 2,75B: ne ha visti ~1,36B.** Il trainer non si
+fermava al confine della tappa (corretto poi da `STAGE_END`, c125cc3) e furono
+eseguite solo `stage(1)` e `stage(3)`. La tappa 1 tirò quindi dritto fino al
+superbatch 20 sulla **sola fetta A**; la tappa 3 ripartì dal checkpoint 20 e tirò
+fino al 40 sulla **sola fetta C**, scrivendo il checkpoint finale. **Le fette B e
+D non sono mai entrate**: due fette, ~1,36B di posizioni distinte contro gli
+1,18B dell'avversaria — il **15%** di dati in più, non il 133%. Ogni fetta è
+stata inoltre ripassata ~2,9 volte invece di ~1,45.
 
-⚠️ **La spiegazione "overfitting per fame di dati" resta comunque indebolita, ma
-non è più esclusa con la stessa forza.** Il secondo run dava alla mappa fitta
-~0,86B di dati in più dell'avversaria e ha spostato il risultato di 2 Elo —
-dentro il rumore. Se fosse stata pura fame di dati, un aumento del 73% avrebbe
-dovuto recuperare una parte visibile del divario, e non l'ha fatto; ma il test
-pulito su tutti i 2,75B non è stato eseguito, e la ripetizione della fetta A
-spinge semmai *verso* l'overfitting, cioè contro la mappa fitta.
+Conseguenza in due direzioni:
+
+- **il verdetto sui 4 bucket ne esce rafforzato.** I due SPRT non sono più "dati
+  pari" + "più dati": sono due **repliche quasi a dati pari**, indipendenti e
+  concordi su circa −11 Elo. Una replica vale più di una misura sola.
+- **la fame di dati non è stata refutata: non è stata testata.** Un +15% di dati
+  non poteva dire nulla, e la mia conclusione "l'ipotesi era sbagliata" era
+  infondata. Va considerata **aperta e non verificata**, non esclusa.
+
+Il test pulito, se un giorno servisse, è la mappa a 8 bucket sui 2,75B interi con
+tutte e quattro le tappe eseguite. **Non è però la prossima cosa da fare**: la
+priorità è A5 sui 4 bucket, che misura se i dati sono ancora una leva viva per
+l'architettura che spediamo davvero. Se lì il guadagno è piccolo, la questione
+della fame di dati a 8 bucket diventa irrilevante da sé.
 
 **Resta da spiegare** il fatto anomalo: train loss migliore, NPS identico, meno
 nodi cercati, e gioco peggiore. Ipotesi superstiti, coi dati ormai esclusi:
