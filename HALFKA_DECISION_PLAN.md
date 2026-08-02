@@ -255,6 +255,40 @@ Da fare **solo** se A3 dà HalfKA perdente o marginale. Addestrare HalfKA su
   davvero e il target volumetrico ha una base;
 - curva piatta → il collo di bottiglia non sono i dati.
 
+### A5-dati. Quanto valgono i dati da soli — ✅ **CHIUSA** (2026-08-02): niente
+
+Prima misura **diretta** del contributo dei dati (prima era solo una sottrazione:
++104 totali meno +26 di architettura). Stessa architettura della 3.0.0, stesso
+budget di 40 superbatch, stesso schedule. **Unica variabile: 2,72B di posizioni
+contro 1,18B** — tutte e quattro le fette, `STAGE_END` attivo, nessuna saltata.
+
+Testa a testa, stesso binario, `EvalFile` contro la rete incorporata:
+
+```
+Elo: -7,30 +/- 8,61   nElo: -9,13 +/- 10,77   LOS 4,83%
+Games: 4000, W1254 L1338 D1408 (48,95%)   LLR -1,93 (nessun bound)
+ordo: base 2303,7 ±4,1  |  new 2296,3 ±4,1
+```
+
+**L'intervallo è [−15,9; +1,3]: qualsiasi guadagno sopra ~1 Elo è escluso al
+95%.** Più che raddoppiare il dataset non compra niente. Il ciclo dati, con la
+ricetta di datagen attuale, è **saturo**: non rimettere le macchine a generare.
+
+⚠️ **Cosa NON dice.** A budget fisso di 40 SB, 2,72B significa **1,47 epoche**
+mentre 1,18B ne faceva 3,4. Il test quindi risponde a "più dati **a parità di
+costo di training** rendono?" — no — e non a "i dati sono inutili in assoluto".
+La variante ancora aperta è **80 superbatch sui 2,72B** (~2h di T4, otto tappe):
+separa "i dati non servono" da "i dati chiedono anche più calcolo". È l'unica
+domanda sui dati che valga ancora la pena di porre.
+
+Ricaduta su A4-bis: se i dati non muovono di un Elo nemmeno la mappa a 4 bucket,
+l'ipotesi che la mappa a 8 fosse semplicemente affamata diventa molto meno
+credibile — resta non testata, ma non è più la spiegazione naturale.
+
+Rete conservata in `nnue/net/a5_halfka4_full.nnue` (non spedita). Sanity: layout
+OK, specchio esatto, startpos +51, **KQvK 169** contro i 128 della 3.0.0 — il
+bucket 0 migliora un po' col seeding B1 ma resta lontano dal vero.
+
 ### A4-bis. Mappa a 8 bucket — ✅ **CHIUSA** (2026-08-01): 4 bucket, definitivamente
 
 Due SPRT ben potenziati e concordi, con l'ipotesi di riserva ora **esclusa**:
