@@ -1,0 +1,12 @@
+{
+  "parameter_ranges": {
+    "RFP_MARGIN_PER_DEPTH": "Integer(50, 160)",
+    "NMP_EVAL_DIV": "Integer(80, 300)",
+    "NMP_EVAL_MAX": "Integer(2, 8)",
+    "FUTILITY_MID_STEP": "Integer(150, 400)",
+    "PROBCUT_MARGIN": "Integer(40, 160)"
+  },
+  "data_path": "search_evalmargins_data.npz",
+  "model_path": "search_evalmargins_model.pkl",
+  "log_path": "log_search_evalmargins.txt"
+}

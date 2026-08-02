@@ -1,8 +1,5 @@
 {
   "parameter_ranges": {
-    "FUTILITY_MID_STEP": "Integer(140, 420)",
-    "FUTILITY_EG_BASE": "Integer(80, 300)",
-    "FUTILITY_EG_STEP": "Integer(90, 300)",
     "LMP_SCALE_STD_PCT": "Integer(60, 170)",
     "LMP_SCALE_IMP_PCT": "Integer(60, 170)",
     "LMR_C_PERCENT": "Integer(200, 450)",
