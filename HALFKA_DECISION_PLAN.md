@@ -262,12 +262,22 @@ Due SPRT ben potenziati e concordi, con l'ipotesi di riserva ora **esclusa**:
 | confronto | dati della 8 bucket | esito |
 |---|---|---|
 | 8 vs 4 | 1,18B contro 1,18B | −12,37 ±9,34 (3073 partite) |
-| 8 vs 4 (rete 3.0.0) | **2,75B** contro 1,18B | **−10,43 ±8,41** (4000, LOS 0,75%) |
+| 8 vs 4 (rete 3.0.0) | ~2,04B contro 1,18B (vedi sotto) | **−10,43 ±8,41** (4000, LOS 0,75%) |
 
-⚠️ **La spiegazione "overfitting per fame di dati" era SBAGLIATA.** Il secondo run
-dava alla mappa fitta 1,57B di dati **in più** dell'avversaria e ha spostato il
-risultato di 2 Elo — dentro il rumore. Se fosse stata fame di dati, raddoppiarli
-avrebbe recuperato gran parte del divario.
+⚠️ **Il secondo run NON ha visto tutti i 2,75B.** La tappa 2 fu saltata: il
+trainer non si fermava al confine della tappa (corretto poi da `STAGE_END`,
+c125cc3), la tappa 1 tirò dritto fino al superbatch 20 sulla **sola fetta A**, e
+si riprese dalla tappa 3. Quindi la **fetta B non è mai entrata**: ~2,04B di
+posizioni distinte su tre fette, con la fetta A ripassata ~2,9 volte invece di
+~1,45. Il confronto resta 73% di dati in più contro l'avversaria, non 133%.
+
+⚠️ **La spiegazione "overfitting per fame di dati" resta comunque indebolita, ma
+non è più esclusa con la stessa forza.** Il secondo run dava alla mappa fitta
+~0,86B di dati in più dell'avversaria e ha spostato il risultato di 2 Elo —
+dentro il rumore. Se fosse stata pura fame di dati, un aumento del 73% avrebbe
+dovuto recuperare una parte visibile del divario, e non l'ha fatto; ma il test
+pulito su tutti i 2,75B non è stato eseguito, e la ripetizione della fetta A
+spinge semmai *verso* l'overfitting, cioè contro la mappa fitta.
 
 **Resta da spiegare** il fatto anomalo: train loss migliore, NPS identico, meno
 nodi cercati, e gioco peggiore. Ipotesi superstiti, coi dati ormai esclusi:
