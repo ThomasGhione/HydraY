@@ -28,10 +28,13 @@
 // schedule exactly, and 10 superbatches consume 1B samples against a 688M
 // slice — the same 1.45 epochs the whole run would do over the whole dataset:
 //
-//   stage 1:  <slice A> 40 hydray-x
-//   stage 2:  <slice B> 40 hydray-x 11 checkpoints/hydray-x-10
-//   stage 3:  <slice C> 40 hydray-x 21 checkpoints/hydray-x-20
-//   stage 4:  <slice D> 40 hydray-x 31 checkpoints/hydray-x-30
+//   STAGE_END=10 stage 1:  <slice A> 40 hydray-x
+//   STAGE_END=20 stage 2:  <slice B> 40 hydray-x 11 checkpoints/hydray-x-10
+//   STAGE_END=30 stage 3:  <slice C> 40 hydray-x 21 checkpoints/hydray-x-20
+//   STAGE_END=40 stage 4:  <slice D> 40 hydray-x 31 checkpoints/hydray-x-30
+//
+// STAGE_END is what stops a stage at its boundary; the second argument stays
+// the total for the whole run so the learning-rate decay lands where planned.
 //
 // Two properties of bullet make this sound, both verified in its source rather
 // than assumed: `Step::new` iterates from `start_superbatch`, so `StepLR` sees
@@ -98,6 +101,16 @@ fn main() {
     let start_superbatch: usize = args.get(4).and_then(|s| s.parse().ok()).unwrap_or(1);
     let resume_from = args.get(5).cloned();
     let test_path = std::env::var("TEST_PATH").ok();
+    // Last superbatch of THIS stage. Without it a stage runs to `superbatches`
+    // on its own slice — which still ends up correct, since each stage resumes
+    // from the previous boundary and overwrites the later checkpoints, but it
+    // burns 2.5x the GPU time on data that gets thrown away. The learning-rate
+    // schedule below keys off `superbatches` regardless, so bounding the stage
+    // does not move where the decay lands.
+    let stage_end: usize = std::env::var("STAGE_END")
+        .ok()
+        .and_then(|s| s.parse().ok())
+        .unwrap_or(superbatches);
 
     let mut trainer = ValueTrainerBuilder::default()
         .dual_perspective()
@@ -148,7 +161,7 @@ fn main() {
             batch_size: 16_384,
             batches_per_superbatch: 6104, // ~100M samples per superbatch
             start_superbatch,
-            end_superbatch: superbatches,
+            end_superbatch: stage_end,
         },
         // NNUE_PLAN lambda = 0.7 on the search score; bullet's `wdl` weights the
         // game RESULT, so wdl = 1 - lambda = 0.3.
