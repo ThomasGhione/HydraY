@@ -79,7 +79,7 @@ board doMove/undoMove/inCheck), evaluator escluso (futuro NNUE). Ordinata per cr
   Quando `evalStack[ply-2] == NEG_INF` (in scacco 2 ply fa) `improving` è sempre false;
   fallback standard a ply−4. ~3 LOC.
 
-- [ ] **9. Campagna SMAC3 sulle costanti di search** — Elo: **+15–40**
+- [x] **9. Campagna SMAC3 sulle costanti di search** — RESA: **+17,74** (2026-08-03)
   Tutti i margini vinti a giugno (FUTILITY_MARGINS, LMP, HISTORY_PRUNE, SEE_CAPTURE, RFP,
   NMP_EVAL_*, PROBCUT_*, SE_*) sono guessed, not tuned.
   - [x] **Esposizione UCI FATTA 2026-07-05**: 16 spin (pattern eval_constants: globali
@@ -100,7 +100,14 @@ board doMove/undoMove/inCheck), evaluator escluso (futuro NNUE). Ordinata per cr
           NESSUN margine**. Girato DOPO aver applicato i margini nuovi, quindi vale anche
           con le potature correnti: la geometria dell'albero non dipende dalla scala dei
           punteggi ed è sopravvissuta intatta alla rimozione dell'HCE. **Non ritarare.**
-        - `search_ordering` (SEE_CAPTURE, HISTORY_PRUNE ×3) → in corso.
+        - `search_ordering` (SEE_CAPTURE, HISTORY_PRUNE ×3) → **+1,0 ±3,7 dopo 128
+          iterazioni, NESSUN margine**. L'argmax è saltato fra due regioni lontane
+          (SEE 74/HP_D3 −11350 e SEE 35/HP_D3 −4000) valutandole uguali: firma di
+          superficie piatta, più netta dell'Elo stesso. **Non ritarare.**
+        **Conclusione**: si erano starate SOLO le costanti che confrontano una eval
+        statica con una soglia in cp. Geometria dell'albero e statistiche di
+        ordinamento non dipendono dalla scala dei punteggi e sono sopravvissute
+        intatte alla rimozione dell'HCE. La campagna è CHIUSA.
         ⚠️ **Il tuner girava a profondità fissa 8** (`base_config.json`, dall'era HCE): a
         profondità fissa una costante di pruning può solo essere premiata se pota di meno,
         quindi la prima campagna è finita nell'angolo della scatola dichiarando +40 falsi.
