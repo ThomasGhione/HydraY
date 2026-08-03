@@ -15,24 +15,22 @@
       }
     }
   ],
-  "engine1_depth": 8,
-  "engine2_depth": 8,
+  "engine1_tc": "4+0.04",
+  "engine2_tc": "4+0.04",
   "rounds": 8,
   "opening_file": "books/openings.pgn",
   "timemargin": 1000,
   "plot_every": 0,
   "result_every": 1,
+  "concurrency": 8,
   "parameter_ranges": {
-    "OPEN_FILE_ROOK_BONUS_Mg": "Integer(14, 34)",
-    "OPEN_FILE_ROOK_BONUS_Eg": "Integer(10, 28)",
-    "SEMI_OPEN_FILE_ROOK_BONUS_Mg": "Integer(4, 16)",
-    "SEMI_OPEN_FILE_ROOK_BONUS_Eg": "Integer(2, 12)",
-    "ROOK_ON_SEVENTH_BONUS_Mg": "Integer(14, 34)",
-    "ROOK_ON_SEVENTH_BONUS_Eg": "Integer(18, 44)",
-    "ROOK_BEHIND_OWN_PASSER_BONUS_Mg": "Integer(4, 16)",
-    "ROOK_BEHIND_OWN_PASSER_BONUS_Eg": "Integer(10, 28)"
+    "RFP_MARGIN_PER_DEPTH": "Integer(50, 160)",
+    "NMP_EVAL_DIV": "Integer(80, 300)",
+    "NMP_EVAL_MAX": "Integer(2, 8)",
+    "FUTILITY_MID_STEP": "Integer(150, 400)",
+    "PROBCUT_MARGIN": "Integer(40, 160)"
   },
-  "data_path": "rook_files_data.npz",
-  "model_path": "rook_files_model.pkl",
-  "log_path": "log_rook_files.txt"
+  "data_path": "search_evalmargins_data.npz",
+  "model_path": "search_evalmargins_model.pkl",
+  "log_path": "log_search_evalmargins.txt"
 }
