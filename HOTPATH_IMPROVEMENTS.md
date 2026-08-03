@@ -88,10 +88,24 @@ board doMove/undoMove/inCheck), evaluator escluso (futuro NNUE). Ordinata per cr
         node-identico 5.782.300 ai default, roundtrip set/restore verificato).
         Gruppi pronti: `tuning/groups/search_pruning.json` (8 param margini) e
         `search_shape.json` (8 param futility/LMP/LMR/SE).
-  - [ ] **RUN tuning**: `cd tuning && ./run_tune_local.sh search_pruning` poi
-        `search_shape` — SOLO a laptop libero (datagen NNUE occupa 3 core fino a
-        ~2026-07-09; partite a TC falsate fino ad allora). Poi ri-congelare gli optimum
-        nei default di search_constants.hpp + SPRT di conferma.
+  - [x] **RUN tuning FATTO 2026-08-03** — risultato: **+17,74 ±8,67** (SPRT 3294 partite,
+        LOS 100%, H1 raggiunto da solo), commit a1dcbaf. I gruppi sono stati ridivisi in
+        tre insiemi disgiunti perché quelli originali si sovrapponevano e `search_shape`
+        tarava due costanti cancellate a luglio (`FUTILITY_EG_*`), bruciando due
+        dimensioni su rumore puro.
+        - `search_evalmargins` (RFP, NMP_EVAL_*, FUTILITY_MID_STEP, PROBCUT) →
+          **+17,74**. Sono le uniche costanti che confrontano una eval statica con una
+          soglia in centipawn, cioè le uniche starate dal passaggio a NNUE.
+        - `search_shape` (LMP ×2, LMR_C, SE ×2) → **−1,3 ±4,6 dopo 153 iterazioni,
+          NESSUN margine**. Girato DOPO aver applicato i margini nuovi, quindi vale anche
+          con le potature correnti: la geometria dell'albero non dipende dalla scala dei
+          punteggi ed è sopravvissuta intatta alla rimozione dell'HCE. **Non ritarare.**
+        - `search_ordering` (SEE_CAPTURE, HISTORY_PRUNE ×3) → in corso.
+        ⚠️ **Il tuner girava a profondità fissa 8** (`base_config.json`, dall'era HCE): a
+        profondità fissa una costante di pruning può solo essere premiata se pota di meno,
+        quindi la prima campagna è finita nell'angolo della scatola dichiarando +40 falsi.
+        Corretto in controllo di tempo. Profondità fissa va bene solo per i **pesi di
+        valutazione**, che non barattano nodi contro profondità.
 
 - [x] **10. TB probe dopo il TT probe** — ✅ **FATTO** 2026-07-04
   Node-identico senza TB (blocco inerte); con TB attive = meno probeWDL a parità di cutoff.
