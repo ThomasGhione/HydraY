@@ -67,7 +67,7 @@ int32_t Sorter::scoreMoveOrderingPriorityInline(const MoveOrderingContext& ctx, 
         score += std::min<int32_t>(500,
             (ctx.runtime.captureHistory[ctx.usSide][m.to][victimType][0]
              + (ctx.runtime.captureHistory[ctx.usSide][m.to][victimType][1] >> 1)) / 20);
-        return std::clamp<int32_t>(score, NEG_INF, POS_INF);
+        return score;
     }
 
     if (m.sameFromTo(ctx.runtime.killerMoves[ctx.ply][0])) return KILLER_1_SCORE;
@@ -92,7 +92,7 @@ int32_t Sorter::scoreMoveOrderingPriorityInline(const MoveOrderingContext& ctx, 
                             HISTORY_SCORE_MIN, HISTORY_SCORE_MAX) / 2;
     }
 
-    return std::clamp<int32_t>(score, NEG_INF, POS_INF);
+    return score;
 }
 
 Sorter::LeastValuableAttacker Sorter::getLeastValuableAttackerTo(
@@ -282,7 +282,7 @@ MovePicker Sorter::sortTacticalMoves(
             if (see < seeThreshold) continue;
             if (standPat + see + MOVE_DELTA_MARGIN <= alpha) continue;
 
-            score = std::clamp<int32_t>(CAPTURE_BASE_SCORE + see + MVV_TABLE[victimType], NEG_INF, POS_INF);
+            score = CAPTURE_BASE_SCORE + see + MVV_TABLE[victimType];
         } else {
             if (!isPromotion) continue;
             score = TACTICAL_PROMOTION_SCORE;

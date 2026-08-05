@@ -66,15 +66,17 @@ constexpr int32_t Searcher::saturatingSub32(int32_t lhs, int32_t rhs) noexcept {
     return static_cast<int32_t>(std::clamp<int64_t>(diff, NEG_INF, POS_INF));
 }
 
+// Plain arithmetic: |score| <= MATE_VALUE and ply <= MAX_PLY, so the rebased
+// value stays well inside int32_t (and inside int16_t, see search_constants).
 constexpr int32_t Searcher::scoreToTT(int32_t score, int ply) noexcept {
-    if (score >= MATE_BOUND)  return saturatingAdd32(score, ply);
-    if (score <= -MATE_BOUND) return saturatingSub32(score, ply);
+    if (score >= MATE_BOUND)  return score + ply;
+    if (score <= -MATE_BOUND) return score - ply;
     return score;
 }
 
 constexpr int32_t Searcher::scoreFromTT(int32_t score, int ply) noexcept {
-    if (score >= MATE_BOUND)  return saturatingSub32(score, ply);
-    if (score <= -MATE_BOUND) return saturatingAdd32(score, ply);
+    if (score >= MATE_BOUND)  return score - ply;
+    if (score <= -MATE_BOUND) return score + ply;
     return score;
 }
 
@@ -107,11 +109,11 @@ bool Searcher::checkEarlyTerminalConditions(
 
     // Terminal king-capture states are possible in this codebase's move model.
     // Negamax / side-to-move relative: losing our own king is a mated score
-    // (NEG_INF + ply); capturing the opponent's king is a winning score.
+    // (-MATE_VALUE + ply); capturing the opponent's king is a winning score.
     if (b.kings_bb[0] == 0ULL || b.kings_bb[1] == 0ULL) {
         const bool whiteToMove = (b.getActiveColor() == chess::Board::WHITE);
         const bool ourKingGone = (b.kings_bb[0] == 0ULL) ? whiteToMove : !whiteToMove;
-        outScore = ourKingGone ? (NEG_INF + ply) : (POS_INF - ply);
+        outScore = ourKingGone ? (-MATE_VALUE + ply) : (MATE_VALUE - ply);
         return true;
     }
 
@@ -885,7 +887,7 @@ int32_t Searcher::searchPosition(
         : engine::MoveGenerator::generateLegalMoves(b, /*knownNotInCheck=*/true);
     if (moves.is_empty()) {
         return node.inCheck
-            ? (NEG_INF + ply)  // side to move is checkmated (negamax)
+            ? (-MATE_VALUE + ply)  // side to move is checkmated (negamax)
             : 0;               // stalemate
     }
 
@@ -972,7 +974,7 @@ int32_t Searcher::quiescenceSearch(
         if (inCheck) {
             MoveList evasions = engine::MoveGenerator::generateLegalEvasions(b, checkers);
             if (evasions.is_empty()) {
-                return NEG_INF + ply; // side to move is checkmated (negamax)
+                return -MATE_VALUE + ply; // side to move is checkmated (negamax)
             }
         }
         return Evaluator::evaluate(b);
@@ -985,7 +987,7 @@ int32_t Searcher::quiescenceSearch(
     if (inCheck) {
         movePicker = engine::MoveGenerator::generateQSearchEvasions(b, checkers);
         if (!movePicker.hasNext()) {
-            return NEG_INF + ply; // side to move is checkmated (negamax)
+            return -MATE_VALUE + ply; // side to move is checkmated (negamax)
         }
         best = NEG_INF;
     } else {
@@ -1170,7 +1172,7 @@ void emitUciInfoLine(int depth, int32_t score, const SearchRuntime& runtime,
     std::cout << "info depth " << depth << " score ";
     const int32_t absScore = (score < 0) ? -score : score;
     if (absScore >= MATE_BOUND) {
-        const int32_t plies = Searcher::POS_INF - absScore;
+        const int32_t plies = Searcher::MATE_VALUE - absScore;
         const int32_t mateMoves = (plies + 1) / 2;
         std::cout << "mate " << (score > 0 ? mateMoves : -mateMoves);
     } else {
@@ -1201,7 +1203,7 @@ Searcher::IterativeSearchResult Searcher::runIterativeDeepening(
         const bool ourKingGone = (rootBoard.kings_bb[0] == 0) ? rootWhite : !rootWhite;
         result.terminalRoot = true;
         result.completedAnyDepth = true;
-        result.bestScore = ourKingGone ? NEG_INF : POS_INF; // STM-relative
+        result.bestScore = ourKingGone ? -MATE_VALUE : MATE_VALUE; // STM-relative
         runtime.eval = result.bestScore;
         return result;
     }
@@ -1221,7 +1223,7 @@ Searcher::IterativeSearchResult Searcher::runIterativeDeepening(
     if (moves.is_empty()) {
         const uint8_t toMove = rootBoard.getActiveColor();
         if (rootBoard.isCheckmate(toMove)) {
-            result.bestScore = NEG_INF; // side to move is mated (negamax/STM)
+            result.bestScore = -MATE_VALUE; // side to move is mated (negamax/STM)
         } else if (rootBoard.isDraw(toMove)) {
             result.bestScore = 0;
         } else {

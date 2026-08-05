@@ -22,9 +22,22 @@ inline constexpr int32_t  CAPTURE_HISTORY_SLOTS  = 2;
 inline constexpr int32_t  CORR_HISTORY_SIZE      = 1 << 14;
 inline constexpr int DEFAULT_DEPTH               = 11;
 
-// Scores within MATE_BOUND of ±INF encode a forced mate at a ply distance and
-// are rebased on TT store/load (see scoreToTT / scoreFromTT).
-inline constexpr int32_t MATE_BOUND = std::numeric_limits<int32_t>::max() - 2048;
+// Score scale. A forced mate `n` plies away scores ±(MATE_VALUE - n), so every
+// score the search can produce fits in int16_t — the precondition for packing a
+// static eval next to the score in the TT payload. Scores at or beyond
+// MATE_BOUND carry a ply distance and are rebased on TT store/load (see
+// scoreToTT / scoreFromTT).
+inline constexpr int32_t MATE_VALUE = 32000;
+inline constexpr int32_t MATE_BOUND = MATE_VALUE - MAX_PLY;
+
+// Window sentinel: one past the best reachable score, so no real score can ever
+// equal it. Negamax-safe (NEG_INF == -POS_INF, negating it is well defined).
+inline constexpr int32_t POS_INF = MATE_VALUE + 1;
+inline constexpr int32_t NEG_INF = -POS_INF;
+
+// scoreToTT pushes a mate score away from zero by up to MAX_PLY before storing.
+static_assert(MATE_VALUE + MAX_PLY <= std::numeric_limits<int16_t>::max(),
+              "rebased mate scores must fit the int16_t TT score field");
 
 // ===================================================
 // PRUNING / EXTENSION PARAMETERS
