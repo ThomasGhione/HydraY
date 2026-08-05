@@ -1,0 +1,3064 @@
+2026-08-03 11:56:43,306 INFO     chess-tuning-tools version: 0.9.5
+2026-08-03 11:56:43,311 INFO     Starting iteration 0
+2026-08-03 11:56:43,311 INFO     Testing {'LMP_SCALE_STD_PCT': 98, 'LMP_SCALE_IMP_PCT': 76, 'LMR_C_PERCENT': 367, 'SE_BETA_MARGIN': 7, 'SE_DOUBLE_MARGIN': 8}
+2026-08-03 11:56:43,312 INFO     Start experiment
+2026-08-03 11:57:19,868 INFO     Experiment finished (36.556173s elapsed).
+2026-08-03 11:57:20,023 INFO     Got Elo: -84.3413461259573 +- 55.28593172408331
+2026-08-03 11:57:20,023 INFO     Estimated draw rate: 40.91%
+2026-08-03 11:57:20,023 INFO     Updating model
+2026-08-03 11:57:20,024 INFO     GP sampling finished (5.5e-05s)
+2026-08-03 11:57:20,032 INFO     Starting iteration 1
+2026-08-03 11:57:20,057 INFO     Testing {'LMP_SCALE_STD_PCT': 153, 'LMP_SCALE_IMP_PCT': 131, 'LMR_C_PERCENT': 242, 'SE_BETA_MARGIN': 4, 'SE_DOUBLE_MARGIN': 20}
+2026-08-03 11:57:20,058 INFO     Start experiment
+2026-08-03 11:57:50,912 INFO     Experiment finished (30.853775s elapsed).
+2026-08-03 11:57:51,077 INFO     Got Elo: 84.3413461259573 +- 66.02726571761553
+2026-08-03 11:57:51,077 INFO     Estimated draw rate: 40.91%
+2026-08-03 11:57:51,077 INFO     Updating model
+2026-08-03 11:57:51,078 INFO     GP sampling finished (6.3e-05s)
+2026-08-03 11:57:51,085 INFO     Starting iteration 2
+2026-08-03 11:57:51,136 INFO     Testing {'LMP_SCALE_STD_PCT': 70, 'LMP_SCALE_IMP_PCT': 159, 'LMR_C_PERCENT': 429, 'SE_BETA_MARGIN': 2, 'SE_DOUBLE_MARGIN': 14}
+2026-08-03 11:57:51,137 INFO     Start experiment
+2026-08-03 11:58:22,865 INFO     Experiment finished (31.727923s elapsed).
+2026-08-03 11:58:23,032 INFO     Got Elo: 66.99643491750547 +- 53.87097571730758
+2026-08-03 11:58:23,032 INFO     Estimated draw rate: 27.27%
+2026-08-03 11:58:23,032 INFO     Updating model
+2026-08-03 11:58:23,032 INFO     GP sampling finished (5.5e-05s)
+2026-08-03 11:58:23,042 INFO     Starting iteration 3
+2026-08-03 11:58:23,073 INFO     Testing {'LMP_SCALE_STD_PCT': 127, 'LMP_SCALE_IMP_PCT': 105, 'LMR_C_PERCENT': 301, 'SE_BETA_MARGIN': 2, 'SE_DOUBLE_MARGIN': 26}
+2026-08-03 11:58:23,074 INFO     Start experiment
+2026-08-03 11:58:55,687 INFO     Experiment finished (32.613116s elapsed).
+2026-08-03 11:58:55,858 INFO     Got Elo: 102.10900204132241 +- 62.50299142792933
+2026-08-03 11:58:55,858 INFO     Estimated draw rate: 45.45%
+2026-08-03 11:58:55,858 INFO     Updating model
+2026-08-03 11:58:55,858 INFO     GP sampling finished (5.3e-05s)
+2026-08-03 11:58:55,866 INFO     Starting iteration 4
+2026-08-03 11:58:55,893 INFO     Testing {'LMP_SCALE_STD_PCT': 115, 'LMP_SCALE_IMP_PCT': 148, 'LMR_C_PERCENT': 204, 'SE_BETA_MARGIN': 5, 'SE_DOUBLE_MARGIN': 28}
+2026-08-03 11:58:55,893 INFO     Start experiment
+2026-08-03 11:59:26,127 INFO     Experiment finished (30.233627s elapsed).
+2026-08-03 11:59:26,286 INFO     Got Elo: -16.55707406328996 +- 62.8263093567884
+2026-08-03 11:59:26,286 INFO     Estimated draw rate: 40.91%
+2026-08-03 11:59:26,287 INFO     Updating model
+2026-08-03 11:59:26,287 INFO     GP sampling finished (5.6e-05s)
+2026-08-03 11:59:26,295 INFO     Starting iteration 5
+2026-08-03 11:59:26,325 INFO     Testing {'LMP_SCALE_STD_PCT': 78, 'LMP_SCALE_IMP_PCT': 98, 'LMR_C_PERCENT': 276, 'SE_BETA_MARGIN': 5, 'SE_DOUBLE_MARGIN': 12}
+2026-08-03 11:59:26,325 INFO     Start experiment
+2026-08-03 12:00:01,048 INFO     Experiment finished (34.722299s elapsed).
+2026-08-03 12:00:01,221 INFO     Got Elo: 49.975494643319976 +- 57.33826482172015
+2026-08-03 12:00:01,221 INFO     Estimated draw rate: 31.82%
+2026-08-03 12:00:01,221 INFO     Updating model
+2026-08-03 12:00:01,221 INFO     GP sampling finished (8e-05s)
+2026-08-03 12:00:01,231 INFO     Starting iteration 6
+2026-08-03 12:00:01,300 INFO     Testing {'LMP_SCALE_STD_PCT': 169, 'LMP_SCALE_IMP_PCT': 82, 'LMR_C_PERCENT': 352, 'SE_BETA_MARGIN': 3, 'SE_DOUBLE_MARGIN': 23}
+2026-08-03 12:00:01,300 INFO     Start experiment
+2026-08-03 12:00:40,098 INFO     Experiment finished (38.798313s elapsed).
+2026-08-03 12:00:40,278 INFO     Got Elo: -49.97549464331997 +- 66.87773592965091
+2026-08-03 12:00:40,278 INFO     Estimated draw rate: 31.82%
+2026-08-03 12:00:40,278 INFO     Updating model
+2026-08-03 12:00:40,278 INFO     GP sampling finished (6.1e-05s)
+2026-08-03 12:00:40,285 INFO     Starting iteration 7
+2026-08-03 12:00:40,315 INFO     Testing {'LMP_SCALE_STD_PCT': 137, 'LMP_SCALE_IMP_PCT': 116, 'LMR_C_PERCENT': 395, 'SE_BETA_MARGIN': 6, 'SE_DOUBLE_MARGIN': 16}
+2026-08-03 12:00:40,315 INFO     Start experiment
+2026-08-03 12:01:12,845 INFO     Experiment finished (32.529917s elapsed).
+2026-08-03 12:01:13,017 INFO     Got Elo: -49.97549464331997 +- 52.182042722411545
+2026-08-03 12:01:13,017 INFO     Estimated draw rate: 50.00%
+2026-08-03 12:01:13,017 INFO     Updating model
+2026-08-03 12:01:13,017 INFO     GP sampling finished (5.7e-05s)
+2026-08-03 12:01:13,024 INFO     Starting iteration 8
+2026-08-03 12:01:13,069 INFO     Testing {'LMP_SCALE_STD_PCT': 160, 'LMP_SCALE_IMP_PCT': 60, 'LMR_C_PERCENT': 260, 'SE_BETA_MARGIN': 7, 'SE_DOUBLE_MARGIN': 30}
+2026-08-03 12:01:13,069 INFO     Start experiment
+2026-08-03 12:01:43,115 INFO     Experiment finished (30.044933s elapsed).
+2026-08-03 12:01:43,293 INFO     Got Elo: -66.99643491750545 +- 59.64651815764277
+2026-08-03 12:01:43,293 INFO     Estimated draw rate: 27.27%
+2026-08-03 12:01:43,293 INFO     Updating model
+2026-08-03 12:01:43,294 INFO     GP sampling finished (5.8e-05s)
+2026-08-03 12:01:43,301 INFO     Starting iteration 9
+2026-08-03 12:01:43,323 INFO     Testing {'LMP_SCALE_STD_PCT': 118, 'LMP_SCALE_IMP_PCT': 155, 'LMR_C_PERCENT': 332, 'SE_BETA_MARGIN': 8, 'SE_DOUBLE_MARGIN': 20}
+2026-08-03 12:01:43,323 INFO     Start experiment
+2026-08-03 12:02:14,612 INFO     Experiment finished (31.289053s elapsed).
+2026-08-03 12:02:14,784 INFO     Got Elo: 33.18969402590559 +- 55.44661288534735
+2026-08-03 12:02:14,784 INFO     Estimated draw rate: 54.55%
+2026-08-03 12:02:14,784 INFO     Updating model
+2026-08-03 12:02:14,784 INFO     GP sampling finished (5.8e-05s)
+2026-08-03 12:02:14,791 INFO     Starting iteration 10
+2026-08-03 12:02:14,803 INFO     Testing {'LMP_SCALE_STD_PCT': 102, 'LMP_SCALE_IMP_PCT': 138, 'LMR_C_PERCENT': 349, 'SE_BETA_MARGIN': 4, 'SE_DOUBLE_MARGIN': 10}
+2026-08-03 12:02:14,804 INFO     Start experiment
+2026-08-03 12:02:52,516 INFO     Experiment finished (37.711991s elapsed).
+2026-08-03 12:02:52,683 INFO     Got Elo: 33.18969402590559 +- 50.16731611462015
+2026-08-03 12:02:52,683 INFO     Estimated draw rate: 18.18%
+2026-08-03 12:02:52,683 INFO     Updating model
+2026-08-03 12:02:52,684 INFO     GP sampling finished (6e-05s)
+2026-08-03 12:02:52,691 INFO     Starting iteration 11
+2026-08-03 12:02:52,709 INFO     Testing {'LMP_SCALE_STD_PCT': 84, 'LMP_SCALE_IMP_PCT': 132, 'LMR_C_PERCENT': 408, 'SE_BETA_MARGIN': 1, 'SE_DOUBLE_MARGIN': 25}
+2026-08-03 12:02:52,710 INFO     Start experiment
+2026-08-03 12:03:24,147 INFO     Experiment finished (31.436783s elapsed).
+2026-08-03 12:03:24,315 INFO     Got Elo: -33.189694025905595 +- 55.41941523315901
+2026-08-03 12:03:24,315 INFO     Estimated draw rate: 54.55%
+2026-08-03 12:03:24,315 INFO     Updating model
+2026-08-03 12:03:24,315 INFO     GP sampling finished (5.8e-05s)
+2026-08-03 12:03:24,326 INFO     Starting iteration 12
+2026-08-03 12:03:24,343 INFO     Testing {'LMP_SCALE_STD_PCT': 149, 'LMP_SCALE_IMP_PCT': 92, 'LMR_C_PERCENT': 288, 'SE_BETA_MARGIN': 2, 'SE_DOUBLE_MARGIN': 14}
+2026-08-03 12:03:24,344 INFO     Start experiment
+2026-08-03 12:03:55,297 INFO     Experiment finished (30.952669s elapsed).
+2026-08-03 12:03:55,481 INFO     Got Elo: 16.557074063289978 +- 58.07620678485187
+2026-08-03 12:03:55,481 INFO     Estimated draw rate: 31.82%
+2026-08-03 12:03:55,481 INFO     Updating model
+2026-08-03 12:03:55,481 INFO     GP sampling finished (6.7e-05s)
+2026-08-03 12:03:55,489 INFO     Starting iteration 13
+2026-08-03 12:03:55,501 INFO     Testing {'LMP_SCALE_STD_PCT': 94, 'LMP_SCALE_IMP_PCT': 61, 'LMR_C_PERCENT': 233, 'SE_BETA_MARGIN': 7, 'SE_DOUBLE_MARGIN': 17}
+2026-08-03 12:03:55,501 INFO     Start experiment
+2026-08-03 12:04:27,615 INFO     Experiment finished (32.113171s elapsed).
+2026-08-03 12:04:27,782 INFO     Got Elo: -16.557074063290028 +- 53.15933695055265
+2026-08-03 12:04:27,783 INFO     Estimated draw rate: 40.91%
+2026-08-03 12:04:27,783 INFO     Updating model
+2026-08-03 12:04:27,783 INFO     GP sampling finished (6.3e-05s)
+2026-08-03 12:04:27,790 INFO     Starting iteration 14
+2026-08-03 12:04:27,802 INFO     Testing {'LMP_SCALE_STD_PCT': 116, 'LMP_SCALE_IMP_PCT': 81, 'LMR_C_PERCENT': 213, 'SE_BETA_MARGIN': 3, 'SE_DOUBLE_MARGIN': 19}
+2026-08-03 12:04:27,802 INFO     Start experiment
+2026-08-03 12:04:57,092 INFO     Experiment finished (29.289566s elapsed).
+2026-08-03 12:04:57,282 INFO     Got Elo: 16.557074063289978 +- 58.08156646625798
+2026-08-03 12:04:57,282 INFO     Estimated draw rate: 31.82%
+2026-08-03 12:04:57,282 INFO     Updating model
+2026-08-03 12:04:57,282 INFO     GP sampling finished (7.9e-05s)
+2026-08-03 12:04:57,290 INFO     Starting iteration 15
+2026-08-03 12:04:57,302 INFO     Testing {'LMP_SCALE_STD_PCT': 141, 'LMP_SCALE_IMP_PCT': 63, 'LMR_C_PERCENT': 270, 'SE_BETA_MARGIN': 4, 'SE_DOUBLE_MARGIN': 31}
+2026-08-03 12:04:57,303 INFO     Start experiment
+2026-08-03 12:05:29,855 INFO     Experiment finished (32.551649s elapsed).
+2026-08-03 12:05:30,033 INFO     Got Elo: 33.18969402590559 +- 37.50664732549452
+2026-08-03 12:05:30,034 INFO     Estimated draw rate: 54.55%
+2026-08-03 12:05:30,034 INFO     Updating model
+2026-08-03 12:05:54,649 INFO     GP sampling finished (24.614956s)
+2026-08-03 12:05:54,709 INFO     Starting iteration 16
+2026-08-03 12:05:57,640 INFO     Current optimum:
+{'LMP_SCALE_STD_PCT': 127, 'LMP_SCALE_IMP_PCT': 105, 'LMR_C_PERCENT': 297, 'SE_BETA_MARGIN': 2, 'SE_DOUBLE_MARGIN': 26}
+2026-08-03 12:05:57,640 INFO     Estimated Elo: 14.5507 +- 17.0249
+2026-08-03 12:05:57,640 INFO     90.0% confidence interval of the Elo value: (-13.4527, 42.5541)
+2026-08-03 12:05:57,708 INFO     90.0% confidence intervals of the parameters:
+Parameter          Lower bound  Upper bound
+-------------------------------------------
+LMP_SCALE_STD_PCT           70          168
+LMP_SCALE_IMP_PCT           71          168
+LMR_C_PERCENT              206          429
+SE_BETA_MARGIN               1            7
+SE_DOUBLE_MARGIN            10           31
+
+2026-08-03 12:05:57,708 INFO     Testing {'LMP_SCALE_STD_PCT': 126, 'LMP_SCALE_IMP_PCT': 119, 'LMR_C_PERCENT': 260, 'SE_BETA_MARGIN': 2, 'SE_DOUBLE_MARGIN': 25}
+2026-08-03 12:05:57,709 INFO     Start experiment
+2026-08-03 12:06:27,533 INFO     Experiment finished (29.824148s elapsed).
+2026-08-03 12:06:27,725 INFO     Got Elo: 49.975494643319955 +- 39.71265006386071
+2026-08-03 12:06:27,725 INFO     Estimated draw rate: 40.91%
+2026-08-03 12:06:27,725 INFO     Updating model
+2026-08-03 12:06:29,993 INFO     GP sampling finished (2.267706s)
+2026-08-03 12:06:30,054 INFO     Starting iteration 17
+2026-08-03 12:06:32,960 INFO     Current optimum:
+{'LMP_SCALE_STD_PCT': 127, 'LMP_SCALE_IMP_PCT': 112, 'LMR_C_PERCENT': 278, 'SE_BETA_MARGIN': 2, 'SE_DOUBLE_MARGIN': 25}
+2026-08-03 12:06:32,961 INFO     Estimated Elo: 20.4427 +- 15.9722
+2026-08-03 12:06:32,961 INFO     90.0% confidence interval of the Elo value: (-5.8292, 46.7145)
+2026-08-03 12:06:33,020 INFO     90.0% confidence intervals of the parameters:
+Parameter          Lower bound  Upper bound
+-------------------------------------------
+LMP_SCALE_STD_PCT           61          160
+LMP_SCALE_IMP_PCT           71          167
+LMR_C_PERCENT              204          425
+SE_BETA_MARGIN               1            7
+SE_DOUBLE_MARGIN             9           30
+
+2026-08-03 12:06:33,020 INFO     Testing {'LMP_SCALE_STD_PCT': 129, 'LMP_SCALE_IMP_PCT': 107, 'LMR_C_PERCENT': 290, 'SE_BETA_MARGIN': 2, 'SE_DOUBLE_MARGIN': 26}
+2026-08-03 12:06:33,020 INFO     Start experiment
+2026-08-03 12:07:05,816 INFO     Experiment finished (32.795333s elapsed).
+2026-08-03 12:07:05,987 INFO     Got Elo: 49.975494643319955 +- 71.18440038457595
+2026-08-03 12:07:05,987 INFO     Estimated draw rate: 40.91%
+2026-08-03 12:07:05,987 INFO     Updating model
+2026-08-03 12:07:08,185 INFO     GP sampling finished (2.19801s)
+2026-08-03 12:07:08,200 INFO     Starting iteration 18
+2026-08-03 12:07:11,125 INFO     Current optimum:
+{'LMP_SCALE_STD_PCT': 127, 'LMP_SCALE_IMP_PCT': 111, 'LMR_C_PERCENT': 282, 'SE_BETA_MARGIN': 2, 'SE_DOUBLE_MARGIN': 26}
+2026-08-03 12:07:11,125 INFO     Estimated Elo: 23.4357 +- 15.7121
+2026-08-03 12:07:11,125 INFO     90.0% confidence interval of the Elo value: (-2.4085, 49.2798)
+2026-08-03 12:07:11,185 INFO     90.0% confidence intervals of the parameters:
+Parameter          Lower bound  Upper bound
+-------------------------------------------
+LMP_SCALE_STD_PCT           61          156
+LMP_SCALE_IMP_PCT           73          169
+LMR_C_PERCENT              207          433
+SE_BETA_MARGIN               1            7
+SE_DOUBLE_MARGIN             8           30
+
+2026-08-03 12:07:11,185 INFO     Testing {'LMP_SCALE_STD_PCT': 128, 'LMP_SCALE_IMP_PCT': 112, 'LMR_C_PERCENT': 295, 'SE_BETA_MARGIN': 2, 'SE_DOUBLE_MARGIN': 30}
+2026-08-03 12:07:11,186 INFO     Start experiment
+2026-08-03 12:07:53,118 INFO     Experiment finished (41.932509s elapsed).
+2026-08-03 12:07:53,293 INFO     Got Elo: 16.55707406328996 +- 52.832015423397095
+2026-08-03 12:07:53,293 INFO     Estimated draw rate: 50.00%
+2026-08-03 12:07:53,294 INFO     Updating model
+2026-08-03 12:07:55,419 INFO     GP sampling finished (2.124896s)
+2026-08-03 12:07:55,431 INFO     Starting iteration 19
+2026-08-03 12:07:58,307 INFO     Current optimum:
+{'LMP_SCALE_STD_PCT': 127, 'LMP_SCALE_IMP_PCT': 111, 'LMR_C_PERCENT': 282, 'SE_BETA_MARGIN': 2, 'SE_DOUBLE_MARGIN': 26}
+2026-08-03 12:07:58,307 INFO     Estimated Elo: 23.8136 +- 15.6452
+2026-08-03 12:07:58,307 INFO     90.0% confidence interval of the Elo value: (-1.9204, 49.5476)
+2026-08-03 12:07:58,356 INFO     90.0% confidence intervals of the parameters:
+Parameter          Lower bound  Upper bound
+-------------------------------------------
+LMP_SCALE_STD_PCT           62          161
+LMP_SCALE_IMP_PCT           72          170
+LMR_C_PERCENT              200          424
+SE_BETA_MARGIN               1            7
+SE_DOUBLE_MARGIN             9           30
+
+2026-08-03 12:07:58,356 INFO     Testing {'LMP_SCALE_STD_PCT': 166, 'LMP_SCALE_IMP_PCT': 124, 'LMR_C_PERCENT': 248, 'SE_BETA_MARGIN': 3, 'SE_DOUBLE_MARGIN': 22}
+2026-08-03 12:07:58,356 INFO     Start experiment
+2026-08-03 12:08:27,802 INFO     Experiment finished (29.445163s elapsed).
+2026-08-03 12:08:27,951 INFO     Got Elo: -0.0 +- 60.64462476437761
+2026-08-03 12:08:27,951 INFO     Estimated draw rate: 45.45%
+2026-08-03 12:08:27,951 INFO     Updating model
+2026-08-03 12:08:30,187 INFO     GP sampling finished (2.235989s)
+2026-08-03 12:08:30,198 INFO     Starting iteration 20
+2026-08-03 12:08:32,878 INFO     Current optimum:
+{'LMP_SCALE_STD_PCT': 127, 'LMP_SCALE_IMP_PCT': 111, 'LMR_C_PERCENT': 282, 'SE_BETA_MARGIN': 2, 'SE_DOUBLE_MARGIN': 26}
+2026-08-03 12:08:32,878 INFO     Estimated Elo: 22.6892 +- 15.2919
+2026-08-03 12:08:32,878 INFO     90.0% confidence interval of the Elo value: (-2.4638, 47.8422)
+2026-08-03 12:08:32,927 INFO     90.0% confidence intervals of the parameters:
+Parameter          Lower bound  Upper bound
+-------------------------------------------
+LMP_SCALE_STD_PCT           62          160
+LMP_SCALE_IMP_PCT           72          166
+LMR_C_PERCENT              211          436
+SE_BETA_MARGIN               1            7
+SE_DOUBLE_MARGIN             9           30
+
+2026-08-03 12:08:32,927 INFO     Testing {'LMP_SCALE_STD_PCT': 129, 'LMP_SCALE_IMP_PCT': 128, 'LMR_C_PERCENT': 290, 'SE_BETA_MARGIN': 3, 'SE_DOUBLE_MARGIN': 25}
+2026-08-03 12:08:32,927 INFO     Start experiment
+2026-08-03 12:09:04,920 INFO     Experiment finished (31.992487s elapsed).
+2026-08-03 12:09:05,099 INFO     Got Elo: -16.557074063290028 +- 47.484307747230154
+2026-08-03 12:09:05,099 INFO     Estimated draw rate: 50.00%
+2026-08-03 12:09:05,099 INFO     Updating model
+2026-08-03 12:09:07,339 INFO     GP sampling finished (2.240007s)
+2026-08-03 12:09:07,352 INFO     Starting iteration 21
+2026-08-03 12:09:10,325 INFO     Current optimum:
+{'LMP_SCALE_STD_PCT': 126, 'LMP_SCALE_IMP_PCT': 108, 'LMR_C_PERCENT': 283, 'SE_BETA_MARGIN': 2, 'SE_DOUBLE_MARGIN': 26}
+2026-08-03 12:09:10,325 INFO     Estimated Elo: 20.1405 +- 14.9963
+2026-08-03 12:09:10,325 INFO     90.0% confidence interval of the Elo value: (-4.5262, 44.8071)
+2026-08-03 12:09:10,373 INFO     90.0% confidence intervals of the parameters:
+Parameter          Lower bound  Upper bound
+-------------------------------------------
+LMP_SCALE_STD_PCT           64          162
+LMP_SCALE_IMP_PCT           72          170
+LMR_C_PERCENT              222          447
+SE_BETA_MARGIN               1            7
+SE_DOUBLE_MARGIN             8           29
+
+2026-08-03 12:09:10,373 INFO     Testing {'LMP_SCALE_STD_PCT': 132, 'LMP_SCALE_IMP_PCT': 104, 'LMR_C_PERCENT': 232, 'SE_BETA_MARGIN': 2, 'SE_DOUBLE_MARGIN': 25}
+2026-08-03 12:09:10,374 INFO     Start experiment
+2026-08-03 12:09:40,032 INFO     Experiment finished (29.658215s elapsed).
+2026-08-03 12:09:40,219 INFO     Got Elo: -16.557074063290028 +- 53.021649021958986
+2026-08-03 12:09:40,219 INFO     Estimated draw rate: 59.09%
+2026-08-03 12:09:40,219 INFO     Updating model
+2026-08-03 12:09:42,490 INFO     GP sampling finished (2.271658s)
+2026-08-03 12:09:42,502 INFO     Starting iteration 22
+2026-08-03 12:09:45,446 INFO     Current optimum:
+{'LMP_SCALE_STD_PCT': 126, 'LMP_SCALE_IMP_PCT': 108, 'LMR_C_PERCENT': 289, 'SE_BETA_MARGIN': 2, 'SE_DOUBLE_MARGIN': 26}
+2026-08-03 12:09:45,446 INFO     Estimated Elo: 17.8115 +- 14.5655
+2026-08-03 12:09:45,446 INFO     90.0% confidence interval of the Elo value: (-6.1466, 41.7696)
+2026-08-03 12:09:45,496 INFO     90.0% confidence intervals of the parameters:
+Parameter          Lower bound  Upper bound
+-------------------------------------------
+LMP_SCALE_STD_PCT           62          160
+LMP_SCALE_IMP_PCT           75          169
+LMR_C_PERCENT              210          435
+SE_BETA_MARGIN               1            7
+SE_DOUBLE_MARGIN             9           30
+
+2026-08-03 12:09:45,496 INFO     Testing {'LMP_SCALE_STD_PCT': 102, 'LMP_SCALE_IMP_PCT': 89, 'LMR_C_PERCENT': 268, 'SE_BETA_MARGIN': 2, 'SE_DOUBLE_MARGIN': 24}
+2026-08-03 12:09:45,496 INFO     Start experiment
+2026-08-03 12:10:16,078 INFO     Experiment finished (30.581241s elapsed).
+2026-08-03 12:10:16,249 INFO     Got Elo: 66.99643491750541 +- 59.01270781363531
+2026-08-03 12:10:16,249 INFO     Estimated draw rate: 45.45%
+2026-08-03 12:10:16,249 INFO     Updating model
+2026-08-03 12:10:18,523 INFO     GP sampling finished (2.274061s)
+2026-08-03 12:10:18,535 INFO     Starting iteration 23
+2026-08-03 12:10:21,786 INFO     Current optimum:
+{'LMP_SCALE_STD_PCT': 122, 'LMP_SCALE_IMP_PCT': 105, 'LMR_C_PERCENT': 288, 'SE_BETA_MARGIN': 2, 'SE_DOUBLE_MARGIN': 26}
+2026-08-03 12:10:21,786 INFO     Estimated Elo: 20.9571 +- 14.7082
+2026-08-03 12:10:21,786 INFO     90.0% confidence interval of the Elo value: (-3.2358, 45.15)
+2026-08-03 12:10:21,836 INFO     90.0% confidence intervals of the parameters:
+Parameter          Lower bound  Upper bound
+-------------------------------------------
+LMP_SCALE_STD_PCT           65          164
+LMP_SCALE_IMP_PCT           62          161
+LMR_C_PERCENT              201          428
+SE_BETA_MARGIN               2            8
+SE_DOUBLE_MARGIN             8           29
+
+2026-08-03 12:10:21,836 INFO     Testing {'LMP_SCALE_STD_PCT': 104, 'LMP_SCALE_IMP_PCT': 96, 'LMR_C_PERCENT': 280, 'SE_BETA_MARGIN': 3, 'SE_DOUBLE_MARGIN': 22}
+2026-08-03 12:10:21,837 INFO     Start experiment
+2026-08-03 12:10:55,355 INFO     Experiment finished (33.518503s elapsed).
+2026-08-03 12:10:55,533 INFO     Got Elo: -84.3413461259573 +- 75.50283545842973
+2026-08-03 12:10:55,533 INFO     Estimated draw rate: 31.82%
+2026-08-03 12:10:55,533 INFO     Updating model
+2026-08-03 12:10:57,792 INFO     GP sampling finished (2.258817s)
+2026-08-03 12:10:57,853 INFO     Starting iteration 24
+2026-08-03 12:11:00,689 INFO     Current optimum:
+{'LMP_SCALE_STD_PCT': 125, 'LMP_SCALE_IMP_PCT': 107, 'LMR_C_PERCENT': 288, 'SE_BETA_MARGIN': 2, 'SE_DOUBLE_MARGIN': 26}
+2026-08-03 12:11:00,689 INFO     Estimated Elo: 18.3384 +- 15.4385
+2026-08-03 12:11:00,689 INFO     90.0% confidence interval of the Elo value: (-7.0556, 43.7324)
+2026-08-03 12:11:00,739 INFO     90.0% confidence intervals of the parameters:
+Parameter          Lower bound  Upper bound
+-------------------------------------------
+LMP_SCALE_STD_PCT           61          161
+LMP_SCALE_IMP_PCT           66          163
+LMR_C_PERCENT              200          422
+SE_BETA_MARGIN               1            7
+SE_DOUBLE_MARGIN            10           32
+
+2026-08-03 12:11:00,739 INFO     Testing {'LMP_SCALE_STD_PCT': 112, 'LMP_SCALE_IMP_PCT': 109, 'LMR_C_PERCENT': 353, 'SE_BETA_MARGIN': 1, 'SE_DOUBLE_MARGIN': 27}
+2026-08-03 12:11:00,739 INFO     Start experiment
+2026-08-03 12:11:36,369 INFO     Experiment finished (35.629406s elapsed).
+2026-08-03 12:11:36,549 INFO     Got Elo: -66.99643491750538 +- 47.61952088227896
+2026-08-03 12:11:36,550 INFO     Estimated draw rate: 45.45%
+2026-08-03 12:11:36,550 INFO     Updating model
+2026-08-03 12:11:38,747 INFO     GP sampling finished (2.197039s)
+2026-08-03 12:11:38,758 INFO     Starting iteration 25
+2026-08-03 12:11:41,644 INFO     Current optimum:
+{'LMP_SCALE_STD_PCT': 127, 'LMP_SCALE_IMP_PCT': 109, 'LMR_C_PERCENT': 278, 'SE_BETA_MARGIN': 2, 'SE_DOUBLE_MARGIN': 26}
+2026-08-03 12:11:41,644 INFO     Estimated Elo: 14.6041 +- 15.109
+2026-08-03 12:11:41,644 INFO     90.0% confidence interval of the Elo value: (-10.248, 39.4561)
+2026-08-03 12:11:41,694 INFO     90.0% confidence intervals of the parameters:
+Parameter          Lower bound  Upper bound
+-------------------------------------------
+LMP_SCALE_STD_PCT           60          159
+LMP_SCALE_IMP_PCT           60          156
+LMR_C_PERCENT              215          439
+SE_BETA_MARGIN               1            7
+SE_DOUBLE_MARGIN            10           31
+
+2026-08-03 12:11:41,694 INFO     Testing {'LMP_SCALE_STD_PCT': 138, 'LMP_SCALE_IMP_PCT': 104, 'LMR_C_PERCENT': 276, 'SE_BETA_MARGIN': 2, 'SE_DOUBLE_MARGIN': 28}
+2026-08-03 12:11:41,694 INFO     Start experiment
+2026-08-03 12:12:14,628 INFO     Experiment finished (32.934103s elapsed).
+2026-08-03 12:12:14,819 INFO     Got Elo: 16.55707406329004 +- 47.54221122602464
+2026-08-03 12:12:14,819 INFO     Estimated draw rate: 40.91%
+2026-08-03 12:12:14,819 INFO     Updating model
+2026-08-03 12:12:17,114 INFO     GP sampling finished (2.294835s)
+2026-08-03 12:12:17,125 INFO     Starting iteration 26
+2026-08-03 12:12:20,255 INFO     Current optimum:
+{'LMP_SCALE_STD_PCT': 127, 'LMP_SCALE_IMP_PCT': 109, 'LMR_C_PERCENT': 278, 'SE_BETA_MARGIN': 2, 'SE_DOUBLE_MARGIN': 26}
+2026-08-03 12:12:20,255 INFO     Estimated Elo: 14.6761 +- 14.3316
+2026-08-03 12:12:20,255 INFO     90.0% confidence interval of the Elo value: (-8.8973, 38.2494)
+2026-08-03 12:12:20,304 INFO     90.0% confidence intervals of the parameters:
+Parameter          Lower bound  Upper bound
+-------------------------------------------
+LMP_SCALE_STD_PCT           62          159
+LMP_SCALE_IMP_PCT           72          169
+LMR_C_PERCENT              210          436
+SE_BETA_MARGIN               1            7
+SE_DOUBLE_MARGIN            10           31
+
+2026-08-03 12:12:20,305 INFO     Testing {'LMP_SCALE_STD_PCT': 130, 'LMP_SCALE_IMP_PCT': 139, 'LMR_C_PERCENT': 261, 'SE_BETA_MARGIN': 4, 'SE_DOUBLE_MARGIN': 16}
+2026-08-03 12:12:20,305 INFO     Start experiment
+2026-08-03 12:12:55,383 INFO     Experiment finished (35.078336s elapsed).
+2026-08-03 12:12:55,560 INFO     Got Elo: 16.55707406329004 +- 47.536708867052376
+2026-08-03 12:12:55,560 INFO     Estimated draw rate: 50.00%
+2026-08-03 12:12:55,560 INFO     Updating model
+2026-08-03 12:12:57,783 INFO     GP sampling finished (2.222054s)
+2026-08-03 12:12:57,795 INFO     Starting iteration 27
+2026-08-03 12:13:00,859 INFO     Current optimum:
+{'LMP_SCALE_STD_PCT': 127, 'LMP_SCALE_IMP_PCT': 109, 'LMR_C_PERCENT': 278, 'SE_BETA_MARGIN': 2, 'SE_DOUBLE_MARGIN': 26}
+2026-08-03 12:13:00,859 INFO     Estimated Elo: 14.6427 +- 14.219
+2026-08-03 12:13:00,859 INFO     90.0% confidence interval of the Elo value: (-8.7455, 38.0308)
+2026-08-03 12:13:00,930 INFO     90.0% confidence intervals of the parameters:
+Parameter          Lower bound  Upper bound
+-------------------------------------------
+LMP_SCALE_STD_PCT           61          162
+LMP_SCALE_IMP_PCT           72          168
+LMR_C_PERCENT              201          425
+SE_BETA_MARGIN               1            7
+SE_DOUBLE_MARGIN             9           30
+
+2026-08-03 12:13:00,930 INFO     Testing {'LMP_SCALE_STD_PCT': 136, 'LMP_SCALE_IMP_PCT': 111, 'LMR_C_PERCENT': 282, 'SE_BETA_MARGIN': 3, 'SE_DOUBLE_MARGIN': 21}
+2026-08-03 12:13:00,930 INFO     Start experiment
+2026-08-03 12:13:34,515 INFO     Experiment finished (33.584581s elapsed).
+2026-08-03 12:13:34,682 INFO     Got Elo: -16.55707406328996 +- 62.72229503020086
+2026-08-03 12:13:34,682 INFO     Estimated draw rate: 50.00%
+2026-08-03 12:13:34,682 INFO     Updating model
+2026-08-03 12:13:37,033 INFO     GP sampling finished (2.35096s)
+2026-08-03 12:13:37,094 INFO     Starting iteration 28
+2026-08-03 12:13:39,938 INFO     Current optimum:
+{'LMP_SCALE_STD_PCT': 127, 'LMP_SCALE_IMP_PCT': 109, 'LMR_C_PERCENT': 277, 'SE_BETA_MARGIN': 2, 'SE_DOUBLE_MARGIN': 26}
+2026-08-03 12:13:39,938 INFO     Estimated Elo: 13.5963 +- 13.9963
+2026-08-03 12:13:39,938 INFO     90.0% confidence interval of the Elo value: (-9.4256, 36.6183)
+2026-08-03 12:13:39,994 INFO     90.0% confidence intervals of the parameters:
+Parameter          Lower bound  Upper bound
+-------------------------------------------
+LMP_SCALE_STD_PCT           61          160
+LMP_SCALE_IMP_PCT           62          160
+LMR_C_PERCENT              219          444
+SE_BETA_MARGIN               1            7
+SE_DOUBLE_MARGIN             9           30
+
+2026-08-03 12:13:39,994 INFO     Testing {'LMP_SCALE_STD_PCT': 116, 'LMP_SCALE_IMP_PCT': 110, 'LMR_C_PERCENT': 287, 'SE_BETA_MARGIN': 2, 'SE_DOUBLE_MARGIN': 22}
+2026-08-03 12:13:39,994 INFO     Start experiment
+2026-08-03 12:14:08,982 INFO     Experiment finished (28.987659s elapsed).
+2026-08-03 12:14:09,159 INFO     Got Elo: -0.0 +- 60.6488486181422
+2026-08-03 12:14:09,159 INFO     Estimated draw rate: 45.45%
+2026-08-03 12:14:09,159 INFO     Updating model
+2026-08-03 12:14:11,578 INFO     GP sampling finished (2.418485s)
+2026-08-03 12:14:11,590 INFO     Starting iteration 29
+2026-08-03 12:14:14,862 INFO     Current optimum:
+{'LMP_SCALE_STD_PCT': 127, 'LMP_SCALE_IMP_PCT': 109, 'LMR_C_PERCENT': 277, 'SE_BETA_MARGIN': 2, 'SE_DOUBLE_MARGIN': 26}
+2026-08-03 12:14:14,863 INFO     Estimated Elo: 12.9187 +- 13.6282
+2026-08-03 12:14:14,863 INFO     90.0% confidence interval of the Elo value: (-9.4977, 35.3351)
+2026-08-03 12:14:14,949 INFO     90.0% confidence intervals of the parameters:
+Parameter          Lower bound  Upper bound
+-------------------------------------------
+LMP_SCALE_STD_PCT           60          161
+LMP_SCALE_IMP_PCT           61          162
+LMR_C_PERCENT              203          426
+SE_BETA_MARGIN               1            7
+SE_DOUBLE_MARGIN             9           29
+
+2026-08-03 12:14:14,949 INFO     Testing {'LMP_SCALE_STD_PCT': 86, 'LMP_SCALE_IMP_PCT': 156, 'LMR_C_PERCENT': 365, 'SE_BETA_MARGIN': 2, 'SE_DOUBLE_MARGIN': 13}
+2026-08-03 12:14:14,949 INFO     Start experiment
+2026-08-03 12:14:42,424 INFO     Experiment finished (27.474339s elapsed).
+2026-08-03 12:14:42,612 INFO     Got Elo: -66.99643491750545 +- 59.585227989821796
+2026-08-03 12:14:42,613 INFO     Estimated draw rate: 54.55%
+2026-08-03 12:14:42,613 INFO     Updating model
+2026-08-03 12:14:45,065 INFO     GP sampling finished (2.451681s)
+2026-08-03 12:14:45,079 INFO     Starting iteration 30
+2026-08-03 12:14:48,550 INFO     Current optimum:
+{'LMP_SCALE_STD_PCT': 127, 'LMP_SCALE_IMP_PCT': 109, 'LMR_C_PERCENT': 278, 'SE_BETA_MARGIN': 2, 'SE_DOUBLE_MARGIN': 26}
+2026-08-03 12:14:48,550 INFO     Estimated Elo: 11.6232 +- 13.6714
+2026-08-03 12:14:48,550 INFO     90.0% confidence interval of the Elo value: (-10.8642, 34.1106)
+2026-08-03 12:14:48,603 INFO     90.0% confidence intervals of the parameters:
+Parameter          Lower bound  Upper bound
+-------------------------------------------
+LMP_SCALE_STD_PCT           63          161
+LMP_SCALE_IMP_PCT           61          161
+LMR_C_PERCENT              204          427
+SE_BETA_MARGIN               1            7
+SE_DOUBLE_MARGIN            10           31
+
+2026-08-03 12:14:48,604 INFO     Testing {'LMP_SCALE_STD_PCT': 141, 'LMP_SCALE_IMP_PCT': 117, 'LMR_C_PERCENT': 306, 'SE_BETA_MARGIN': 2, 'SE_DOUBLE_MARGIN': 27}
+2026-08-03 12:14:48,604 INFO     Start experiment
+2026-08-03 12:15:19,974 INFO     Experiment finished (31.370446s elapsed).
+2026-08-03 12:15:20,151 INFO     Got Elo: -49.97549464331997 +- 62.51573773364319
+2026-08-03 12:15:20,151 INFO     Estimated draw rate: 31.82%
+2026-08-03 12:15:20,151 INFO     Updating model
+2026-08-03 12:15:22,485 INFO     GP sampling finished (2.333409s)
+2026-08-03 12:15:22,498 INFO     Starting iteration 31
+2026-08-03 12:15:25,749 INFO     Current optimum:
+{'LMP_SCALE_STD_PCT': 125, 'LMP_SCALE_IMP_PCT': 108, 'LMR_C_PERCENT': 272, 'SE_BETA_MARGIN': 2, 'SE_DOUBLE_MARGIN': 26}
+2026-08-03 12:15:25,750 INFO     Estimated Elo: 9.2064 +- 13.6847
+2026-08-03 12:15:25,750 INFO     90.0% confidence interval of the Elo value: (-13.3029, 31.7158)
+2026-08-03 12:15:25,801 INFO     90.0% confidence intervals of the parameters:
+Parameter          Lower bound  Upper bound
+-------------------------------------------
+LMP_SCALE_STD_PCT           66          165
+LMP_SCALE_IMP_PCT           69          166
+LMR_C_PERCENT              227          449
+SE_BETA_MARGIN               2            8
+SE_DOUBLE_MARGIN             9           30
+
+2026-08-03 12:15:25,801 INFO     Testing {'LMP_SCALE_STD_PCT': 147, 'LMP_SCALE_IMP_PCT': 123, 'LMR_C_PERCENT': 256, 'SE_BETA_MARGIN': 5, 'SE_DOUBLE_MARGIN': 17}
+2026-08-03 12:15:25,801 INFO     Start experiment
+2026-08-03 12:16:01,438 INFO     Experiment finished (35.636684s elapsed).
+2026-08-03 12:16:01,606 INFO     Got Elo: -0.0 +- 44.801412366572954
+2026-08-03 12:16:01,606 INFO     Estimated draw rate: 54.55%
+2026-08-03 12:16:01,606 INFO     Updating model
+2026-08-03 12:16:03,854 INFO     GP sampling finished (2.248254s)
+2026-08-03 12:16:03,867 INFO     Starting iteration 32
+2026-08-03 12:16:07,118 INFO     Current optimum:
+{'LMP_SCALE_STD_PCT': 125, 'LMP_SCALE_IMP_PCT': 108, 'LMR_C_PERCENT': 272, 'SE_BETA_MARGIN': 2, 'SE_DOUBLE_MARGIN': 26}
+2026-08-03 12:16:07,118 INFO     Estimated Elo: 8.9205 +- 13.4841
+2026-08-03 12:16:07,118 INFO     90.0% confidence interval of the Elo value: (-13.2589, 31.1)
+2026-08-03 12:16:07,169 INFO     90.0% confidence intervals of the parameters:
+Parameter          Lower bound  Upper bound
+-------------------------------------------
+LMP_SCALE_STD_PCT           62          160
+LMP_SCALE_IMP_PCT           64          162
+LMR_C_PERCENT              202          430
+SE_BETA_MARGIN               1            7
+SE_DOUBLE_MARGIN             9           30
+
+2026-08-03 12:16:07,169 INFO     Testing {'LMP_SCALE_STD_PCT': 153, 'LMP_SCALE_IMP_PCT': 134, 'LMR_C_PERCENT': 213, 'SE_BETA_MARGIN': 4, 'SE_DOUBLE_MARGIN': 22}
+2026-08-03 12:16:07,169 INFO     Start experiment
+2026-08-03 12:16:36,421 INFO     Experiment finished (29.251083s elapsed).
+2026-08-03 12:16:36,592 INFO     Got Elo: -0.0 +- 55.724402032985495
+2026-08-03 12:16:36,592 INFO     Estimated draw rate: 45.45%
+2026-08-03 12:16:36,592 INFO     Updating model
+2026-08-03 12:16:38,883 INFO     GP sampling finished (2.290832s)
+2026-08-03 12:16:38,945 INFO     Starting iteration 33
+2026-08-03 12:16:42,071 INFO     Current optimum:
+{'LMP_SCALE_STD_PCT': 125, 'LMP_SCALE_IMP_PCT': 108, 'LMR_C_PERCENT': 273, 'SE_BETA_MARGIN': 2, 'SE_DOUBLE_MARGIN': 26}
+2026-08-03 12:16:42,071 INFO     Estimated Elo: 8.6293 +- 13.2527
+2026-08-03 12:16:42,071 INFO     90.0% confidence interval of the Elo value: (-13.1695, 30.428)
+2026-08-03 12:16:42,123 INFO     90.0% confidence intervals of the parameters:
+Parameter          Lower bound  Upper bound
+-------------------------------------------
+LMP_SCALE_STD_PCT           61          158
+LMP_SCALE_IMP_PCT           62          160
+LMR_C_PERCENT              201          430
+SE_BETA_MARGIN               1            7
+SE_DOUBLE_MARGIN             8           30
+
+2026-08-03 12:16:42,123 INFO     Testing {'LMP_SCALE_STD_PCT': 123, 'LMP_SCALE_IMP_PCT': 75, 'LMR_C_PERCENT': 283, 'SE_BETA_MARGIN': 2, 'SE_DOUBLE_MARGIN': 31}
+2026-08-03 12:16:42,123 INFO     Start experiment
+2026-08-03 12:17:14,795 INFO     Experiment finished (32.671991s elapsed).
+2026-08-03 12:17:14,977 INFO     Got Elo: 33.18969402590559 +- 44.01514829591695
+2026-08-03 12:17:14,977 INFO     Estimated draw rate: 36.36%
+2026-08-03 12:17:14,978 INFO     Updating model
+2026-08-03 12:17:17,314 INFO     GP sampling finished (2.336312s)
+2026-08-03 12:17:17,327 INFO     Starting iteration 34
+2026-08-03 12:17:20,678 INFO     Current optimum:
+{'LMP_SCALE_STD_PCT': 125, 'LMP_SCALE_IMP_PCT': 104, 'LMR_C_PERCENT': 275, 'SE_BETA_MARGIN': 2, 'SE_DOUBLE_MARGIN': 26}
+2026-08-03 12:17:20,678 INFO     Estimated Elo: 9.5856 +- 13.2163
+2026-08-03 12:17:20,678 INFO     90.0% confidence interval of the Elo value: (-12.1533, 31.3245)
+2026-08-03 12:17:20,730 INFO     90.0% confidence intervals of the parameters:
+Parameter          Lower bound  Upper bound
+-------------------------------------------
+LMP_SCALE_STD_PCT           60          158
+LMP_SCALE_IMP_PCT           62          161
+LMR_C_PERCENT              210          429
+SE_BETA_MARGIN               1            7
+SE_DOUBLE_MARGIN             9           30
+
+2026-08-03 12:17:20,731 INFO     Testing {'LMP_SCALE_STD_PCT': 111, 'LMP_SCALE_IMP_PCT': 79, 'LMR_C_PERCENT': 266, 'SE_BETA_MARGIN': 2, 'SE_DOUBLE_MARGIN': 25}
+2026-08-03 12:17:20,731 INFO     Start experiment
+2026-08-03 12:17:56,179 INFO     Experiment finished (35.447866s elapsed).
+2026-08-03 12:17:56,359 INFO     Got Elo: -49.97549464331997 +- 39.73776451356512
+2026-08-03 12:17:56,359 INFO     Estimated draw rate: 50.00%
+2026-08-03 12:17:56,359 INFO     Updating model
+2026-08-03 12:17:58,660 INFO     GP sampling finished (2.300922s)
+2026-08-03 12:17:58,673 INFO     Starting iteration 35
+2026-08-03 12:18:01,916 INFO     Current optimum:
+{'LMP_SCALE_STD_PCT': 127, 'LMP_SCALE_IMP_PCT': 113, 'LMR_C_PERCENT': 271, 'SE_BETA_MARGIN': 2, 'SE_DOUBLE_MARGIN': 26}
+2026-08-03 12:18:01,916 INFO     Estimated Elo: 6.9557 +- 12.8765
+2026-08-03 12:18:01,916 INFO     90.0% confidence interval of the Elo value: (-14.2244, 28.1357)
+2026-08-03 12:18:02,010 INFO     90.0% confidence intervals of the parameters:
+Parameter          Lower bound  Upper bound
+-------------------------------------------
+LMP_SCALE_STD_PCT           60          159
+LMP_SCALE_IMP_PCT           62          160
+LMR_C_PERCENT              222          441
+SE_BETA_MARGIN               1            7
+SE_DOUBLE_MARGIN             9           30
+
+2026-08-03 12:18:02,010 INFO     Testing {'LMP_SCALE_STD_PCT': 135, 'LMP_SCALE_IMP_PCT': 122, 'LMR_C_PERCENT': 241, 'SE_BETA_MARGIN': 2, 'SE_DOUBLE_MARGIN': 24}
+2026-08-03 12:18:02,011 INFO     Start experiment
+2026-08-03 12:18:35,818 INFO     Experiment finished (33.806861s elapsed).
+2026-08-03 12:18:35,963 INFO     Got Elo: 33.18969402590552 +- 64.78081364809277
+2026-08-03 12:18:35,963 INFO     Estimated draw rate: 45.45%
+2026-08-03 12:18:35,963 INFO     Updating model
+2026-08-03 12:18:38,271 INFO     GP sampling finished (2.307976s)
+2026-08-03 12:18:38,340 INFO     Starting iteration 36
+2026-08-03 12:18:41,392 INFO     Current optimum:
+{'LMP_SCALE_STD_PCT': 127, 'LMP_SCALE_IMP_PCT': 115, 'LMR_C_PERCENT': 264, 'SE_BETA_MARGIN': 2, 'SE_DOUBLE_MARGIN': 26}
+2026-08-03 12:18:41,392 INFO     Estimated Elo: 7.9941 +- 12.7368
+2026-08-03 12:18:41,392 INFO     90.0% confidence interval of the Elo value: (-12.9561, 28.9444)
+2026-08-03 12:18:41,443 INFO     90.0% confidence intervals of the parameters:
+Parameter          Lower bound  Upper bound
+-------------------------------------------
+LMP_SCALE_STD_PCT           61          155
+LMP_SCALE_IMP_PCT           73          170
+LMR_C_PERCENT              214          443
+SE_BETA_MARGIN               1            7
+SE_DOUBLE_MARGIN            11           31
+
+2026-08-03 12:18:41,444 INFO     Testing {'LMP_SCALE_STD_PCT': 118, 'LMP_SCALE_IMP_PCT': 108, 'LMR_C_PERCENT': 311, 'SE_BETA_MARGIN': 2, 'SE_DOUBLE_MARGIN': 27}
+2026-08-03 12:18:41,444 INFO     Start experiment
+2026-08-03 12:19:13,232 INFO     Experiment finished (31.788091s elapsed).
+2026-08-03 12:19:13,404 INFO     Got Elo: 33.18969402590559 +- 55.36430238723716
+2026-08-03 12:19:13,404 INFO     Estimated draw rate: 54.55%
+2026-08-03 12:19:13,404 INFO     Updating model
+2026-08-03 12:19:15,738 INFO     GP sampling finished (2.334114s)
+2026-08-03 12:19:15,807 INFO     Starting iteration 37
+2026-08-03 12:19:19,049 INFO     Current optimum:
+{'LMP_SCALE_STD_PCT': 126, 'LMP_SCALE_IMP_PCT': 113, 'LMR_C_PERCENT': 272, 'SE_BETA_MARGIN': 2, 'SE_DOUBLE_MARGIN': 26}
+2026-08-03 12:19:19,049 INFO     Estimated Elo: 8.8432 +- 12.3307
+2026-08-03 12:19:19,049 INFO     90.0% confidence interval of the Elo value: (-11.439, 29.1254)
+2026-08-03 12:19:19,101 INFO     90.0% confidence intervals of the parameters:
+Parameter          Lower bound  Upper bound
+-------------------------------------------
+LMP_SCALE_STD_PCT           64          162
+LMP_SCALE_IMP_PCT           62          160
+LMR_C_PERCENT              213          430
+SE_BETA_MARGIN               1            7
+SE_DOUBLE_MARGIN             9           30
+
+2026-08-03 12:19:19,101 INFO     Testing {'LMP_SCALE_STD_PCT': 72, 'LMP_SCALE_IMP_PCT': 113, 'LMR_C_PERCENT': 326, 'SE_BETA_MARGIN': 5, 'SE_DOUBLE_MARGIN': 15}
+2026-08-03 12:19:19,101 INFO     Start experiment
+2026-08-03 12:19:46,856 INFO     Experiment finished (27.755011s elapsed).
+2026-08-03 12:19:47,031 INFO     Got Elo: -16.55707406328996 +- 57.91145567920874
+2026-08-03 12:19:47,031 INFO     Estimated draw rate: 40.91%
+2026-08-03 12:19:47,031 INFO     Updating model
+2026-08-03 12:19:49,388 INFO     GP sampling finished (2.356459s)
+2026-08-03 12:19:49,457 INFO     Starting iteration 38
+2026-08-03 12:19:52,646 INFO     Current optimum:
+{'LMP_SCALE_STD_PCT': 127, 'LMP_SCALE_IMP_PCT': 113, 'LMR_C_PERCENT': 272, 'SE_BETA_MARGIN': 2, 'SE_DOUBLE_MARGIN': 26}
+2026-08-03 12:19:52,646 INFO     Estimated Elo: 8.5089 +- 12.2692
+2026-08-03 12:19:52,646 INFO     90.0% confidence interval of the Elo value: (-11.6722, 28.6901)
+2026-08-03 12:19:52,697 INFO     90.0% confidence intervals of the parameters:
+Parameter          Lower bound  Upper bound
+-------------------------------------------
+LMP_SCALE_STD_PCT           75          170
+LMP_SCALE_IMP_PCT           62          159
+LMR_C_PERCENT              200          424
+SE_BETA_MARGIN               1            7
+SE_DOUBLE_MARGIN            10           31
+
+2026-08-03 12:19:52,697 INFO     Testing {'LMP_SCALE_STD_PCT': 130, 'LMP_SCALE_IMP_PCT': 92, 'LMR_C_PERCENT': 284, 'SE_BETA_MARGIN': 2, 'SE_DOUBLE_MARGIN': 31}
+2026-08-03 12:19:52,698 INFO     Start experiment
+2026-08-03 12:20:22,006 INFO     Experiment finished (29.308004s elapsed).
+2026-08-03 12:20:22,181 INFO     Got Elo: -0.0 +- 44.852035783758076
+2026-08-03 12:20:22,181 INFO     Estimated draw rate: 54.55%
+2026-08-03 12:20:22,181 INFO     Updating model
+2026-08-03 12:20:24,534 INFO     GP sampling finished (2.352813s)
+2026-08-03 12:20:24,548 INFO     Starting iteration 39
+2026-08-03 12:20:27,647 INFO     Current optimum:
+{'LMP_SCALE_STD_PCT': 126, 'LMP_SCALE_IMP_PCT': 114, 'LMR_C_PERCENT': 270, 'SE_BETA_MARGIN': 2, 'SE_DOUBLE_MARGIN': 26}
+2026-08-03 12:20:27,647 INFO     Estimated Elo: 8.4863 +- 12.4012
+2026-08-03 12:20:27,647 INFO     90.0% confidence interval of the Elo value: (-11.9119, 28.8845)
+2026-08-03 12:20:27,698 INFO     90.0% confidence intervals of the parameters:
+Parameter          Lower bound  Upper bound
+-------------------------------------------
+LMP_SCALE_STD_PCT           62          162
+LMP_SCALE_IMP_PCT           69          168
+LMR_C_PERCENT              222          449
+SE_BETA_MARGIN               1            7
+SE_DOUBLE_MARGIN             9           30
+
+2026-08-03 12:20:27,698 INFO     Testing {'LMP_SCALE_STD_PCT': 162, 'LMP_SCALE_IMP_PCT': 127, 'LMR_C_PERCENT': 242, 'SE_BETA_MARGIN': 4, 'SE_DOUBLE_MARGIN': 19}
+2026-08-03 12:20:27,698 INFO     Start experiment
+2026-08-03 12:20:57,994 INFO     Experiment finished (30.295071s elapsed).
+2026-08-03 12:20:58,172 INFO     Got Elo: -66.99643491750545 +- 58.97449536589
+2026-08-03 12:20:58,172 INFO     Estimated draw rate: 36.36%
+2026-08-03 12:20:58,172 INFO     Updating model
+2026-08-03 12:21:00,480 INFO     GP sampling finished (2.307928s)
+2026-08-03 12:21:00,542 INFO     Starting iteration 40
+2026-08-03 12:21:04,136 INFO     Current optimum:
+{'LMP_SCALE_STD_PCT': 126, 'LMP_SCALE_IMP_PCT': 112, 'LMR_C_PERCENT': 273, 'SE_BETA_MARGIN': 2, 'SE_DOUBLE_MARGIN': 26}
+2026-08-03 12:21:04,136 INFO     Estimated Elo: 7.178 +- 12.1385
+2026-08-03 12:21:04,136 INFO     90.0% confidence interval of the Elo value: (-12.7881, 27.1441)
+2026-08-03 12:21:04,188 INFO     90.0% confidence intervals of the parameters:
+Parameter          Lower bound  Upper bound
+-------------------------------------------
+LMP_SCALE_STD_PCT           61          160
+LMP_SCALE_IMP_PCT           60          158
+LMR_C_PERCENT              201          424
+SE_BETA_MARGIN               1            7
+SE_DOUBLE_MARGIN            10           31
+
+2026-08-03 12:21:04,188 INFO     Testing {'LMP_SCALE_STD_PCT': 123, 'LMP_SCALE_IMP_PCT': 135, 'LMR_C_PERCENT': 233, 'SE_BETA_MARGIN': 1, 'SE_DOUBLE_MARGIN': 23}
+2026-08-03 12:21:04,188 INFO     Start experiment
+2026-08-03 12:21:37,524 INFO     Experiment finished (33.336016s elapsed).
+2026-08-03 12:21:37,682 INFO     Got Elo: -49.97549464331997 +- 52.17910131179095
+2026-08-03 12:21:37,682 INFO     Estimated draw rate: 40.91%
+2026-08-03 12:21:37,682 INFO     Updating model
+2026-08-03 12:21:40,036 INFO     GP sampling finished (2.353746s)
+2026-08-03 12:21:40,105 INFO     Starting iteration 41
+2026-08-03 12:21:43,906 INFO     Current optimum:
+{'LMP_SCALE_STD_PCT': 127, 'LMP_SCALE_IMP_PCT': 109, 'LMR_C_PERCENT': 280, 'SE_BETA_MARGIN': 2, 'SE_DOUBLE_MARGIN': 26}
+2026-08-03 12:21:43,906 INFO     Estimated Elo: 5.7885 +- 11.8298
+2026-08-03 12:21:43,906 INFO     90.0% confidence interval of the Elo value: (-13.6697, 25.2467)
+2026-08-03 12:21:43,961 INFO     90.0% confidence intervals of the parameters:
+Parameter          Lower bound  Upper bound
+-------------------------------------------
+LMP_SCALE_STD_PCT           62          158
+LMP_SCALE_IMP_PCT           60          157
+LMR_C_PERCENT              219          444
+SE_BETA_MARGIN               1            7
+SE_DOUBLE_MARGIN             8           30
+
+2026-08-03 12:21:43,961 INFO     Testing {'LMP_SCALE_STD_PCT': 91, 'LMP_SCALE_IMP_PCT': 133, 'LMR_C_PERCENT': 277, 'SE_BETA_MARGIN': 2, 'SE_DOUBLE_MARGIN': 26}
+2026-08-03 12:21:43,961 INFO     Start experiment
+2026-08-03 12:22:21,853 INFO     Experiment finished (37.892276s elapsed).
+2026-08-03 12:22:22,043 INFO     Got Elo: -49.97549464331997 +- 46.01646125931136
+2026-08-03 12:22:22,043 INFO     Estimated draw rate: 50.00%
+2026-08-03 12:22:22,044 INFO     Updating model
+2026-08-03 12:22:24,335 INFO     GP sampling finished (2.29121s)
+2026-08-03 12:22:24,404 INFO     Starting iteration 42
+2026-08-03 12:22:27,859 INFO     Current optimum:
+{'LMP_SCALE_STD_PCT': 128, 'LMP_SCALE_IMP_PCT': 108, 'LMR_C_PERCENT': 281, 'SE_BETA_MARGIN': 2, 'SE_DOUBLE_MARGIN': 27}
+2026-08-03 12:22:27,859 INFO     Estimated Elo: 4.8604 +- 11.9085
+2026-08-03 12:22:27,859 INFO     90.0% confidence interval of the Elo value: (-14.7274, 24.4482)
+2026-08-03 12:22:27,921 INFO     90.0% confidence intervals of the parameters:
+Parameter          Lower bound  Upper bound
+-------------------------------------------
+LMP_SCALE_STD_PCT           61          157
+LMP_SCALE_IMP_PCT           67          161
+LMR_C_PERCENT              220          443
+SE_BETA_MARGIN               1            7
+SE_DOUBLE_MARGIN             9           30
+
+2026-08-03 12:22:27,921 INFO     Testing {'LMP_SCALE_STD_PCT': 134, 'LMP_SCALE_IMP_PCT': 63, 'LMR_C_PERCENT': 281, 'SE_BETA_MARGIN': 4, 'SE_DOUBLE_MARGIN': 31}
+2026-08-03 12:22:27,921 INFO     Start experiment
+2026-08-03 12:22:57,298 INFO     Experiment finished (29.376376s elapsed).
+2026-08-03 12:22:57,481 INFO     Got Elo: -16.55707406328996 +- 41.546869823492614
+2026-08-03 12:22:57,481 INFO     Estimated draw rate: 68.18%
+2026-08-03 12:22:57,481 INFO     Updating model
+2026-08-03 12:22:59,825 INFO     GP sampling finished (2.343599s)
+2026-08-03 12:22:59,838 INFO     Starting iteration 43
+2026-08-03 12:23:03,671 INFO     Current optimum:
+{'LMP_SCALE_STD_PCT': 128, 'LMP_SCALE_IMP_PCT': 108, 'LMR_C_PERCENT': 281, 'SE_BETA_MARGIN': 2, 'SE_DOUBLE_MARGIN': 26}
+2026-08-03 12:23:03,671 INFO     Estimated Elo: 4.4655 +- 11.7857
+2026-08-03 12:23:03,671 INFO     90.0% confidence interval of the Elo value: (-14.9203, 23.8513)
+2026-08-03 12:23:03,727 INFO     90.0% confidence intervals of the parameters:
+Parameter          Lower bound  Upper bound
+-------------------------------------------
+LMP_SCALE_STD_PCT           62          159
+LMP_SCALE_IMP_PCT           66          164
+LMR_C_PERCENT              216          440
+SE_BETA_MARGIN               1            7
+SE_DOUBLE_MARGIN            10           31
+
+2026-08-03 12:23:03,727 INFO     Testing {'LMP_SCALE_STD_PCT': 137, 'LMP_SCALE_IMP_PCT': 117, 'LMR_C_PERCENT': 227, 'SE_BETA_MARGIN': 2, 'SE_DOUBLE_MARGIN': 25}
+2026-08-03 12:23:03,727 INFO     Start experiment
+2026-08-03 12:23:38,874 INFO     Experiment finished (35.146363s elapsed).
+2026-08-03 12:23:39,042 INFO     Got Elo: -49.975494643320026 +- 57.243104426886134
+2026-08-03 12:23:39,042 INFO     Estimated draw rate: 40.91%
+2026-08-03 12:23:39,042 INFO     Updating model
+2026-08-03 12:23:41,341 INFO     GP sampling finished (2.298297s)
+2026-08-03 12:23:41,410 INFO     Starting iteration 44
+2026-08-03 12:23:44,227 INFO     Current optimum:
+{'LMP_SCALE_STD_PCT': 128, 'LMP_SCALE_IMP_PCT': 107, 'LMR_C_PERCENT': 286, 'SE_BETA_MARGIN': 2, 'SE_DOUBLE_MARGIN': 27}
+2026-08-03 12:23:44,227 INFO     Estimated Elo: 2.7785 +- 11.4192
+2026-08-03 12:23:44,227 INFO     90.0% confidence interval of the Elo value: (-16.0043, 21.5614)
+2026-08-03 12:23:44,279 INFO     90.0% confidence intervals of the parameters:
+Parameter          Lower bound  Upper bound
+-------------------------------------------
+LMP_SCALE_STD_PCT           61          159
+LMP_SCALE_IMP_PCT           66          163
+LMR_C_PERCENT              208          431
+SE_BETA_MARGIN               1            7
+SE_DOUBLE_MARGIN             8           30
+
+2026-08-03 12:23:44,279 INFO     Testing {'LMP_SCALE_STD_PCT': 124, 'LMP_SCALE_IMP_PCT': 96, 'LMR_C_PERCENT': 265, 'SE_BETA_MARGIN': 4, 'SE_DOUBLE_MARGIN': 14}
+2026-08-03 12:23:44,279 INFO     Start experiment
+2026-08-03 12:24:22,640 INFO     Experiment finished (38.360937s elapsed).
+2026-08-03 12:24:22,817 INFO     Got Elo: -16.55707406328996 +- 41.64969918791781
+2026-08-03 12:24:22,817 INFO     Estimated draw rate: 59.09%
+2026-08-03 12:24:22,817 INFO     Updating model
+2026-08-03 12:24:25,063 INFO     GP sampling finished (2.245801s)
+2026-08-03 12:24:25,076 INFO     Starting iteration 45
+2026-08-03 12:24:28,566 INFO     Current optimum:
+{'LMP_SCALE_STD_PCT': 128, 'LMP_SCALE_IMP_PCT': 107, 'LMR_C_PERCENT': 286, 'SE_BETA_MARGIN': 2, 'SE_DOUBLE_MARGIN': 27}
+2026-08-03 12:24:28,566 INFO     Estimated Elo: 1.9861 +- 10.9561
+2026-08-03 12:24:28,566 INFO     90.0% confidence interval of the Elo value: (-16.0352, 20.0073)
+2026-08-03 12:24:28,618 INFO     90.0% confidence intervals of the parameters:
+Parameter          Lower bound  Upper bound
+-------------------------------------------
+LMP_SCALE_STD_PCT           72          170
+LMP_SCALE_IMP_PCT           62          159
+LMR_C_PERCENT              201          421
+SE_BETA_MARGIN               1            7
+SE_DOUBLE_MARGIN             9           30
+
+2026-08-03 12:24:28,618 INFO     Testing {'LMP_SCALE_STD_PCT': 118, 'LMP_SCALE_IMP_PCT': 98, 'LMR_C_PERCENT': 275, 'SE_BETA_MARGIN': 1, 'SE_DOUBLE_MARGIN': 30}
+2026-08-03 12:24:28,619 INFO     Start experiment
+2026-08-03 12:24:58,774 INFO     Experiment finished (30.155024s elapsed).
+2026-08-03 12:24:58,955 INFO     Got Elo: 66.99643491750547 +- 64.26821808397371
+2026-08-03 12:24:58,955 INFO     Estimated draw rate: 36.36%
+2026-08-03 12:24:58,955 INFO     Updating model
+2026-08-03 12:25:01,321 INFO     GP sampling finished (2.365947s)
+2026-08-03 12:25:01,335 INFO     Starting iteration 46
+2026-08-03 12:25:04,769 INFO     Current optimum:
+{'LMP_SCALE_STD_PCT': 127, 'LMP_SCALE_IMP_PCT': 105, 'LMR_C_PERCENT': 285, 'SE_BETA_MARGIN': 2, 'SE_DOUBLE_MARGIN': 27}
+2026-08-03 12:25:04,769 INFO     Estimated Elo: 3.6354 +- 10.8423
+2026-08-03 12:25:04,769 INFO     90.0% confidence interval of the Elo value: (-14.1985, 21.4693)
+2026-08-03 12:25:04,852 INFO     90.0% confidence intervals of the parameters:
+Parameter          Lower bound  Upper bound
+-------------------------------------------
+LMP_SCALE_STD_PCT           61          156
+LMP_SCALE_IMP_PCT           69          167
+LMR_C_PERCENT              207          429
+SE_BETA_MARGIN               2            8
+SE_DOUBLE_MARGIN            10           31
+
+2026-08-03 12:25:04,852 INFO     Testing {'LMP_SCALE_STD_PCT': 124, 'LMP_SCALE_IMP_PCT': 106, 'LMR_C_PERCENT': 302, 'SE_BETA_MARGIN': 4, 'SE_DOUBLE_MARGIN': 30}
+2026-08-03 12:25:04,853 INFO     Start experiment
+2026-08-03 12:25:36,329 INFO     Experiment finished (31.476176s elapsed).
+2026-08-03 12:25:36,489 INFO     Got Elo: -33.189694025905595 +- 69.38137294074046
+2026-08-03 12:25:36,489 INFO     Estimated draw rate: 27.27%
+2026-08-03 12:25:36,489 INFO     Updating model
+2026-08-03 12:25:38,852 INFO     GP sampling finished (2.363045s)
+2026-08-03 12:25:38,866 INFO     Starting iteration 47
+2026-08-03 12:25:42,235 INFO     Current optimum:
+{'LMP_SCALE_STD_PCT': 127, 'LMP_SCALE_IMP_PCT': 105, 'LMR_C_PERCENT': 285, 'SE_BETA_MARGIN': 2, 'SE_DOUBLE_MARGIN': 27}
+2026-08-03 12:25:42,235 INFO     Estimated Elo: 3.1704 +- 10.8837
+2026-08-03 12:25:42,235 INFO     90.0% confidence interval of the Elo value: (-14.7317, 21.0724)
+2026-08-03 12:25:42,289 INFO     90.0% confidence intervals of the parameters:
+Parameter          Lower bound  Upper bound
+-------------------------------------------
+LMP_SCALE_STD_PCT           60          159
+LMP_SCALE_IMP_PCT           63          160
+LMR_C_PERCENT              221          448
+SE_BETA_MARGIN               1            7
+SE_DOUBLE_MARGIN             8           29
+
+2026-08-03 12:25:42,289 INFO     Testing {'LMP_SCALE_STD_PCT': 123, 'LMP_SCALE_IMP_PCT': 72, 'LMR_C_PERCENT': 329, 'SE_BETA_MARGIN': 2, 'SE_DOUBLE_MARGIN': 28}
+2026-08-03 12:25:42,289 INFO     Start experiment
+2026-08-03 12:26:14,964 INFO     Experiment finished (32.67491s elapsed).
+2026-08-03 12:26:15,139 INFO     Got Elo: -33.189694025905595 +- 50.223026447494625
+2026-08-03 12:26:15,139 INFO     Estimated draw rate: 54.55%
+2026-08-03 12:26:15,139 INFO     Updating model
+2026-08-03 12:26:17,483 INFO     GP sampling finished (2.343488s)
+2026-08-03 12:26:17,498 INFO     Starting iteration 48
+2026-08-03 12:26:20,829 INFO     Current optimum:
+{'LMP_SCALE_STD_PCT': 127, 'LMP_SCALE_IMP_PCT': 107, 'LMR_C_PERCENT': 283, 'SE_BETA_MARGIN': 2, 'SE_DOUBLE_MARGIN': 27}
+2026-08-03 12:26:20,829 INFO     Estimated Elo: 2.1474 +- 10.4875
+2026-08-03 12:26:20,829 INFO     90.0% confidence interval of the Elo value: (-15.103, 19.3979)
+2026-08-03 12:26:20,880 INFO     90.0% confidence intervals of the parameters:
+Parameter          Lower bound  Upper bound
+-------------------------------------------
+LMP_SCALE_STD_PCT           60          159
+LMP_SCALE_IMP_PCT           70          168
+LMR_C_PERCENT              211          438
+SE_BETA_MARGIN               1            7
+SE_DOUBLE_MARGIN             9           30
+
+2026-08-03 12:26:20,880 INFO     Testing {'LMP_SCALE_STD_PCT': 127, 'LMP_SCALE_IMP_PCT': 114, 'LMR_C_PERCENT': 291, 'SE_BETA_MARGIN': 3, 'SE_DOUBLE_MARGIN': 30}
+2026-08-03 12:26:20,881 INFO     Start experiment
+2026-08-03 12:26:53,247 INFO     Experiment finished (32.366079s elapsed).
+2026-08-03 12:26:53,439 INFO     Got Elo: 33.18969402590552 +- 49.73364324094946
+2026-08-03 12:26:53,439 INFO     Estimated draw rate: 45.45%
+2026-08-03 12:26:53,439 INFO     Updating model
+2026-08-03 12:26:55,758 INFO     GP sampling finished (2.318809s)
+2026-08-03 12:26:55,830 INFO     Starting iteration 49
+2026-08-03 12:26:59,410 INFO     Current optimum:
+{'LMP_SCALE_STD_PCT': 127, 'LMP_SCALE_IMP_PCT': 107, 'LMR_C_PERCENT': 284, 'SE_BETA_MARGIN': 2, 'SE_DOUBLE_MARGIN': 27}
+2026-08-03 12:26:59,410 INFO     Estimated Elo: 2.8426 +- 10.059
+2026-08-03 12:26:59,411 INFO     90.0% confidence interval of the Elo value: (-13.7029, 19.3881)
+2026-08-03 12:26:59,467 INFO     90.0% confidence intervals of the parameters:
+Parameter          Lower bound  Upper bound
+-------------------------------------------
+LMP_SCALE_STD_PCT           62          156
+LMP_SCALE_IMP_PCT           67          164
+LMR_C_PERCENT              232          450
+SE_BETA_MARGIN               1            7
+SE_DOUBLE_MARGIN             8           30
+
+2026-08-03 12:26:59,467 INFO     Testing {'LMP_SCALE_STD_PCT': 129, 'LMP_SCALE_IMP_PCT': 130, 'LMR_C_PERCENT': 280, 'SE_BETA_MARGIN': 2, 'SE_DOUBLE_MARGIN': 30}
+2026-08-03 12:26:59,468 INFO     Start experiment
+2026-08-03 12:27:31,041 INFO     Experiment finished (31.572801s elapsed).
+2026-08-03 12:27:31,216 INFO     Got Elo: 16.55707406328996 +- 57.853528352801206
+2026-08-03 12:27:31,216 INFO     Estimated draw rate: 50.00%
+2026-08-03 12:27:31,216 INFO     Updating model
+2026-08-03 12:27:33,513 INFO     GP sampling finished (2.296631s)
+2026-08-03 12:27:33,582 INFO     Starting iteration 50
+2026-08-03 12:27:37,293 INFO     Current optimum:
+{'LMP_SCALE_STD_PCT': 127, 'LMP_SCALE_IMP_PCT': 108, 'LMR_C_PERCENT': 284, 'SE_BETA_MARGIN': 2, 'SE_DOUBLE_MARGIN': 28}
+2026-08-03 12:27:37,293 INFO     Estimated Elo: 3.1265 +- 9.9425
+2026-08-03 12:27:37,294 INFO     90.0% confidence interval of the Elo value: (-13.2275, 19.4804)
+2026-08-03 12:27:37,346 INFO     90.0% confidence intervals of the parameters:
+Parameter          Lower bound  Upper bound
+-------------------------------------------
+LMP_SCALE_STD_PCT           72          168
+LMP_SCALE_IMP_PCT           70          167
+LMR_C_PERCENT              201          426
+SE_BETA_MARGIN               2            8
+SE_DOUBLE_MARGIN             9           30
+
+2026-08-03 12:27:37,346 INFO     Testing {'LMP_SCALE_STD_PCT': 117, 'LMP_SCALE_IMP_PCT': 87, 'LMR_C_PERCENT': 293, 'SE_BETA_MARGIN': 2, 'SE_DOUBLE_MARGIN': 30}
+2026-08-03 12:27:37,347 INFO     Start experiment
+2026-08-03 12:28:11,100 INFO     Experiment finished (33.753426s elapsed).
+2026-08-03 12:28:11,277 INFO     Got Elo: -16.55707406328996 +- 57.91890636332888
+2026-08-03 12:28:11,277 INFO     Estimated draw rate: 40.91%
+2026-08-03 12:28:11,277 INFO     Updating model
+2026-08-03 12:28:13,637 INFO     GP sampling finished (2.360118s)
+2026-08-03 12:28:13,652 INFO     Starting iteration 51
+2026-08-03 12:28:17,185 INFO     Current optimum:
+{'LMP_SCALE_STD_PCT': 127, 'LMP_SCALE_IMP_PCT': 108, 'LMR_C_PERCENT': 283, 'SE_BETA_MARGIN': 2, 'SE_DOUBLE_MARGIN': 27}
+2026-08-03 12:28:17,185 INFO     Estimated Elo: 2.3608 +- 9.5456
+2026-08-03 12:28:17,185 INFO     90.0% confidence interval of the Elo value: (-13.3403, 18.062)
+2026-08-03 12:28:17,250 INFO     90.0% confidence intervals of the parameters:
+Parameter          Lower bound  Upper bound
+-------------------------------------------
+LMP_SCALE_STD_PCT           65          163
+LMP_SCALE_IMP_PCT           68          166
+LMR_C_PERCENT              233          448
+SE_BETA_MARGIN               1            7
+SE_DOUBLE_MARGIN             9           30
+
+2026-08-03 12:28:17,250 INFO     Testing {'LMP_SCALE_STD_PCT': 77, 'LMP_SCALE_IMP_PCT': 126, 'LMR_C_PERCENT': 215, 'SE_BETA_MARGIN': 6, 'SE_DOUBLE_MARGIN': 15}
+2026-08-03 12:28:17,250 INFO     Start experiment
+2026-08-03 12:28:48,501 INFO     Experiment finished (31.250467s elapsed).
+2026-08-03 12:28:48,652 INFO     Got Elo: -16.55707406328996 +- 62.72881391539277
+2026-08-03 12:28:48,653 INFO     Estimated draw rate: 40.91%
+2026-08-03 12:28:48,653 INFO     Updating model
+2026-08-03 12:28:51,025 INFO     GP sampling finished (2.372294s)
+2026-08-03 12:28:51,101 INFO     Starting iteration 52
+2026-08-03 12:28:54,851 INFO     Current optimum:
+{'LMP_SCALE_STD_PCT': 127, 'LMP_SCALE_IMP_PCT': 108, 'LMR_C_PERCENT': 283, 'SE_BETA_MARGIN': 2, 'SE_DOUBLE_MARGIN': 27}
+2026-08-03 12:28:54,851 INFO     Estimated Elo: 2.182 +- 9.533
+2026-08-03 12:28:54,851 INFO     90.0% confidence interval of the Elo value: (-13.4983, 17.8624)
+2026-08-03 12:28:54,903 INFO     90.0% confidence intervals of the parameters:
+Parameter          Lower bound  Upper bound
+-------------------------------------------
+LMP_SCALE_STD_PCT           68          163
+LMP_SCALE_IMP_PCT           68          166
+LMR_C_PERCENT              215          439
+SE_BETA_MARGIN               1            7
+SE_DOUBLE_MARGIN            10           31
+
+2026-08-03 12:28:54,903 INFO     Testing {'LMP_SCALE_STD_PCT': 66, 'LMP_SCALE_IMP_PCT': 87, 'LMR_C_PERCENT': 258, 'SE_BETA_MARGIN': 5, 'SE_DOUBLE_MARGIN': 12}
+2026-08-03 12:28:54,904 INFO     Start experiment
+2026-08-03 12:29:23,274 INFO     Experiment finished (28.370198s elapsed).
+2026-08-03 12:29:23,461 INFO     Got Elo: -49.97549464331997 +- 46.01239615763271
+2026-08-03 12:29:23,461 INFO     Estimated draw rate: 59.09%
+2026-08-03 12:29:23,461 INFO     Updating model
+2026-08-03 12:29:25,852 INFO     GP sampling finished (2.390966s)
+2026-08-03 12:29:25,922 INFO     Starting iteration 53
+2026-08-03 12:29:29,401 INFO     Current optimum:
+{'LMP_SCALE_STD_PCT': 127, 'LMP_SCALE_IMP_PCT': 109, 'LMR_C_PERCENT': 283, 'SE_BETA_MARGIN': 2, 'SE_DOUBLE_MARGIN': 27}
+2026-08-03 12:29:29,401 INFO     Estimated Elo: 1.6984 +- 9.5564
+2026-08-03 12:29:29,401 INFO     90.0% confidence interval of the Elo value: (-14.0205, 17.4173)
+2026-08-03 12:29:29,453 INFO     90.0% confidence intervals of the parameters:
+Parameter          Lower bound  Upper bound
+-------------------------------------------
+LMP_SCALE_STD_PCT           63          157
+LMP_SCALE_IMP_PCT           62          162
+LMR_C_PERCENT              205          429
+SE_BETA_MARGIN               1            7
+SE_DOUBLE_MARGIN            10           31
+
+2026-08-03 12:29:29,453 INFO     Testing {'LMP_SCALE_STD_PCT': 126, 'LMP_SCALE_IMP_PCT': 116, 'LMR_C_PERCENT': 273, 'SE_BETA_MARGIN': 4, 'SE_DOUBLE_MARGIN': 27}
+2026-08-03 12:29:29,453 INFO     Start experiment
+2026-08-03 12:29:57,732 INFO     Experiment finished (28.279172s elapsed).
+2026-08-03 12:29:57,905 INFO     Got Elo: 49.975494643319976 +- 57.29208716002335
+2026-08-03 12:29:57,906 INFO     Estimated draw rate: 50.00%
+2026-08-03 12:29:57,906 INFO     Updating model
+2026-08-03 12:30:00,401 INFO     GP sampling finished (2.495305s)
+2026-08-03 12:30:00,416 INFO     Starting iteration 54
+2026-08-03 12:30:04,223 INFO     Current optimum:
+{'LMP_SCALE_STD_PCT': 127, 'LMP_SCALE_IMP_PCT': 109, 'LMR_C_PERCENT': 283, 'SE_BETA_MARGIN': 2, 'SE_DOUBLE_MARGIN': 27}
+2026-08-03 12:30:04,224 INFO     Estimated Elo: 2.3671 +- 9.2451
+2026-08-03 12:30:04,224 INFO     90.0% confidence interval of the Elo value: (-12.8397, 17.574)
+2026-08-03 12:30:04,286 INFO     90.0% confidence intervals of the parameters:
+Parameter          Lower bound  Upper bound
+-------------------------------------------
+LMP_SCALE_STD_PCT           67          166
+LMP_SCALE_IMP_PCT           64          163
+LMR_C_PERCENT              202          425
+SE_BETA_MARGIN               1            7
+SE_DOUBLE_MARGIN            11           31
+
+2026-08-03 12:30:04,286 INFO     Testing {'LMP_SCALE_STD_PCT': 122, 'LMP_SCALE_IMP_PCT': 109, 'LMR_C_PERCENT': 324, 'SE_BETA_MARGIN': 3, 'SE_DOUBLE_MARGIN': 27}
+2026-08-03 12:30:04,287 INFO     Start experiment
+2026-08-03 12:30:39,847 INFO     Experiment finished (35.560391s elapsed).
+2026-08-03 12:30:40,040 INFO     Got Elo: 16.55707406329004 +- 47.55974172210827
+2026-08-03 12:30:40,040 INFO     Estimated draw rate: 59.09%
+2026-08-03 12:30:40,040 INFO     Updating model
+2026-08-03 12:30:42,418 INFO     GP sampling finished (2.37835s)
+2026-08-03 12:30:42,482 INFO     Starting iteration 55
+2026-08-03 12:30:46,144 INFO     Current optimum:
+{'LMP_SCALE_STD_PCT': 127, 'LMP_SCALE_IMP_PCT': 109, 'LMR_C_PERCENT': 285, 'SE_BETA_MARGIN': 2, 'SE_DOUBLE_MARGIN': 27}
+2026-08-03 12:30:46,145 INFO     Estimated Elo: 2.7812 +- 9.0679
+2026-08-03 12:30:46,145 INFO     90.0% confidence interval of the Elo value: (-12.1341, 17.6966)
+2026-08-03 12:30:46,208 INFO     90.0% confidence intervals of the parameters:
+Parameter          Lower bound  Upper bound
+-------------------------------------------
+LMP_SCALE_STD_PCT           73          170
+LMP_SCALE_IMP_PCT           67          163
+LMR_C_PERCENT              226          444
+SE_BETA_MARGIN               1            7
+SE_DOUBLE_MARGIN            10           31
+
+2026-08-03 12:30:46,208 INFO     Testing {'LMP_SCALE_STD_PCT': 170, 'LMP_SCALE_IMP_PCT': 106, 'LMR_C_PERCENT': 239, 'SE_BETA_MARGIN': 3, 'SE_DOUBLE_MARGIN': 30}
+2026-08-03 12:30:46,208 INFO     Start experiment
+2026-08-03 12:31:18,236 INFO     Experiment finished (32.027732s elapsed).
+2026-08-03 12:31:18,419 INFO     Got Elo: -33.189694025905595 +- 60.17202393174759
+2026-08-03 12:31:18,419 INFO     Estimated draw rate: 45.45%
+2026-08-03 12:31:18,419 INFO     Updating model
+2026-08-03 12:31:20,730 INFO     GP sampling finished (2.310809s)
+2026-08-03 12:31:20,748 INFO     Starting iteration 56
+2026-08-03 12:31:24,398 INFO     Current optimum:
+{'LMP_SCALE_STD_PCT': 126, 'LMP_SCALE_IMP_PCT': 109, 'LMR_C_PERCENT': 285, 'SE_BETA_MARGIN': 2, 'SE_DOUBLE_MARGIN': 27}
+2026-08-03 12:31:24,398 INFO     Estimated Elo: 1.9987 +- 8.7423
+2026-08-03 12:31:24,398 INFO     90.0% confidence interval of the Elo value: (-12.3811, 16.3785)
+2026-08-03 12:31:24,468 INFO     90.0% confidence intervals of the parameters:
+Parameter          Lower bound  Upper bound
+-------------------------------------------
+LMP_SCALE_STD_PCT           70          168
+LMP_SCALE_IMP_PCT           64          160
+LMR_C_PERCENT              226          447
+SE_BETA_MARGIN               1            7
+SE_DOUBLE_MARGIN             9           30
+
+2026-08-03 12:31:24,468 INFO     Testing {'LMP_SCALE_STD_PCT': 143, 'LMP_SCALE_IMP_PCT': 117, 'LMR_C_PERCENT': 269, 'SE_BETA_MARGIN': 2, 'SE_DOUBLE_MARGIN': 30}
+2026-08-03 12:31:24,468 INFO     Start experiment
+2026-08-03 12:31:50,764 INFO     Experiment finished (26.296182s elapsed).
+2026-08-03 12:31:50,940 INFO     Got Elo: -16.557074063290028 +- 47.55746781689767
+2026-08-03 12:31:50,940 INFO     Estimated draw rate: 40.91%
+2026-08-03 12:31:50,940 INFO     Updating model
+2026-08-03 12:31:53,343 INFO     GP sampling finished (2.402985s)
+2026-08-03 12:31:53,358 INFO     Starting iteration 57
+2026-08-03 12:31:56,928 INFO     Current optimum:
+{'LMP_SCALE_STD_PCT': 126, 'LMP_SCALE_IMP_PCT': 109, 'LMR_C_PERCENT': 286, 'SE_BETA_MARGIN': 2, 'SE_DOUBLE_MARGIN': 27}
+2026-08-03 12:31:56,928 INFO     Estimated Elo: 1.6506 +- 8.7567
+2026-08-03 12:31:56,928 INFO     90.0% confidence interval of the Elo value: (-12.7529, 16.0541)
+2026-08-03 12:31:56,981 INFO     90.0% confidence intervals of the parameters:
+Parameter          Lower bound  Upper bound
+-------------------------------------------
+LMP_SCALE_STD_PCT           62          158
+LMP_SCALE_IMP_PCT           62          160
+LMR_C_PERCENT              205          427
+SE_BETA_MARGIN               1            7
+SE_DOUBLE_MARGIN             9           30
+
+2026-08-03 12:31:56,981 INFO     Testing {'LMP_SCALE_STD_PCT': 144, 'LMP_SCALE_IMP_PCT': 146, 'LMR_C_PERCENT': 285, 'SE_BETA_MARGIN': 5, 'SE_DOUBLE_MARGIN': 29}
+2026-08-03 12:31:56,982 INFO     Start experiment
+2026-08-03 12:32:27,212 INFO     Experiment finished (30.230554s elapsed).
+2026-08-03 12:32:27,401 INFO     Got Elo: -0.0 +- 44.86048446763355
+2026-08-03 12:32:27,401 INFO     Estimated draw rate: 45.45%
+2026-08-03 12:32:27,401 INFO     Updating model
+2026-08-03 12:32:29,764 INFO     GP sampling finished (2.363153s)
+2026-08-03 12:32:29,780 INFO     Starting iteration 58
+2026-08-03 12:32:33,166 INFO     Current optimum:
+{'LMP_SCALE_STD_PCT': 126, 'LMP_SCALE_IMP_PCT': 109, 'LMR_C_PERCENT': 286, 'SE_BETA_MARGIN': 2, 'SE_DOUBLE_MARGIN': 27}
+2026-08-03 12:32:33,166 INFO     Estimated Elo: 1.2826 +- 8.3983
+2026-08-03 12:32:33,166 INFO     90.0% confidence interval of the Elo value: (-12.5313, 15.0966)
+2026-08-03 12:32:33,218 INFO     90.0% confidence intervals of the parameters:
+Parameter          Lower bound  Upper bound
+-------------------------------------------
+LMP_SCALE_STD_PCT           74          167
+LMP_SCALE_IMP_PCT           64          162
+LMR_C_PERCENT              219          442
+SE_BETA_MARGIN               1            7
+SE_DOUBLE_MARGIN             8           30
+
+2026-08-03 12:32:33,219 INFO     Testing {'LMP_SCALE_STD_PCT': 120, 'LMP_SCALE_IMP_PCT': 113, 'LMR_C_PERCENT': 296, 'SE_BETA_MARGIN': 2, 'SE_DOUBLE_MARGIN': 26}
+2026-08-03 12:32:33,219 INFO     Start experiment
+2026-08-03 12:33:04,591 INFO     Experiment finished (31.37162s elapsed).
+2026-08-03 12:33:04,767 INFO     Got Elo: 66.99643491750547 +- 53.81621030185724
+2026-08-03 12:33:04,768 INFO     Estimated draw rate: 45.45%
+2026-08-03 12:33:04,768 INFO     Updating model
+2026-08-03 12:33:07,196 INFO     GP sampling finished (2.428374s)
+2026-08-03 12:33:07,214 INFO     Starting iteration 59
+2026-08-03 12:33:10,968 INFO     Current optimum:
+{'LMP_SCALE_STD_PCT': 124, 'LMP_SCALE_IMP_PCT': 110, 'LMR_C_PERCENT': 288, 'SE_BETA_MARGIN': 2, 'SE_DOUBLE_MARGIN': 27}
+2026-08-03 12:33:10,969 INFO     Estimated Elo: 3.5174 +- 8.3738
+2026-08-03 12:33:10,969 INFO     90.0% confidence interval of the Elo value: (-10.2562, 17.291)
+2026-08-03 12:33:11,028 INFO     90.0% confidence intervals of the parameters:
+Parameter          Lower bound  Upper bound
+-------------------------------------------
+LMP_SCALE_STD_PCT           65          162
+LMP_SCALE_IMP_PCT           72          170
+LMR_C_PERCENT              203          427
+SE_BETA_MARGIN               1            7
+SE_DOUBLE_MARGIN            11           31
+
+2026-08-03 12:33:11,028 INFO     Testing {'LMP_SCALE_STD_PCT': 128, 'LMP_SCALE_IMP_PCT': 116, 'LMR_C_PERCENT': 279, 'SE_BETA_MARGIN': 2, 'SE_DOUBLE_MARGIN': 32}
+2026-08-03 12:33:11,028 INFO     Start experiment
+2026-08-03 12:33:38,618 INFO     Experiment finished (27.589831s elapsed).
+2026-08-03 12:33:38,791 INFO     Got Elo: -33.189694025905595 +- 44.0471583039824
+2026-08-03 12:33:38,791 INFO     Estimated draw rate: 54.55%
+2026-08-03 12:33:38,792 INFO     Updating model
+2026-08-03 12:33:41,228 INFO     GP sampling finished (2.436059s)
+2026-08-03 12:33:41,243 INFO     Starting iteration 60
+2026-08-03 12:33:44,914 INFO     Current optimum:
+{'LMP_SCALE_STD_PCT': 124, 'LMP_SCALE_IMP_PCT': 110, 'LMR_C_PERCENT': 289, 'SE_BETA_MARGIN': 2, 'SE_DOUBLE_MARGIN': 26}
+2026-08-03 12:33:44,914 INFO     Estimated Elo: 2.909 +- 8.5239
+2026-08-03 12:33:44,914 INFO     90.0% confidence interval of the Elo value: (-11.1117, 16.9296)
+2026-08-03 12:33:44,965 INFO     90.0% confidence intervals of the parameters:
+Parameter          Lower bound  Upper bound
+-------------------------------------------
+LMP_SCALE_STD_PCT           64          158
+LMP_SCALE_IMP_PCT           72          168
+LMR_C_PERCENT              217          441
+SE_BETA_MARGIN               1            7
+SE_DOUBLE_MARGIN             9           30
+
+2026-08-03 12:33:44,965 INFO     Testing {'LMP_SCALE_STD_PCT': 127, 'LMP_SCALE_IMP_PCT': 99, 'LMR_C_PERCENT': 211, 'SE_BETA_MARGIN': 4, 'SE_DOUBLE_MARGIN': 27}
+2026-08-03 12:33:44,965 INFO     Start experiment
+2026-08-03 12:34:16,927 INFO     Experiment finished (31.961399s elapsed).
+2026-08-03 12:34:17,077 INFO     Got Elo: 16.55707406329004 +- 67.09328740160392
+2026-08-03 12:34:17,077 INFO     Estimated draw rate: 40.91%
+2026-08-03 12:34:17,077 INFO     Updating model
+2026-08-03 12:34:19,529 INFO     GP sampling finished (2.451324s)
+2026-08-03 12:34:19,544 INFO     Starting iteration 61
+2026-08-03 12:34:23,133 INFO     Current optimum:
+{'LMP_SCALE_STD_PCT': 124, 'LMP_SCALE_IMP_PCT': 110, 'LMR_C_PERCENT': 289, 'SE_BETA_MARGIN': 2, 'SE_DOUBLE_MARGIN': 26}
+2026-08-03 12:34:23,133 INFO     Estimated Elo: 3.0154 +- 8.4461
+2026-08-03 12:34:23,133 INFO     90.0% confidence interval of the Elo value: (-10.8771, 16.9079)
+2026-08-03 12:34:23,186 INFO     90.0% confidence intervals of the parameters:
+Parameter          Lower bound  Upper bound
+-------------------------------------------
+LMP_SCALE_STD_PCT           66          165
+LMP_SCALE_IMP_PCT           65          162
+LMR_C_PERCENT              216          446
+SE_BETA_MARGIN               1            7
+SE_DOUBLE_MARGIN             9           30
+
+2026-08-03 12:34:23,186 INFO     Testing {'LMP_SCALE_STD_PCT': 134, 'LMP_SCALE_IMP_PCT': 104, 'LMR_C_PERCENT': 372, 'SE_BETA_MARGIN': 2, 'SE_DOUBLE_MARGIN': 22}
+2026-08-03 12:34:23,187 INFO     Start experiment
+2026-08-03 12:34:53,889 INFO     Experiment finished (30.701734s elapsed).
+2026-08-03 12:34:54,050 INFO     Got Elo: 33.18969402590559 +- 60.11587228282864
+2026-08-03 12:34:54,050 INFO     Estimated draw rate: 54.55%
+2026-08-03 12:34:54,050 INFO     Updating model
+2026-08-03 12:34:56,394 INFO     GP sampling finished (2.343877s)
+2026-08-03 12:34:56,458 INFO     Starting iteration 62
+2026-08-03 12:35:00,131 INFO     Current optimum:
+{'LMP_SCALE_STD_PCT': 125, 'LMP_SCALE_IMP_PCT': 109, 'LMR_C_PERCENT': 290, 'SE_BETA_MARGIN': 2, 'SE_DOUBLE_MARGIN': 26}
+2026-08-03 12:35:00,131 INFO     Estimated Elo: 3.4619 +- 8.4047
+2026-08-03 12:35:00,131 INFO     90.0% confidence interval of the Elo value: (-10.3626, 17.2864)
+2026-08-03 12:35:00,184 INFO     90.0% confidence intervals of the parameters:
+Parameter          Lower bound  Upper bound
+-------------------------------------------
+LMP_SCALE_STD_PCT           69          166
+LMP_SCALE_IMP_PCT           69          168
+LMR_C_PERCENT              204          425
+SE_BETA_MARGIN               1            7
+SE_DOUBLE_MARGIN             9           30
+
+2026-08-03 12:35:00,185 INFO     Testing {'LMP_SCALE_STD_PCT': 127, 'LMP_SCALE_IMP_PCT': 99, 'LMR_C_PERCENT': 298, 'SE_BETA_MARGIN': 4, 'SE_DOUBLE_MARGIN': 27}
+2026-08-03 12:35:00,185 INFO     Start experiment
+2026-08-03 12:35:29,967 INFO     Experiment finished (29.781562s elapsed).
+2026-08-03 12:35:30,139 INFO     Got Elo: -84.3413461259573 +- 70.15666290535724
+2026-08-03 12:35:30,139 INFO     Estimated draw rate: 31.82%
+2026-08-03 12:35:30,139 INFO     Updating model
+2026-08-03 12:35:32,539 INFO     GP sampling finished (2.400276s)
+2026-08-03 12:35:32,555 INFO     Starting iteration 63
+2026-08-03 12:35:36,129 INFO     Current optimum:
+{'LMP_SCALE_STD_PCT': 124, 'LMP_SCALE_IMP_PCT': 110, 'LMR_C_PERCENT': 289, 'SE_BETA_MARGIN': 2, 'SE_DOUBLE_MARGIN': 26}
+2026-08-03 12:35:36,129 INFO     Estimated Elo: 2.3833 +- 8.4545
+2026-08-03 12:35:36,129 INFO     90.0% confidence interval of the Elo value: (-11.5231, 16.2897)
+2026-08-03 12:35:36,181 INFO     90.0% confidence intervals of the parameters:
+Parameter          Lower bound  Upper bound
+-------------------------------------------
+LMP_SCALE_STD_PCT           68          162
+LMP_SCALE_IMP_PCT           62          160
+LMR_C_PERCENT              206          426
+SE_BETA_MARGIN               2            8
+SE_DOUBLE_MARGIN             9           30
+
+2026-08-03 12:35:36,182 INFO     Testing {'LMP_SCALE_STD_PCT': 120, 'LMP_SCALE_IMP_PCT': 119, 'LMR_C_PERCENT': 300, 'SE_BETA_MARGIN': 1, 'SE_DOUBLE_MARGIN': 26}
+2026-08-03 12:35:36,182 INFO     Start experiment
+2026-08-03 12:36:13,585 INFO     Experiment finished (37.403464s elapsed).
+2026-08-03 12:36:13,783 INFO     Got Elo: -66.99643491750554 +- 41.395170831441476
+2026-08-03 12:36:13,784 INFO     Estimated draw rate: 45.45%
+2026-08-03 12:36:13,784 INFO     Updating model
+2026-08-03 12:36:17,099 INFO     GP sampling finished (3.315144s)
+2026-08-03 12:36:17,116 INFO     Starting iteration 64
+2026-08-03 12:36:21,111 INFO     Current optimum:
+{'LMP_SCALE_STD_PCT': 126, 'LMP_SCALE_IMP_PCT': 108, 'LMR_C_PERCENT': 287, 'SE_BETA_MARGIN': 2, 'SE_DOUBLE_MARGIN': 27}
+2026-08-03 12:36:21,112 INFO     Estimated Elo: 0.1812 +- 8.1372
+2026-08-03 12:36:21,112 INFO     90.0% confidence interval of the Elo value: (-13.2034, 13.5658)
+2026-08-03 12:36:21,205 INFO     90.0% confidence intervals of the parameters:
+Parameter          Lower bound  Upper bound
+-------------------------------------------
+LMP_SCALE_STD_PCT           62          160
+LMP_SCALE_IMP_PCT           70          165
+LMR_C_PERCENT              202          423
+SE_BETA_MARGIN               1            7
+SE_DOUBLE_MARGIN             9           30
+
+2026-08-03 12:36:21,205 INFO     Testing {'LMP_SCALE_STD_PCT': 137, 'LMP_SCALE_IMP_PCT': 114, 'LMR_C_PERCENT': 236, 'SE_BETA_MARGIN': 3, 'SE_DOUBLE_MARGIN': 26}
+2026-08-03 12:36:21,205 INFO     Start experiment
+2026-08-03 12:36:50,498 INFO     Experiment finished (29.292415s elapsed).
+2026-08-03 12:36:50,673 INFO     Got Elo: -16.557074063290028 +- 58.070597038296846
+2026-08-03 12:36:50,673 INFO     Estimated draw rate: 40.91%
+2026-08-03 12:36:50,673 INFO     Updating model
+2026-08-03 12:36:54,509 INFO     GP sampling finished (3.836118s)
+2026-08-03 12:36:54,547 INFO     Starting iteration 65
+2026-08-03 12:36:58,469 INFO     Current optimum:
+{'LMP_SCALE_STD_PCT': 125, 'LMP_SCALE_IMP_PCT': 108, 'LMR_C_PERCENT': 288, 'SE_BETA_MARGIN': 2, 'SE_DOUBLE_MARGIN': 27}
+2026-08-03 12:36:58,469 INFO     Estimated Elo: -0.2512 +- 7.952
+2026-08-03 12:36:58,469 INFO     90.0% confidence interval of the Elo value: (-13.331, 12.8287)
+2026-08-03 12:36:58,640 INFO     90.0% confidence intervals of the parameters:
+Parameter          Lower bound  Upper bound
+-------------------------------------------
+LMP_SCALE_STD_PCT           60          159
+LMP_SCALE_IMP_PCT           72          170
+LMR_C_PERCENT              233          449
+SE_BETA_MARGIN               1            7
+SE_DOUBLE_MARGIN             8           29
+
+2026-08-03 12:36:58,641 INFO     Testing {'LMP_SCALE_STD_PCT': 126, 'LMP_SCALE_IMP_PCT': 102, 'LMR_C_PERCENT': 315, 'SE_BETA_MARGIN': 3, 'SE_DOUBLE_MARGIN': 27}
+2026-08-03 12:36:58,641 INFO     Start experiment
+2026-08-03 12:37:30,258 INFO     Experiment finished (31.61699s elapsed).
+2026-08-03 12:37:30,453 INFO     Got Elo: 16.55707406329004 +- 47.52261811062434
+2026-08-03 12:37:30,453 INFO     Estimated draw rate: 50.00%
+2026-08-03 12:37:30,453 INFO     Updating model
+2026-08-03 12:37:33,874 INFO     GP sampling finished (3.420581s)
+2026-08-03 12:37:33,891 INFO     Starting iteration 66
+2026-08-03 12:37:37,820 INFO     Current optimum:
+{'LMP_SCALE_STD_PCT': 125, 'LMP_SCALE_IMP_PCT': 108, 'LMR_C_PERCENT': 290, 'SE_BETA_MARGIN': 2, 'SE_DOUBLE_MARGIN': 27}
+2026-08-03 12:37:37,820 INFO     Estimated Elo: 0.1698 +- 7.825
+2026-08-03 12:37:37,820 INFO     90.0% confidence interval of the Elo value: (-12.7012, 13.0408)
+2026-08-03 12:37:37,938 INFO     90.0% confidence intervals of the parameters:
+Parameter          Lower bound  Upper bound
+-------------------------------------------
+LMP_SCALE_STD_PCT           66          164
+LMP_SCALE_IMP_PCT           66          164
+LMR_C_PERCENT              209          419
+SE_BETA_MARGIN               2            8
+SE_DOUBLE_MARGIN            10           31
+
+2026-08-03 12:37:37,938 INFO     Testing {'LMP_SCALE_STD_PCT': 120, 'LMP_SCALE_IMP_PCT': 112, 'LMR_C_PERCENT': 216, 'SE_BETA_MARGIN': 3, 'SE_DOUBLE_MARGIN': 27}
+2026-08-03 12:37:37,938 INFO     Start experiment
+2026-08-03 12:38:09,741 INFO     Experiment finished (31.802391s elapsed).
+2026-08-03 12:38:09,927 INFO     Got Elo: -0.0 +- 50.42760075249966
+2026-08-03 12:38:09,927 INFO     Estimated draw rate: 54.55%
+2026-08-03 12:38:09,927 INFO     Updating model
+2026-08-03 12:38:12,817 INFO     GP sampling finished (2.889572s)
+2026-08-03 12:38:12,859 INFO     Starting iteration 67
+2026-08-03 12:38:16,748 INFO     Current optimum:
+{'LMP_SCALE_STD_PCT': 125, 'LMP_SCALE_IMP_PCT': 108, 'LMR_C_PERCENT': 290, 'SE_BETA_MARGIN': 2, 'SE_DOUBLE_MARGIN': 27}
+2026-08-03 12:38:16,748 INFO     Estimated Elo: 0.1793 +- 7.7648
+2026-08-03 12:38:16,748 INFO     90.0% confidence interval of the Elo value: (-12.5926, 12.9512)
+2026-08-03 12:38:16,820 INFO     90.0% confidence intervals of the parameters:
+Parameter          Lower bound  Upper bound
+-------------------------------------------
+LMP_SCALE_STD_PCT           70          166
+LMP_SCALE_IMP_PCT           74          170
+LMR_C_PERCENT              201          421
+SE_BETA_MARGIN               1            7
+SE_DOUBLE_MARGIN             8           30
+
+2026-08-03 12:38:16,820 INFO     Testing {'LMP_SCALE_STD_PCT': 131, 'LMP_SCALE_IMP_PCT': 113, 'LMR_C_PERCENT': 270, 'SE_BETA_MARGIN': 4, 'SE_DOUBLE_MARGIN': 30}
+2026-08-03 12:38:16,820 INFO     Start experiment
+2026-08-03 12:38:51,656 INFO     Experiment finished (34.835232s elapsed).
+2026-08-03 12:38:51,825 INFO     Got Elo: -66.99643491750545 +- 53.911734909164885
+2026-08-03 12:38:51,826 INFO     Estimated draw rate: 36.36%
+2026-08-03 12:38:51,826 INFO     Updating model
+2026-08-03 12:38:55,046 INFO     GP sampling finished (3.220658s)
+2026-08-03 12:38:55,066 INFO     Starting iteration 68
+2026-08-03 12:38:58,697 INFO     Current optimum:
+{'LMP_SCALE_STD_PCT': 125, 'LMP_SCALE_IMP_PCT': 107, 'LMR_C_PERCENT': 291, 'SE_BETA_MARGIN': 2, 'SE_DOUBLE_MARGIN': 26}
+2026-08-03 12:38:58,697 INFO     Estimated Elo: -0.9168 +- 7.6804
+2026-08-03 12:38:58,697 INFO     90.0% confidence interval of the Elo value: (-13.5499, 11.7163)
+2026-08-03 12:38:58,860 INFO     90.0% confidence intervals of the parameters:
+Parameter          Lower bound  Upper bound
+-------------------------------------------
+LMP_SCALE_STD_PCT           70          165
+LMP_SCALE_IMP_PCT           61          158
+LMR_C_PERCENT              205          424
+SE_BETA_MARGIN               1            7
+SE_DOUBLE_MARGIN             9           30
+
+2026-08-03 12:38:58,860 INFO     Testing {'LMP_SCALE_STD_PCT': 132, 'LMP_SCALE_IMP_PCT': 165, 'LMR_C_PERCENT': 280, 'SE_BETA_MARGIN': 7, 'SE_DOUBLE_MARGIN': 22}
+2026-08-03 12:38:58,860 INFO     Start experiment
+2026-08-03 12:39:29,719 INFO     Experiment finished (30.858319s elapsed).
+2026-08-03 12:39:29,886 INFO     Got Elo: -33.189694025905595 +- 77.64217560178312
+2026-08-03 12:39:29,886 INFO     Estimated draw rate: 36.36%
+2026-08-03 12:39:29,886 INFO     Updating model
+2026-08-03 12:39:33,172 INFO     GP sampling finished (3.285802s)
+2026-08-03 12:39:33,245 INFO     Starting iteration 69
+2026-08-03 12:39:36,990 INFO     Current optimum:
+{'LMP_SCALE_STD_PCT': 125, 'LMP_SCALE_IMP_PCT': 107, 'LMR_C_PERCENT': 291, 'SE_BETA_MARGIN': 2, 'SE_DOUBLE_MARGIN': 26}
+2026-08-03 12:39:36,990 INFO     Estimated Elo: -1.5531 +- 7.3152
+2026-08-03 12:39:36,990 INFO     90.0% confidence interval of the Elo value: (-13.5855, 10.4794)
+2026-08-03 12:39:37,069 INFO     90.0% confidence intervals of the parameters:
+Parameter          Lower bound  Upper bound
+-------------------------------------------
+LMP_SCALE_STD_PCT           62          158
+LMP_SCALE_IMP_PCT           68          165
+LMR_C_PERCENT              201          425
+SE_BETA_MARGIN               1            7
+SE_DOUBLE_MARGIN             8           30
+
+2026-08-03 12:39:37,069 INFO     Testing {'LMP_SCALE_STD_PCT': 97, 'LMP_SCALE_IMP_PCT': 100, 'LMR_C_PERCENT': 272, 'SE_BETA_MARGIN': 2, 'SE_DOUBLE_MARGIN': 29}
+2026-08-03 12:39:37,069 INFO     Start experiment
+2026-08-03 12:40:10,584 INFO     Experiment finished (33.514464s elapsed).
+2026-08-03 12:40:10,760 INFO     Got Elo: -0.0 +- 65.03938148815274
+2026-08-03 12:40:10,761 INFO     Estimated draw rate: 36.36%
+2026-08-03 12:40:10,761 INFO     Updating model
+2026-08-03 12:40:13,765 INFO     GP sampling finished (3.00413s)
+2026-08-03 12:40:13,784 INFO     Starting iteration 70
+2026-08-03 12:40:17,646 INFO     Current optimum:
+{'LMP_SCALE_STD_PCT': 125, 'LMP_SCALE_IMP_PCT': 107, 'LMR_C_PERCENT': 291, 'SE_BETA_MARGIN': 2, 'SE_DOUBLE_MARGIN': 26}
+2026-08-03 12:40:17,646 INFO     Estimated Elo: -1.4996 +- 7.2953
+2026-08-03 12:40:17,646 INFO     90.0% confidence interval of the Elo value: (-13.4993, 10.5)
+2026-08-03 12:40:17,718 INFO     90.0% confidence intervals of the parameters:
+Parameter          Lower bound  Upper bound
+-------------------------------------------
+LMP_SCALE_STD_PCT           66          164
+LMP_SCALE_IMP_PCT           64          160
+LMR_C_PERCENT              200          425
+SE_BETA_MARGIN               1            7
+SE_DOUBLE_MARGIN            10           31
+
+2026-08-03 12:40:17,718 INFO     Testing {'LMP_SCALE_STD_PCT': 61, 'LMP_SCALE_IMP_PCT': 157, 'LMR_C_PERCENT': 409, 'SE_BETA_MARGIN': 4, 'SE_DOUBLE_MARGIN': 14}
+2026-08-03 12:40:17,718 INFO     Start experiment
+2026-08-03 12:40:56,155 INFO     Experiment finished (38.436876s elapsed).
+2026-08-03 12:40:56,342 INFO     Got Elo: -0.0 +- 38.60579319375392
+2026-08-03 12:40:56,342 INFO     Estimated draw rate: 45.45%
+2026-08-03 12:40:56,342 INFO     Updating model
+2026-08-03 12:40:59,251 INFO     GP sampling finished (2.908513s)
+2026-08-03 12:40:59,317 INFO     Starting iteration 71
+2026-08-03 12:41:03,099 INFO     Current optimum:
+{'LMP_SCALE_STD_PCT': 125, 'LMP_SCALE_IMP_PCT': 107, 'LMR_C_PERCENT': 291, 'SE_BETA_MARGIN': 2, 'SE_DOUBLE_MARGIN': 26}
+2026-08-03 12:41:03,099 INFO     Estimated Elo: -1.632 +- 7.1394
+2026-08-03 12:41:03,099 INFO     90.0% confidence interval of the Elo value: (-13.3753, 10.1113)
+2026-08-03 12:41:03,229 INFO     90.0% confidence intervals of the parameters:
+Parameter          Lower bound  Upper bound
+-------------------------------------------
+LMP_SCALE_STD_PCT           61          158
+LMP_SCALE_IMP_PCT           68          166
+LMR_C_PERCENT              229          446
+SE_BETA_MARGIN               1            7
+SE_DOUBLE_MARGIN            10           30
+
+2026-08-03 12:41:03,229 INFO     Testing {'LMP_SCALE_STD_PCT': 146, 'LMP_SCALE_IMP_PCT': 110, 'LMR_C_PERCENT': 344, 'SE_BETA_MARGIN': 2, 'SE_DOUBLE_MARGIN': 24}
+2026-08-03 12:41:03,230 INFO     Start experiment
+2026-08-03 12:41:32,921 INFO     Experiment finished (29.691388s elapsed).
+2026-08-03 12:41:33,113 INFO     Got Elo: -66.99643491750538 +- 47.606693961691526
+2026-08-03 12:41:33,113 INFO     Estimated draw rate: 54.55%
+2026-08-03 12:41:33,113 INFO     Updating model
+2026-08-03 12:41:36,280 INFO     GP sampling finished (3.167172s)
+2026-08-03 12:41:36,349 INFO     Starting iteration 72
+2026-08-03 12:41:40,533 INFO     Current optimum:
+{'LMP_SCALE_STD_PCT': 124, 'LMP_SCALE_IMP_PCT': 107, 'LMR_C_PERCENT': 286, 'SE_BETA_MARGIN': 2, 'SE_DOUBLE_MARGIN': 27}
+2026-08-03 12:41:40,533 INFO     Estimated Elo: -2.5575 +- 7.1484
+2026-08-03 12:41:40,533 INFO     90.0% confidence interval of the Elo value: (-14.3155, 9.2006)
+2026-08-03 12:41:40,586 INFO     90.0% confidence intervals of the parameters:
+Parameter          Lower bound  Upper bound
+-------------------------------------------
+LMP_SCALE_STD_PCT           60          158
+LMP_SCALE_IMP_PCT           68          166
+LMR_C_PERCENT              206          431
+SE_BETA_MARGIN               1            7
+SE_DOUBLE_MARGIN             9           30
+
+2026-08-03 12:41:40,586 INFO     Testing {'LMP_SCALE_STD_PCT': 121, 'LMP_SCALE_IMP_PCT': 100, 'LMR_C_PERCENT': 205, 'SE_BETA_MARGIN': 2, 'SE_DOUBLE_MARGIN': 23}
+2026-08-03 12:41:40,587 INFO     Start experiment
+2026-08-03 12:42:19,201 INFO     Experiment finished (38.614172s elapsed).
+2026-08-03 12:42:19,383 INFO     Got Elo: 16.55707406329004 +- 47.46587346790479
+2026-08-03 12:42:19,383 INFO     Estimated draw rate: 50.00%
+2026-08-03 12:42:19,383 INFO     Updating model
+2026-08-03 12:42:22,127 INFO     GP sampling finished (2.74382s)
+2026-08-03 12:42:22,201 INFO     Starting iteration 73
+2026-08-03 12:42:25,769 INFO     Current optimum:
+{'LMP_SCALE_STD_PCT': 124, 'LMP_SCALE_IMP_PCT': 107, 'LMR_C_PERCENT': 285, 'SE_BETA_MARGIN': 2, 'SE_DOUBLE_MARGIN': 27}
+2026-08-03 12:42:25,769 INFO     Estimated Elo: -2.3706 +- 7.0013
+2026-08-03 12:42:25,769 INFO     90.0% confidence interval of the Elo value: (-13.8868, 9.1456)
+2026-08-03 12:42:25,822 INFO     90.0% confidence intervals of the parameters:
+Parameter          Lower bound  Upper bound
+-------------------------------------------
+LMP_SCALE_STD_PCT           62          160
+LMP_SCALE_IMP_PCT           63          158
+LMR_C_PERCENT              204          424
+SE_BETA_MARGIN               2            8
+SE_DOUBLE_MARGIN             8           29
+
+2026-08-03 12:42:25,823 INFO     Testing {'LMP_SCALE_STD_PCT': 64, 'LMP_SCALE_IMP_PCT': 142, 'LMR_C_PERCENT': 437, 'SE_BETA_MARGIN': 2, 'SE_DOUBLE_MARGIN': 23}
+2026-08-03 12:42:25,823 INFO     Start experiment
+2026-08-03 12:42:55,090 INFO     Experiment finished (29.267339s elapsed).
+2026-08-03 12:42:55,280 INFO     Got Elo: -0.0 +- 38.55077793999697
+2026-08-03 12:42:55,280 INFO     Estimated draw rate: 63.64%
+2026-08-03 12:42:55,280 INFO     Updating model
+2026-08-03 12:42:58,168 INFO     GP sampling finished (2.888308s)
+2026-08-03 12:42:58,189 INFO     Starting iteration 74
+2026-08-03 12:43:02,128 INFO     Current optimum:
+{'LMP_SCALE_STD_PCT': 124, 'LMP_SCALE_IMP_PCT': 107, 'LMR_C_PERCENT': 285, 'SE_BETA_MARGIN': 2, 'SE_DOUBLE_MARGIN': 27}
+2026-08-03 12:43:02,129 INFO     Estimated Elo: -2.2141 +- 7.0956
+2026-08-03 12:43:02,129 INFO     90.0% confidence interval of the Elo value: (-13.8853, 9.4572)
+2026-08-03 12:43:02,199 INFO     90.0% confidence intervals of the parameters:
+Parameter          Lower bound  Upper bound
+-------------------------------------------
+LMP_SCALE_STD_PCT           60          159
+LMP_SCALE_IMP_PCT           73          169
+LMR_C_PERCENT              205          430
+SE_BETA_MARGIN               1            7
+SE_DOUBLE_MARGIN             9           30
+
+2026-08-03 12:43:02,199 INFO     Testing {'LMP_SCALE_STD_PCT': 107, 'LMP_SCALE_IMP_PCT': 114, 'LMR_C_PERCENT': 262, 'SE_BETA_MARGIN': 2, 'SE_DOUBLE_MARGIN': 28}
+2026-08-03 12:43:02,199 INFO     Start experiment
+2026-08-03 12:43:36,033 INFO     Experiment finished (33.83358s elapsed).
+2026-08-03 12:43:36,220 INFO     Got Elo: -33.189694025905595 +- 54.958831603942535
+2026-08-03 12:43:36,220 INFO     Estimated draw rate: 36.36%
+2026-08-03 12:43:36,220 INFO     Updating model
+2026-08-03 12:43:39,009 INFO     GP sampling finished (2.789541s)
+2026-08-03 12:43:39,077 INFO     Starting iteration 75
+2026-08-03 12:43:42,722 INFO     Current optimum:
+{'LMP_SCALE_STD_PCT': 125, 'LMP_SCALE_IMP_PCT': 107, 'LMR_C_PERCENT': 287, 'SE_BETA_MARGIN': 2, 'SE_DOUBLE_MARGIN': 27}
+2026-08-03 12:43:42,722 INFO     Estimated Elo: -2.6748 +- 7.0729
+2026-08-03 12:43:42,722 INFO     90.0% confidence interval of the Elo value: (-14.3086, 8.959)
+2026-08-03 12:43:42,775 INFO     90.0% confidence intervals of the parameters:
+Parameter          Lower bound  Upper bound
+-------------------------------------------
+LMP_SCALE_STD_PCT           60          158
+LMP_SCALE_IMP_PCT           71          169
+LMR_C_PERCENT              220          449
+SE_BETA_MARGIN               1            7
+SE_DOUBLE_MARGIN             8           30
+
+2026-08-03 12:43:42,775 INFO     Testing {'LMP_SCALE_STD_PCT': 124, 'LMP_SCALE_IMP_PCT': 134, 'LMR_C_PERCENT': 296, 'SE_BETA_MARGIN': 2, 'SE_DOUBLE_MARGIN': 26}
+2026-08-03 12:43:42,775 INFO     Start experiment
+2026-08-03 12:44:10,786 INFO     Experiment finished (28.010551s elapsed).
+2026-08-03 12:44:10,947 INFO     Got Elo: -16.55707406328996 +- 62.76564456177238
+2026-08-03 12:44:10,947 INFO     Estimated draw rate: 50.00%
+2026-08-03 12:44:10,947 INFO     Updating model
+2026-08-03 12:44:14,326 INFO     GP sampling finished (3.378338s)
+2026-08-03 12:44:14,400 INFO     Starting iteration 76
+2026-08-03 12:44:18,191 INFO     Current optimum:
+{'LMP_SCALE_STD_PCT': 125, 'LMP_SCALE_IMP_PCT': 107, 'LMR_C_PERCENT': 287, 'SE_BETA_MARGIN': 2, 'SE_DOUBLE_MARGIN': 27}
+2026-08-03 12:44:18,191 INFO     Estimated Elo: -3.1659 +- 6.7013
+2026-08-03 12:44:18,191 INFO     90.0% confidence interval of the Elo value: (-14.1887, 7.8568)
+2026-08-03 12:44:18,246 INFO     90.0% confidence intervals of the parameters:
+Parameter          Lower bound  Upper bound
+-------------------------------------------
+LMP_SCALE_STD_PCT           65          162
+LMP_SCALE_IMP_PCT           72          168
+LMR_C_PERCENT              201          421
+SE_BETA_MARGIN               1            7
+SE_DOUBLE_MARGIN             9           29
+
+2026-08-03 12:44:18,246 INFO     Testing {'LMP_SCALE_STD_PCT': 132, 'LMP_SCALE_IMP_PCT': 84, 'LMR_C_PERCENT': 248, 'SE_BETA_MARGIN': 2, 'SE_DOUBLE_MARGIN': 31}
+2026-08-03 12:44:18,246 INFO     Start experiment
+2026-08-03 12:44:51,952 INFO     Experiment finished (33.705545s elapsed).
+2026-08-03 12:44:52,121 INFO     Got Elo: -84.3413461259573 +- 55.209063456775695
+2026-08-03 12:44:52,121 INFO     Estimated draw rate: 50.00%
+2026-08-03 12:44:52,121 INFO     Updating model
+2026-08-03 12:44:54,932 INFO     GP sampling finished (2.810618s)
+2026-08-03 12:44:55,007 INFO     Starting iteration 77
+2026-08-03 12:44:58,869 INFO     Current optimum:
+{'LMP_SCALE_STD_PCT': 125, 'LMP_SCALE_IMP_PCT': 108, 'LMR_C_PERCENT': 288, 'SE_BETA_MARGIN': 2, 'SE_DOUBLE_MARGIN': 26}
+2026-08-03 12:44:58,869 INFO     Estimated Elo: -4.3303 +- 6.5318
+2026-08-03 12:44:58,869 INFO     90.0% confidence interval of the Elo value: (-15.0742, 6.4136)
+2026-08-03 12:44:58,922 INFO     90.0% confidence intervals of the parameters:
+Parameter          Lower bound  Upper bound
+-------------------------------------------
+LMP_SCALE_STD_PCT           61          157
+LMP_SCALE_IMP_PCT           71          166
+LMR_C_PERCENT              203          430
+SE_BETA_MARGIN               1            7
+SE_DOUBLE_MARGIN             8           30
+
+2026-08-03 12:44:58,922 INFO     Testing {'LMP_SCALE_STD_PCT': 87, 'LMP_SCALE_IMP_PCT': 143, 'LMR_C_PERCENT': 295, 'SE_BETA_MARGIN': 4, 'SE_DOUBLE_MARGIN': 14}
+2026-08-03 12:44:58,923 INFO     Start experiment
+2026-08-03 12:45:26,506 INFO     Experiment finished (27.583187s elapsed).
+2026-08-03 12:45:26,681 INFO     Got Elo: -84.3413461259573 +- 55.210649611133945
+2026-08-03 12:45:26,681 INFO     Estimated draw rate: 50.00%
+2026-08-03 12:45:26,681 INFO     Updating model
+2026-08-03 12:45:29,649 INFO     GP sampling finished (2.967572s)
+2026-08-03 12:45:29,670 INFO     Starting iteration 78
+2026-08-03 12:45:33,712 INFO     Current optimum:
+{'LMP_SCALE_STD_PCT': 125, 'LMP_SCALE_IMP_PCT': 108, 'LMR_C_PERCENT': 288, 'SE_BETA_MARGIN': 2, 'SE_DOUBLE_MARGIN': 26}
+2026-08-03 12:45:33,712 INFO     Estimated Elo: -4.918 +- 6.6406
+2026-08-03 12:45:33,712 INFO     90.0% confidence interval of the Elo value: (-15.8409, 6.0048)
+2026-08-03 12:45:33,766 INFO     90.0% confidence intervals of the parameters:
+Parameter          Lower bound  Upper bound
+-------------------------------------------
+LMP_SCALE_STD_PCT           62          157
+LMP_SCALE_IMP_PCT           62          160
+LMR_C_PERCENT              202          428
+SE_BETA_MARGIN               1            7
+SE_DOUBLE_MARGIN            10           30
+
+2026-08-03 12:45:33,766 INFO     Testing {'LMP_SCALE_STD_PCT': 119, 'LMP_SCALE_IMP_PCT': 115, 'LMR_C_PERCENT': 227, 'SE_BETA_MARGIN': 4, 'SE_DOUBLE_MARGIN': 24}
+2026-08-03 12:45:33,766 INFO     Start experiment
+2026-08-03 12:46:01,913 INFO     Experiment finished (28.146946s elapsed).
+2026-08-03 12:46:02,090 INFO     Got Elo: -0.0 +- 44.81918332546468
+2026-08-03 12:46:02,090 INFO     Estimated draw rate: 45.45%
+2026-08-03 12:46:02,090 INFO     Updating model
+2026-08-03 12:46:05,441 INFO     GP sampling finished (3.351231s)
+2026-08-03 12:46:05,516 INFO     Starting iteration 79
+2026-08-03 12:46:09,419 INFO     Current optimum:
+{'LMP_SCALE_STD_PCT': 125, 'LMP_SCALE_IMP_PCT': 108, 'LMR_C_PERCENT': 288, 'SE_BETA_MARGIN': 2, 'SE_DOUBLE_MARGIN': 26}
+2026-08-03 12:46:09,420 INFO     Estimated Elo: -4.6486 +- 6.7911
+2026-08-03 12:46:09,420 INFO     90.0% confidence interval of the Elo value: (-15.819, 6.5218)
+2026-08-03 12:46:09,474 INFO     90.0% confidence intervals of the parameters:
+Parameter          Lower bound  Upper bound
+-------------------------------------------
+LMP_SCALE_STD_PCT           68          163
+LMP_SCALE_IMP_PCT           73          169
+LMR_C_PERCENT              224          449
+SE_BETA_MARGIN               1            7
+SE_DOUBLE_MARGIN             9           30
+
+2026-08-03 12:46:09,474 INFO     Testing {'LMP_SCALE_STD_PCT': 121, 'LMP_SCALE_IMP_PCT': 95, 'LMR_C_PERCENT': 288, 'SE_BETA_MARGIN': 3, 'SE_DOUBLE_MARGIN': 24}
+2026-08-03 12:46:09,474 INFO     Start experiment
+2026-08-03 12:46:46,056 INFO     Experiment finished (36.581956s elapsed).
+2026-08-03 12:46:46,245 INFO     Got Elo: -33.189694025905595 +- 44.04271584894577
+2026-08-03 12:46:46,245 INFO     Estimated draw rate: 54.55%
+2026-08-03 12:46:46,246 INFO     Updating model
+2026-08-03 12:46:49,037 INFO     GP sampling finished (2.79148s)
+2026-08-03 12:46:49,056 INFO     Starting iteration 80
+2026-08-03 12:46:52,779 INFO     Current optimum:
+{'LMP_SCALE_STD_PCT': 125, 'LMP_SCALE_IMP_PCT': 109, 'LMR_C_PERCENT': 288, 'SE_BETA_MARGIN': 2, 'SE_DOUBLE_MARGIN': 27}
+2026-08-03 12:46:52,779 INFO     Estimated Elo: -5.2595 +- 6.6989
+2026-08-03 12:46:52,779 INFO     90.0% confidence interval of the Elo value: (-16.2782, 5.7591)
+2026-08-03 12:46:52,831 INFO     90.0% confidence intervals of the parameters:
+Parameter          Lower bound  Upper bound
+-------------------------------------------
+LMP_SCALE_STD_PCT           62          158
+LMP_SCALE_IMP_PCT           66          164
+LMR_C_PERCENT              203          422
+SE_BETA_MARGIN               1            7
+SE_DOUBLE_MARGIN             9           30
+
+2026-08-03 12:46:52,831 INFO     Testing {'LMP_SCALE_STD_PCT': 121, 'LMP_SCALE_IMP_PCT': 143, 'LMR_C_PERCENT': 285, 'SE_BETA_MARGIN': 3, 'SE_DOUBLE_MARGIN': 24}
+2026-08-03 12:46:52,831 INFO     Start experiment
+2026-08-03 12:47:23,982 INFO     Experiment finished (31.150411s elapsed).
+2026-08-03 12:47:24,174 INFO     Got Elo: -16.557074063290028 +- 47.522382869059356
+2026-08-03 12:47:24,174 INFO     Estimated draw rate: 59.09%
+2026-08-03 12:47:24,174 INFO     Updating model
+2026-08-03 12:47:27,167 INFO     GP sampling finished (2.992812s)
+2026-08-03 12:47:27,243 INFO     Starting iteration 81
+2026-08-03 12:47:31,431 INFO     Current optimum:
+{'LMP_SCALE_STD_PCT': 125, 'LMP_SCALE_IMP_PCT': 109, 'LMR_C_PERCENT': 288, 'SE_BETA_MARGIN': 2, 'SE_DOUBLE_MARGIN': 27}
+2026-08-03 12:47:31,431 INFO     Estimated Elo: -5.3821 +- 6.6723
+2026-08-03 12:47:31,431 INFO     90.0% confidence interval of the Elo value: (-16.3569, 5.5928)
+2026-08-03 12:47:31,484 INFO     90.0% confidence intervals of the parameters:
+Parameter          Lower bound  Upper bound
+-------------------------------------------
+LMP_SCALE_STD_PCT           68          165
+LMP_SCALE_IMP_PCT           60          157
+LMR_C_PERCENT              211          431
+SE_BETA_MARGIN               1            7
+SE_DOUBLE_MARGIN            10           31
+
+2026-08-03 12:47:31,484 INFO     Testing {'LMP_SCALE_STD_PCT': 136, 'LMP_SCALE_IMP_PCT': 113, 'LMR_C_PERCENT': 271, 'SE_BETA_MARGIN': 3, 'SE_DOUBLE_MARGIN': 25}
+2026-08-03 12:47:31,484 INFO     Start experiment
+2026-08-03 12:48:00,032 INFO     Experiment finished (28.547301s elapsed).
+2026-08-03 12:48:00,209 INFO     Got Elo: 33.18969402590559 +- 60.130640119609794
+2026-08-03 12:48:00,209 INFO     Estimated draw rate: 45.45%
+2026-08-03 12:48:00,209 INFO     Updating model
+2026-08-03 12:48:03,213 INFO     GP sampling finished (3.004702s)
+2026-08-03 12:48:03,234 INFO     Starting iteration 82
+2026-08-03 12:48:06,876 INFO     Current optimum:
+{'LMP_SCALE_STD_PCT': 126, 'LMP_SCALE_IMP_PCT': 110, 'LMR_C_PERCENT': 286, 'SE_BETA_MARGIN': 2, 'SE_DOUBLE_MARGIN': 26}
+2026-08-03 12:48:06,877 INFO     Estimated Elo: -4.7007 +- 6.7202
+2026-08-03 12:48:06,877 INFO     90.0% confidence interval of the Elo value: (-15.7544, 6.3531)
+2026-08-03 12:48:06,930 INFO     90.0% confidence intervals of the parameters:
+Parameter          Lower bound  Upper bound
+-------------------------------------------
+LMP_SCALE_STD_PCT           61          160
+LMP_SCALE_IMP_PCT           69          166
+LMR_C_PERCENT              213          435
+SE_BETA_MARGIN               1            7
+SE_DOUBLE_MARGIN             9           30
+
+2026-08-03 12:48:06,930 INFO     Testing {'LMP_SCALE_STD_PCT': 127, 'LMP_SCALE_IMP_PCT': 107, 'LMR_C_PERCENT': 313, 'SE_BETA_MARGIN': 3, 'SE_DOUBLE_MARGIN': 29}
+2026-08-03 12:48:06,930 INFO     Start experiment
+2026-08-03 12:48:36,118 INFO     Experiment finished (29.188038s elapsed).
+2026-08-03 12:48:36,300 INFO     Got Elo: -33.189694025905595 +- 44.05803572641001
+2026-08-03 12:48:36,300 INFO     Estimated draw rate: 63.64%
+2026-08-03 12:48:36,300 INFO     Updating model
+2026-08-03 12:48:39,204 INFO     GP sampling finished (2.90429s)
+2026-08-03 12:48:39,224 INFO     Starting iteration 83
+2026-08-03 12:48:43,063 INFO     Current optimum:
+{'LMP_SCALE_STD_PCT': 126, 'LMP_SCALE_IMP_PCT': 110, 'LMR_C_PERCENT': 283, 'SE_BETA_MARGIN': 2, 'SE_DOUBLE_MARGIN': 26}
+2026-08-03 12:48:43,064 INFO     Estimated Elo: -5.5376 +- 6.3379
+2026-08-03 12:48:43,064 INFO     90.0% confidence interval of the Elo value: (-15.9626, 4.8874)
+2026-08-03 12:48:43,115 INFO     90.0% confidence intervals of the parameters:
+Parameter          Lower bound  Upper bound
+-------------------------------------------
+LMP_SCALE_STD_PCT           72          168
+LMP_SCALE_IMP_PCT           73          168
+LMR_C_PERCENT              216          446
+SE_BETA_MARGIN               1            7
+SE_DOUBLE_MARGIN            10           31
+
+2026-08-03 12:48:43,115 INFO     Testing {'LMP_SCALE_STD_PCT': 134, 'LMP_SCALE_IMP_PCT': 135, 'LMR_C_PERCENT': 202, 'SE_BETA_MARGIN': 5, 'SE_DOUBLE_MARGIN': 19}
+2026-08-03 12:48:43,116 INFO     Start experiment
+2026-08-03 12:49:13,828 INFO     Experiment finished (30.71211s elapsed).
+2026-08-03 12:49:14,012 INFO     Got Elo: 16.55707406328996 +- 52.85970845941392
+2026-08-03 12:49:14,012 INFO     Estimated draw rate: 40.91%
+2026-08-03 12:49:14,012 INFO     Updating model
+2026-08-03 12:49:16,974 INFO     GP sampling finished (2.962083s)
+2026-08-03 12:49:16,994 INFO     Starting iteration 84
+2026-08-03 12:49:20,845 INFO     Current optimum:
+{'LMP_SCALE_STD_PCT': 126, 'LMP_SCALE_IMP_PCT': 110, 'LMR_C_PERCENT': 283, 'SE_BETA_MARGIN': 2, 'SE_DOUBLE_MARGIN': 26}
+2026-08-03 12:49:20,845 INFO     Estimated Elo: -5.4531 +- 6.1774
+2026-08-03 12:49:20,845 INFO     90.0% confidence interval of the Elo value: (-15.614, 4.7078)
+2026-08-03 12:49:20,904 INFO     90.0% confidence intervals of the parameters:
+Parameter          Lower bound  Upper bound
+-------------------------------------------
+LMP_SCALE_STD_PCT           63          160
+LMP_SCALE_IMP_PCT           60          157
+LMR_C_PERCENT              221          446
+SE_BETA_MARGIN               1            7
+SE_DOUBLE_MARGIN             9           29
+
+2026-08-03 12:49:20,904 INFO     Testing {'LMP_SCALE_STD_PCT': 144, 'LMP_SCALE_IMP_PCT': 117, 'LMR_C_PERCENT': 265, 'SE_BETA_MARGIN': 2, 'SE_DOUBLE_MARGIN': 26}
+2026-08-03 12:49:20,904 INFO     Start experiment
+2026-08-03 12:49:53,347 INFO     Experiment finished (32.442945s elapsed).
+2026-08-03 12:49:53,537 INFO     Got Elo: 49.975494643319955 +- 51.64458830102815
+2026-08-03 12:49:53,537 INFO     Estimated draw rate: 50.00%
+2026-08-03 12:49:53,537 INFO     Updating model
+2026-08-03 12:49:56,434 INFO     GP sampling finished (2.897274s)
+2026-08-03 12:49:56,510 INFO     Starting iteration 85
+2026-08-03 12:50:00,616 INFO     Current optimum:
+{'LMP_SCALE_STD_PCT': 128, 'LMP_SCALE_IMP_PCT': 111, 'LMR_C_PERCENT': 278, 'SE_BETA_MARGIN': 2, 'SE_DOUBLE_MARGIN': 26}
+2026-08-03 12:50:00,616 INFO     Estimated Elo: -4.3508 +- 6.3488
+2026-08-03 12:50:00,616 INFO     90.0% confidence interval of the Elo value: (-14.7937, 6.0921)
+2026-08-03 12:50:00,689 INFO     90.0% confidence intervals of the parameters:
+Parameter          Lower bound  Upper bound
+-------------------------------------------
+LMP_SCALE_STD_PCT           62          159
+LMP_SCALE_IMP_PCT           71          168
+LMR_C_PERCENT              205          432
+SE_BETA_MARGIN               1            7
+SE_DOUBLE_MARGIN             8           29
+
+2026-08-03 12:50:00,689 INFO     Testing {'LMP_SCALE_STD_PCT': 118, 'LMP_SCALE_IMP_PCT': 115, 'LMR_C_PERCENT': 241, 'SE_BETA_MARGIN': 2, 'SE_DOUBLE_MARGIN': 24}
+2026-08-03 12:50:00,690 INFO     Start experiment
+2026-08-03 12:50:28,553 INFO     Experiment finished (27.863465s elapsed).
+2026-08-03 12:50:28,726 INFO     Got Elo: -0.0 +- 44.90381805322239
+2026-08-03 12:50:28,726 INFO     Estimated draw rate: 54.55%
+2026-08-03 12:50:28,726 INFO     Updating model
+2026-08-03 12:50:31,991 INFO     GP sampling finished (3.264952s)
+2026-08-03 12:50:32,068 INFO     Starting iteration 86
+2026-08-03 12:50:35,792 INFO     Current optimum:
+{'LMP_SCALE_STD_PCT': 128, 'LMP_SCALE_IMP_PCT': 112, 'LMR_C_PERCENT': 277, 'SE_BETA_MARGIN': 2, 'SE_DOUBLE_MARGIN': 26}
+2026-08-03 12:50:35,793 INFO     Estimated Elo: -4.5037 +- 6.0624
+2026-08-03 12:50:35,793 INFO     90.0% confidence interval of the Elo value: (-14.4754, 5.4681)
+2026-08-03 12:50:35,847 INFO     90.0% confidence intervals of the parameters:
+Parameter          Lower bound  Upper bound
+-------------------------------------------
+LMP_SCALE_STD_PCT           66          161
+LMP_SCALE_IMP_PCT           70          168
+LMR_C_PERCENT              210          432
+SE_BETA_MARGIN               1            7
+SE_DOUBLE_MARGIN             8           30
+
+2026-08-03 12:50:35,847 INFO     Testing {'LMP_SCALE_STD_PCT': 128, 'LMP_SCALE_IMP_PCT': 99, 'LMR_C_PERCENT': 316, 'SE_BETA_MARGIN': 2, 'SE_DOUBLE_MARGIN': 19}
+2026-08-03 12:50:35,847 INFO     Start experiment
+2026-08-03 12:51:13,244 INFO     Experiment finished (37.395947s elapsed).
+2026-08-03 12:51:13,426 INFO     Got Elo: 179.98760347041903 +- 67.26475614139576
+2026-08-03 12:51:13,426 INFO     Estimated draw rate: 36.36%
+2026-08-03 12:51:13,426 INFO     Updating model
+2026-08-03 12:51:16,573 INFO     GP sampling finished (3.146658s)
+2026-08-03 12:51:16,595 INFO     Starting iteration 87
+2026-08-03 12:51:20,190 INFO     Current optimum:
+{'LMP_SCALE_STD_PCT': 128, 'LMP_SCALE_IMP_PCT': 110, 'LMR_C_PERCENT': 281, 'SE_BETA_MARGIN': 2, 'SE_DOUBLE_MARGIN': 25}
+2026-08-03 12:51:20,190 INFO     Estimated Elo: -2.2674 +- 6.4359
+2026-08-03 12:51:20,190 INFO     90.0% confidence interval of the Elo value: (-12.8535, 8.3188)
+2026-08-03 12:51:20,242 INFO     90.0% confidence intervals of the parameters:
+Parameter          Lower bound  Upper bound
+-------------------------------------------
+LMP_SCALE_STD_PCT           62          159
+LMP_SCALE_IMP_PCT           72          169
+LMR_C_PERCENT              226          450
+SE_BETA_MARGIN               1            7
+SE_DOUBLE_MARGIN             9           30
+
+2026-08-03 12:51:20,242 INFO     Testing {'LMP_SCALE_STD_PCT': 123, 'LMP_SCALE_IMP_PCT': 86, 'LMR_C_PERCENT': 352, 'SE_BETA_MARGIN': 3, 'SE_DOUBLE_MARGIN': 16}
+2026-08-03 12:51:20,242 INFO     Start experiment
+2026-08-03 12:51:53,606 INFO     Experiment finished (33.363256s elapsed).
+2026-08-03 12:51:53,779 INFO     Got Elo: 66.99643491750547 +- 48.36512930102725
+2026-08-03 12:51:53,779 INFO     Estimated draw rate: 45.45%
+2026-08-03 12:51:53,779 INFO     Updating model
+2026-08-03 12:51:56,608 INFO     GP sampling finished (2.828708s)
+2026-08-03 12:51:56,630 INFO     Starting iteration 88
+2026-08-03 12:52:00,260 INFO     Current optimum:
+{'LMP_SCALE_STD_PCT': 128, 'LMP_SCALE_IMP_PCT': 110, 'LMR_C_PERCENT': 282, 'SE_BETA_MARGIN': 2, 'SE_DOUBLE_MARGIN': 25}
+2026-08-03 12:52:00,260 INFO     Estimated Elo: -1.6043 +- 6.4756
+2026-08-03 12:52:00,260 INFO     90.0% confidence interval of the Elo value: (-12.2557, 9.047)
+2026-08-03 12:52:00,312 INFO     90.0% confidence intervals of the parameters:
+Parameter          Lower bound  Upper bound
+-------------------------------------------
+LMP_SCALE_STD_PCT           70          168
+LMP_SCALE_IMP_PCT           61          160
+LMR_C_PERCENT              200          422
+SE_BETA_MARGIN               1            7
+SE_DOUBLE_MARGIN             9           30
+
+2026-08-03 12:52:00,312 INFO     Testing {'LMP_SCALE_STD_PCT': 144, 'LMP_SCALE_IMP_PCT': 99, 'LMR_C_PERCENT': 326, 'SE_BETA_MARGIN': 2, 'SE_DOUBLE_MARGIN': 18}
+2026-08-03 12:52:00,312 INFO     Start experiment
+2026-08-03 12:52:34,978 INFO     Experiment finished (34.665491s elapsed).
+2026-08-03 12:52:35,149 INFO     Got Elo: -66.99643491750554 +- 64.35180470689626
+2026-08-03 12:52:35,149 INFO     Estimated draw rate: 36.36%
+2026-08-03 12:52:35,149 INFO     Updating model
+2026-08-03 12:52:38,055 INFO     GP sampling finished (2.905519s)
+2026-08-03 12:52:38,076 INFO     Starting iteration 89
+2026-08-03 12:52:42,020 INFO     Current optimum:
+{'LMP_SCALE_STD_PCT': 128, 'LMP_SCALE_IMP_PCT': 110, 'LMR_C_PERCENT': 281, 'SE_BETA_MARGIN': 2, 'SE_DOUBLE_MARGIN': 25}
+2026-08-03 12:52:42,020 INFO     Estimated Elo: -2.3551 +- 6.2684
+2026-08-03 12:52:42,020 INFO     90.0% confidence interval of the Elo value: (-12.6656, 7.9555)
+2026-08-03 12:52:42,078 INFO     90.0% confidence intervals of the parameters:
+Parameter          Lower bound  Upper bound
+-------------------------------------------
+LMP_SCALE_STD_PCT           66          161
+LMP_SCALE_IMP_PCT           71          168
+LMR_C_PERCENT              201          427
+SE_BETA_MARGIN               1            7
+SE_DOUBLE_MARGIN             8           30
+
+2026-08-03 12:52:42,079 INFO     Testing {'LMP_SCALE_STD_PCT': 128, 'LMP_SCALE_IMP_PCT': 115, 'LMR_C_PERCENT': 266, 'SE_BETA_MARGIN': 2, 'SE_DOUBLE_MARGIN': 25}
+2026-08-03 12:52:42,079 INFO     Start experiment
+2026-08-03 12:53:12,963 INFO     Experiment finished (30.883999s elapsed).
+2026-08-03 12:53:13,151 INFO     Got Elo: -102.10900204132254 +- 50.62814640506584
+2026-08-03 12:53:13,152 INFO     Estimated draw rate: 36.36%
+2026-08-03 12:53:13,152 INFO     Updating model
+2026-08-03 12:53:16,097 INFO     GP sampling finished (2.945092s)
+2026-08-03 12:53:16,119 INFO     Starting iteration 90
+2026-08-03 12:53:20,078 INFO     Current optimum:
+{'LMP_SCALE_STD_PCT': 125, 'LMP_SCALE_IMP_PCT': 98, 'LMR_C_PERCENT': 319, 'SE_BETA_MARGIN': 2, 'SE_DOUBLE_MARGIN': 19}
+2026-08-03 12:53:20,078 INFO     Estimated Elo: -4.2156 +- 6.5503
+2026-08-03 12:53:20,078 INFO     90.0% confidence interval of the Elo value: (-14.9899, 6.5587)
+2026-08-03 12:53:20,146 INFO     90.0% confidence intervals of the parameters:
+Parameter          Lower bound  Upper bound
+-------------------------------------------
+LMP_SCALE_STD_PCT           70          168
+LMP_SCALE_IMP_PCT           68          165
+LMR_C_PERCENT              213          432
+SE_BETA_MARGIN               1            7
+SE_DOUBLE_MARGIN             8           29
+
+2026-08-03 12:53:20,146 INFO     Testing {'LMP_SCALE_STD_PCT': 124, 'LMP_SCALE_IMP_PCT': 92, 'LMR_C_PERCENT': 296, 'SE_BETA_MARGIN': 2, 'SE_DOUBLE_MARGIN': 17}
+2026-08-03 12:53:20,146 INFO     Start experiment
+2026-08-03 12:53:47,869 INFO     Experiment finished (27.722419s elapsed).
+2026-08-03 12:53:48,021 INFO     Got Elo: -49.97549464331997 +- 71.12313715793657
+2026-08-03 12:53:48,021 INFO     Estimated draw rate: 31.82%
+2026-08-03 12:53:48,021 INFO     Updating model
+2026-08-03 12:53:51,030 INFO     GP sampling finished (3.008759s)
+2026-08-03 12:53:51,053 INFO     Starting iteration 91
+2026-08-03 12:53:55,141 INFO     Current optimum:
+{'LMP_SCALE_STD_PCT': 126, 'LMP_SCALE_IMP_PCT': 107, 'LMR_C_PERCENT': 295, 'SE_BETA_MARGIN': 2, 'SE_DOUBLE_MARGIN': 26}
+2026-08-03 12:53:55,141 INFO     Estimated Elo: -4.7452 +- 6.047
+2026-08-03 12:53:55,141 INFO     90.0% confidence interval of the Elo value: (-14.6917, 5.2012)
+2026-08-03 12:53:55,193 INFO     90.0% confidence intervals of the parameters:
+Parameter          Lower bound  Upper bound
+-------------------------------------------
+LMP_SCALE_STD_PCT           62          157
+LMP_SCALE_IMP_PCT           60          157
+LMR_C_PERCENT              211          437
+SE_BETA_MARGIN               1            7
+SE_DOUBLE_MARGIN             9           30
+
+2026-08-03 12:53:55,193 INFO     Testing {'LMP_SCALE_STD_PCT': 122, 'LMP_SCALE_IMP_PCT': 85, 'LMR_C_PERCENT': 328, 'SE_BETA_MARGIN': 2, 'SE_DOUBLE_MARGIN': 19}
+2026-08-03 12:53:55,194 INFO     Start experiment
+2026-08-03 12:54:27,676 INFO     Experiment finished (32.481656s elapsed).
+2026-08-03 12:54:27,861 INFO     Got Elo: 16.55707406329004 +- 41.61246804968677
+2026-08-03 12:54:27,862 INFO     Estimated draw rate: 50.00%
+2026-08-03 12:54:27,862 INFO     Updating model
+2026-08-03 12:54:30,787 INFO     GP sampling finished (2.925638s)
+2026-08-03 12:54:30,808 INFO     Starting iteration 92
+2026-08-03 12:54:34,899 INFO     Current optimum:
+{'LMP_SCALE_STD_PCT': 125, 'LMP_SCALE_IMP_PCT': 95, 'LMR_C_PERCENT': 326, 'SE_BETA_MARGIN': 2, 'SE_DOUBLE_MARGIN': 19}
+2026-08-03 12:54:34,899 INFO     Estimated Elo: -4.5116 +- 6.0982
+2026-08-03 12:54:34,899 INFO     90.0% confidence interval of the Elo value: (-14.5423, 5.519)
+2026-08-03 12:54:34,953 INFO     90.0% confidence intervals of the parameters:
+Parameter          Lower bound  Upper bound
+-------------------------------------------
+LMP_SCALE_STD_PCT           71          170
+LMP_SCALE_IMP_PCT           73          168
+LMR_C_PERCENT              222          441
+SE_BETA_MARGIN               1            7
+SE_DOUBLE_MARGIN            10           31
+
+2026-08-03 12:54:34,953 INFO     Testing {'LMP_SCALE_STD_PCT': 142, 'LMP_SCALE_IMP_PCT': 93, 'LMR_C_PERCENT': 347, 'SE_BETA_MARGIN': 2, 'SE_DOUBLE_MARGIN': 15}
+2026-08-03 12:54:34,954 INFO     Start experiment
+2026-08-03 12:55:05,965 INFO     Experiment finished (31.010854s elapsed).
+2026-08-03 12:55:06,150 INFO     Got Elo: -49.97549464331997 +- 46.03561165515955
+2026-08-03 12:55:06,150 INFO     Estimated draw rate: 50.00%
+2026-08-03 12:55:06,150 INFO     Updating model
+2026-08-03 12:55:09,089 INFO     GP sampling finished (2.939134s)
+2026-08-03 12:55:09,112 INFO     Starting iteration 93
+2026-08-03 12:55:13,361 INFO     Current optimum:
+{'LMP_SCALE_STD_PCT': 126, 'LMP_SCALE_IMP_PCT': 106, 'LMR_C_PERCENT': 296, 'SE_BETA_MARGIN': 2, 'SE_DOUBLE_MARGIN': 26}
+2026-08-03 12:55:13,361 INFO     Estimated Elo: -5.0779 +- 5.675
+2026-08-03 12:55:13,361 INFO     90.0% confidence interval of the Elo value: (-14.4125, 4.2567)
+2026-08-03 12:55:13,415 INFO     90.0% confidence intervals of the parameters:
+Parameter          Lower bound  Upper bound
+-------------------------------------------
+LMP_SCALE_STD_PCT           66          162
+LMP_SCALE_IMP_PCT           61          160
+LMR_C_PERCENT              220          438
+SE_BETA_MARGIN               1            7
+SE_DOUBLE_MARGIN             9           30
+
+2026-08-03 12:55:13,415 INFO     Testing {'LMP_SCALE_STD_PCT': 125, 'LMP_SCALE_IMP_PCT': 102, 'LMR_C_PERCENT': 309, 'SE_BETA_MARGIN': 2, 'SE_DOUBLE_MARGIN': 25}
+2026-08-03 12:55:13,416 INFO     Start experiment
+2026-08-03 12:55:45,259 INFO     Experiment finished (31.843641s elapsed).
+2026-08-03 12:55:45,443 INFO     Got Elo: 66.99643491750547 +- 47.58875059945348
+2026-08-03 12:55:45,444 INFO     Estimated draw rate: 54.55%
+2026-08-03 12:55:45,444 INFO     Updating model
+2026-08-03 12:55:48,971 INFO     GP sampling finished (3.527338s)
+2026-08-03 12:55:49,047 INFO     Starting iteration 94
+2026-08-03 12:55:53,211 INFO     Current optimum:
+{'LMP_SCALE_STD_PCT': 125, 'LMP_SCALE_IMP_PCT': 104, 'LMR_C_PERCENT': 302, 'SE_BETA_MARGIN': 2, 'SE_DOUBLE_MARGIN': 25}
+2026-08-03 12:55:53,211 INFO     Estimated Elo: -3.5318 +- 5.6977
+2026-08-03 12:55:53,212 INFO     90.0% confidence interval of the Elo value: (-12.9037, 5.8401)
+2026-08-03 12:55:53,268 INFO     90.0% confidence intervals of the parameters:
+Parameter          Lower bound  Upper bound
+-------------------------------------------
+LMP_SCALE_STD_PCT           64          162
+LMP_SCALE_IMP_PCT           68          166
+LMR_C_PERCENT              206          427
+SE_BETA_MARGIN               1            7
+SE_DOUBLE_MARGIN             8           29
+
+2026-08-03 12:55:53,268 INFO     Testing {'LMP_SCALE_STD_PCT': 104, 'LMP_SCALE_IMP_PCT': 110, 'LMR_C_PERCENT': 341, 'SE_BETA_MARGIN': 3, 'SE_DOUBLE_MARGIN': 20}
+2026-08-03 12:55:53,268 INFO     Start experiment
+2026-08-03 12:56:20,767 INFO     Experiment finished (27.498198s elapsed).
+2026-08-03 12:56:20,956 INFO     Got Elo: -84.3413461259573 +- 49.663499943289715
+2026-08-03 12:56:20,956 INFO     Estimated draw rate: 50.00%
+2026-08-03 12:56:20,956 INFO     Updating model
+2026-08-03 12:56:23,962 INFO     GP sampling finished (3.006263s)
+2026-08-03 12:56:24,039 INFO     Starting iteration 95
+2026-08-03 12:56:28,238 INFO     Current optimum:
+{'LMP_SCALE_STD_PCT': 126, 'LMP_SCALE_IMP_PCT': 104, 'LMR_C_PERCENT': 299, 'SE_BETA_MARGIN': 2, 'SE_DOUBLE_MARGIN': 26}
+2026-08-03 12:56:28,238 INFO     Estimated Elo: -4.2769 +- 5.7207
+2026-08-03 12:56:28,238 INFO     90.0% confidence interval of the Elo value: (-13.6866, 5.1328)
+2026-08-03 12:56:28,292 INFO     90.0% confidence intervals of the parameters:
+Parameter          Lower bound  Upper bound
+-------------------------------------------
+LMP_SCALE_STD_PCT           71          168
+LMP_SCALE_IMP_PCT           61          160
+LMR_C_PERCENT              219          447
+SE_BETA_MARGIN               1            7
+SE_DOUBLE_MARGIN             9           30
+
+2026-08-03 12:56:28,293 INFO     Testing {'LMP_SCALE_STD_PCT': 125, 'LMP_SCALE_IMP_PCT': 92, 'LMR_C_PERCENT': 322, 'SE_BETA_MARGIN': 2, 'SE_DOUBLE_MARGIN': 11}
+2026-08-03 12:56:28,293 INFO     Start experiment
+2026-08-03 12:56:59,500 INFO     Experiment finished (31.207323s elapsed).
+2026-08-03 12:56:59,682 INFO     Got Elo: 16.55707406329004 +- 53.20160169483699
+2026-08-03 12:56:59,682 INFO     Estimated draw rate: 40.91%
+2026-08-03 12:56:59,682 INFO     Updating model
+2026-08-03 12:57:03,297 INFO     GP sampling finished (3.614755s)
+2026-08-03 12:57:03,323 INFO     Starting iteration 96
+2026-08-03 12:57:07,926 INFO     Current optimum:
+{'LMP_SCALE_STD_PCT': 126, 'LMP_SCALE_IMP_PCT': 104, 'LMR_C_PERCENT': 300, 'SE_BETA_MARGIN': 2, 'SE_DOUBLE_MARGIN': 25}
+2026-08-03 12:57:07,926 INFO     Estimated Elo: -3.9939 +- 5.8476
+2026-08-03 12:57:07,926 INFO     90.0% confidence interval of the Elo value: (-13.6124, 5.6245)
+2026-08-03 12:57:07,980 INFO     90.0% confidence intervals of the parameters:
+Parameter          Lower bound  Upper bound
+-------------------------------------------
+LMP_SCALE_STD_PCT           64          158
+LMP_SCALE_IMP_PCT           62          160
+LMR_C_PERCENT              206          430
+SE_BETA_MARGIN               1            7
+SE_DOUBLE_MARGIN             9           30
+
+2026-08-03 12:57:07,980 INFO     Testing {'LMP_SCALE_STD_PCT': 69, 'LMP_SCALE_IMP_PCT': 152, 'LMR_C_PERCENT': 426, 'SE_BETA_MARGIN': 2, 'SE_DOUBLE_MARGIN': 15}
+2026-08-03 12:57:07,980 INFO     Start experiment
+2026-08-03 12:57:34,338 INFO     Experiment finished (26.357536s elapsed).
+2026-08-03 12:57:34,526 INFO     Got Elo: -33.189694025905595 +- 55.36747649798352
+2026-08-03 12:57:34,526 INFO     Estimated draw rate: 45.45%
+2026-08-03 12:57:34,526 INFO     Updating model
+2026-08-03 12:57:37,991 INFO     GP sampling finished (3.464889s)
+2026-08-03 12:57:38,064 INFO     Starting iteration 97
+2026-08-03 12:57:42,441 INFO     Current optimum:
+{'LMP_SCALE_STD_PCT': 126, 'LMP_SCALE_IMP_PCT': 104, 'LMR_C_PERCENT': 300, 'SE_BETA_MARGIN': 2, 'SE_DOUBLE_MARGIN': 25}
+2026-08-03 12:57:42,441 INFO     Estimated Elo: -4.2293 +- 5.8159
+2026-08-03 12:57:42,441 INFO     90.0% confidence interval of the Elo value: (-13.7955, 5.337)
+2026-08-03 12:57:42,495 INFO     90.0% confidence intervals of the parameters:
+Parameter          Lower bound  Upper bound
+-------------------------------------------
+LMP_SCALE_STD_PCT           69          166
+LMP_SCALE_IMP_PCT           68          166
+LMR_C_PERCENT              206          428
+SE_BETA_MARGIN               1            7
+SE_DOUBLE_MARGIN             8           30
+
+2026-08-03 12:57:42,495 INFO     Testing {'LMP_SCALE_STD_PCT': 127, 'LMP_SCALE_IMP_PCT': 107, 'LMR_C_PERCENT': 303, 'SE_BETA_MARGIN': 3, 'SE_DOUBLE_MARGIN': 19}
+2026-08-03 12:57:42,496 INFO     Start experiment
+2026-08-03 12:58:12,350 INFO     Experiment finished (29.854229s elapsed).
+2026-08-03 12:58:12,550 INFO     Got Elo: 33.18969402590559 +- 44.02089251451095
+2026-08-03 12:58:12,551 INFO     Estimated draw rate: 45.45%
+2026-08-03 12:58:12,551 INFO     Updating model
+2026-08-03 12:58:16,003 INFO     GP sampling finished (3.451962s)
+2026-08-03 12:58:16,075 INFO     Starting iteration 98
+2026-08-03 12:58:20,423 INFO     Current optimum:
+{'LMP_SCALE_STD_PCT': 126, 'LMP_SCALE_IMP_PCT': 104, 'LMR_C_PERCENT': 300, 'SE_BETA_MARGIN': 2, 'SE_DOUBLE_MARGIN': 25}
+2026-08-03 12:58:20,423 INFO     Estimated Elo: -3.657 +- 5.9055
+2026-08-03 12:58:20,423 INFO     90.0% confidence interval of the Elo value: (-13.3707, 6.0568)
+2026-08-03 12:58:20,479 INFO     90.0% confidence intervals of the parameters:
+Parameter          Lower bound  Upper bound
+-------------------------------------------
+LMP_SCALE_STD_PCT           64          162
+LMP_SCALE_IMP_PCT           73          170
+LMR_C_PERCENT              228          448
+SE_BETA_MARGIN               1            7
+SE_DOUBLE_MARGIN            10           31
+
+2026-08-03 12:58:20,479 INFO     Testing {'LMP_SCALE_STD_PCT': 96, 'LMP_SCALE_IMP_PCT': 98, 'LMR_C_PERCENT': 277, 'SE_BETA_MARGIN': 2, 'SE_DOUBLE_MARGIN': 21}
+2026-08-03 12:58:20,480 INFO     Start experiment
+2026-08-03 12:58:59,464 INFO     Experiment finished (38.983932s elapsed).
+2026-08-03 12:58:59,646 INFO     Got Elo: 49.975494643319955 +- 52.17480610958641
+2026-08-03 12:58:59,646 INFO     Estimated draw rate: 40.91%
+2026-08-03 12:58:59,646 INFO     Updating model
+2026-08-03 12:59:02,506 INFO     GP sampling finished (2.860134s)
+2026-08-03 12:59:02,583 INFO     Starting iteration 99
+2026-08-03 12:59:06,403 INFO     Current optimum:
+{'LMP_SCALE_STD_PCT': 126, 'LMP_SCALE_IMP_PCT': 104, 'LMR_C_PERCENT': 300, 'SE_BETA_MARGIN': 2, 'SE_DOUBLE_MARGIN': 25}
+2026-08-03 12:59:06,403 INFO     Estimated Elo: -3.2061 +- 5.8163
+2026-08-03 12:59:06,403 INFO     90.0% confidence interval of the Elo value: (-12.773, 6.3607)
+2026-08-03 12:59:06,457 INFO     90.0% confidence intervals of the parameters:
+Parameter          Lower bound  Upper bound
+-------------------------------------------
+LMP_SCALE_STD_PCT           61          160
+LMP_SCALE_IMP_PCT           70          166
+LMR_C_PERCENT              201          422
+SE_BETA_MARGIN               1            7
+SE_DOUBLE_MARGIN             9           30
+
+2026-08-03 12:59:06,457 INFO     Testing {'LMP_SCALE_STD_PCT': 126, 'LMP_SCALE_IMP_PCT': 108, 'LMR_C_PERCENT': 249, 'SE_BETA_MARGIN': 2, 'SE_DOUBLE_MARGIN': 20}
+2026-08-03 12:59:06,457 INFO     Start experiment
+2026-08-03 12:59:40,293 INFO     Experiment finished (33.835919s elapsed).
+2026-08-03 12:59:40,473 INFO     Got Elo: 84.34134612595726 +- 60.361510586237245
+2026-08-03 12:59:40,473 INFO     Estimated draw rate: 40.91%
+2026-08-03 12:59:40,473 INFO     Updating model
+2026-08-03 12:59:43,722 INFO     GP sampling finished (3.248431s)
+2026-08-03 12:59:43,745 INFO     Starting iteration 100
+2026-08-03 12:59:47,509 INFO     Current optimum:
+{'LMP_SCALE_STD_PCT': 126, 'LMP_SCALE_IMP_PCT': 103, 'LMR_C_PERCENT': 297, 'SE_BETA_MARGIN': 2, 'SE_DOUBLE_MARGIN': 24}
+2026-08-03 12:59:47,509 INFO     Estimated Elo: -2.0645 +- 6.0945
+2026-08-03 12:59:47,510 INFO     90.0% confidence interval of the Elo value: (-12.0889, 7.96)
+2026-08-03 12:59:47,562 INFO     90.0% confidence intervals of the parameters:
+Parameter          Lower bound  Upper bound
+-------------------------------------------
+LMP_SCALE_STD_PCT           66          167
+LMP_SCALE_IMP_PCT           61          161
+LMR_C_PERCENT              215          440
+SE_BETA_MARGIN               1            7
+SE_DOUBLE_MARGIN            10           31
+
+2026-08-03 12:59:47,562 INFO     Testing {'LMP_SCALE_STD_PCT': 130, 'LMP_SCALE_IMP_PCT': 108, 'LMR_C_PERCENT': 259, 'SE_BETA_MARGIN': 2, 'SE_DOUBLE_MARGIN': 17}
+2026-08-03 12:59:47,563 INFO     Start experiment
+2026-08-03 13:00:21,695 INFO     Experiment finished (34.131993s elapsed).
+2026-08-03 13:00:21,850 INFO     Got Elo: -49.975494643320026 +- 57.32376033992094
+2026-08-03 13:00:21,850 INFO     Estimated draw rate: 40.91%
+2026-08-03 13:00:21,850 INFO     Updating model
+2026-08-03 13:00:24,978 INFO     GP sampling finished (3.127568s)
+2026-08-03 13:00:25,001 INFO     Starting iteration 101
+2026-08-03 13:00:28,770 INFO     Current optimum:
+{'LMP_SCALE_STD_PCT': 126, 'LMP_SCALE_IMP_PCT': 103, 'LMR_C_PERCENT': 298, 'SE_BETA_MARGIN': 2, 'SE_DOUBLE_MARGIN': 24}
+2026-08-03 13:00:28,770 INFO     Estimated Elo: -2.5157 +- 6.1088
+2026-08-03 13:00:28,771 INFO     90.0% confidence interval of the Elo value: (-12.5638, 7.5323)
+2026-08-03 13:00:28,823 INFO     90.0% confidence intervals of the parameters:
+Parameter          Lower bound  Upper bound
+-------------------------------------------
+LMP_SCALE_STD_PCT           60          157
+LMP_SCALE_IMP_PCT           60          157
+LMR_C_PERCENT              222          444
+SE_BETA_MARGIN               1            7
+SE_DOUBLE_MARGIN            10           32
+
+2026-08-03 13:00:28,823 INFO     Testing {'LMP_SCALE_STD_PCT': 96, 'LMP_SCALE_IMP_PCT': 99, 'LMR_C_PERCENT': 292, 'SE_BETA_MARGIN': 2, 'SE_DOUBLE_MARGIN': 20}
+2026-08-03 13:00:28,824 INFO     Start experiment
+2026-08-03 13:01:01,401 INFO     Experiment finished (32.577105s elapsed).
+2026-08-03 13:01:01,573 INFO     Got Elo: 66.99643491750547 +- 53.85215894497175
+2026-08-03 13:01:01,573 INFO     Estimated draw rate: 36.36%
+2026-08-03 13:01:01,573 INFO     Updating model
+2026-08-03 13:01:04,897 INFO     GP sampling finished (3.323809s)
+2026-08-03 13:01:04,969 INFO     Starting iteration 102
+2026-08-03 13:01:08,910 INFO     Current optimum:
+{'LMP_SCALE_STD_PCT': 124, 'LMP_SCALE_IMP_PCT': 103, 'LMR_C_PERCENT': 299, 'SE_BETA_MARGIN': 2, 'SE_DOUBLE_MARGIN': 24}
+2026-08-03 13:01:08,911 INFO     Estimated Elo: -1.9388 +- 5.9527
+2026-08-03 13:01:08,911 INFO     90.0% confidence interval of the Elo value: (-11.7301, 7.8525)
+2026-08-03 13:01:08,965 INFO     90.0% confidence intervals of the parameters:
+Parameter          Lower bound  Upper bound
+-------------------------------------------
+LMP_SCALE_STD_PCT           60          158
+LMP_SCALE_IMP_PCT           60          157
+LMR_C_PERCENT              204          426
+SE_BETA_MARGIN               2            8
+SE_DOUBLE_MARGIN            10           31
+
+2026-08-03 13:01:08,965 INFO     Testing {'LMP_SCALE_STD_PCT': 131, 'LMP_SCALE_IMP_PCT': 72, 'LMR_C_PERCENT': 262, 'SE_BETA_MARGIN': 2, 'SE_DOUBLE_MARGIN': 23}
+2026-08-03 13:01:08,965 INFO     Start experiment
+2026-08-03 13:01:37,261 INFO     Experiment finished (28.29592s elapsed).
+2026-08-03 13:01:37,457 INFO     Got Elo: -139.38185823684773 +- 66.05065653354355
+2026-08-03 13:01:37,458 INFO     Estimated draw rate: 36.36%
+2026-08-03 13:01:37,458 INFO     Updating model
+2026-08-03 13:01:40,743 INFO     GP sampling finished (3.285008s)
+2026-08-03 13:01:40,767 INFO     Starting iteration 103
+2026-08-03 13:01:44,828 INFO     Current optimum:
+{'LMP_SCALE_STD_PCT': 124, 'LMP_SCALE_IMP_PCT': 105, 'LMR_C_PERCENT': 299, 'SE_BETA_MARGIN': 2, 'SE_DOUBLE_MARGIN': 24}
+2026-08-03 13:01:44,828 INFO     Estimated Elo: -2.9854 +- 6.0939
+2026-08-03 13:01:44,828 INFO     90.0% confidence interval of the Elo value: (-13.009, 7.0382)
+2026-08-03 13:01:44,882 INFO     90.0% confidence intervals of the parameters:
+Parameter          Lower bound  Upper bound
+-------------------------------------------
+LMP_SCALE_STD_PCT           62          159
+LMP_SCALE_IMP_PCT           61          161
+LMR_C_PERCENT              217          444
+SE_BETA_MARGIN               1            7
+SE_DOUBLE_MARGIN             8           30
+
+2026-08-03 13:01:44,882 INFO     Testing {'LMP_SCALE_STD_PCT': 127, 'LMP_SCALE_IMP_PCT': 118, 'LMR_C_PERCENT': 261, 'SE_BETA_MARGIN': 3, 'SE_DOUBLE_MARGIN': 20}
+2026-08-03 13:01:44,883 INFO     Start experiment
+2026-08-03 13:02:22,195 INFO     Experiment finished (37.312368s elapsed).
+2026-08-03 13:02:22,362 INFO     Got Elo: -66.99643491750545 +- 59.63321433806762
+2026-08-03 13:02:22,362 INFO     Estimated draw rate: 54.55%
+2026-08-03 13:02:22,362 INFO     Updating model
+2026-08-03 13:02:25,164 INFO     GP sampling finished (2.802412s)
+2026-08-03 13:02:25,233 INFO     Starting iteration 104
+2026-08-03 13:02:29,329 INFO     Current optimum:
+{'LMP_SCALE_STD_PCT': 124, 'LMP_SCALE_IMP_PCT': 104, 'LMR_C_PERCENT': 300, 'SE_BETA_MARGIN': 2, 'SE_DOUBLE_MARGIN': 25}
+2026-08-03 13:02:29,329 INFO     Estimated Elo: -3.7546 +- 5.8867
+2026-08-03 13:02:29,329 INFO     90.0% confidence interval of the Elo value: (-13.4374, 5.9282)
+2026-08-03 13:02:29,383 INFO     90.0% confidence intervals of the parameters:
+Parameter          Lower bound  Upper bound
+-------------------------------------------
+LMP_SCALE_STD_PCT           71          170
+LMP_SCALE_IMP_PCT           61          158
+LMR_C_PERCENT              201          420
+SE_BETA_MARGIN               1            7
+SE_DOUBLE_MARGIN             8           30
+
+2026-08-03 13:02:29,383 INFO     Testing {'LMP_SCALE_STD_PCT': 117, 'LMP_SCALE_IMP_PCT': 100, 'LMR_C_PERCENT': 336, 'SE_BETA_MARGIN': 1, 'SE_DOUBLE_MARGIN': 19}
+2026-08-03 13:02:29,383 INFO     Start experiment
+2026-08-03 13:03:07,769 INFO     Experiment finished (38.38533s elapsed).
+2026-08-03 13:03:07,945 INFO     Got Elo: -33.189694025905595 +- 55.38079572613231
+2026-08-03 13:03:07,945 INFO     Estimated draw rate: 45.45%
+2026-08-03 13:03:07,945 INFO     Updating model
+2026-08-03 13:03:10,964 INFO     GP sampling finished (3.018216s)
+2026-08-03 13:03:11,033 INFO     Starting iteration 105
+2026-08-03 13:03:14,713 INFO     Current optimum:
+{'LMP_SCALE_STD_PCT': 124, 'LMP_SCALE_IMP_PCT': 105, 'LMR_C_PERCENT': 299, 'SE_BETA_MARGIN': 2, 'SE_DOUBLE_MARGIN': 25}
+2026-08-03 13:03:14,714 INFO     Estimated Elo: -3.9723 +- 5.9373
+2026-08-03 13:03:14,714 INFO     90.0% confidence interval of the Elo value: (-13.7382, 5.7937)
+2026-08-03 13:03:14,766 INFO     90.0% confidence intervals of the parameters:
+Parameter          Lower bound  Upper bound
+-------------------------------------------
+LMP_SCALE_STD_PCT           72          169
+LMP_SCALE_IMP_PCT           72          170
+LMR_C_PERCENT              201          426
+SE_BETA_MARGIN               1            7
+SE_DOUBLE_MARGIN             9           30
+
+2026-08-03 13:03:14,766 INFO     Testing {'LMP_SCALE_STD_PCT': 115, 'LMP_SCALE_IMP_PCT': 96, 'LMR_C_PERCENT': 313, 'SE_BETA_MARGIN': 2, 'SE_DOUBLE_MARGIN': 16}
+2026-08-03 13:03:14,766 INFO     Start experiment
+2026-08-03 13:03:48,479 INFO     Experiment finished (33.712207s elapsed).
+2026-08-03 13:03:48,660 INFO     Got Elo: 33.18969402590559 +- 37.5015568116822
+2026-08-03 13:03:48,660 INFO     Estimated draw rate: 45.45%
+2026-08-03 13:03:48,660 INFO     Updating model
+2026-08-03 13:03:51,809 INFO     GP sampling finished (3.148817s)
+2026-08-03 13:03:51,882 INFO     Starting iteration 106
+2026-08-03 13:03:55,786 INFO     Current optimum:
+{'LMP_SCALE_STD_PCT': 124, 'LMP_SCALE_IMP_PCT': 104, 'LMR_C_PERCENT': 299, 'SE_BETA_MARGIN': 2, 'SE_DOUBLE_MARGIN': 24}
+2026-08-03 13:03:55,786 INFO     Estimated Elo: -4.0832 +- 5.451
+2026-08-03 13:03:55,786 INFO     90.0% confidence interval of the Elo value: (-13.0493, 4.883)
+2026-08-03 13:03:55,844 INFO     90.0% confidence intervals of the parameters:
+Parameter          Lower bound  Upper bound
+-------------------------------------------
+LMP_SCALE_STD_PCT           70          166
+LMP_SCALE_IMP_PCT           66          162
+LMR_C_PERCENT              212          438
+SE_BETA_MARGIN               1            7
+SE_DOUBLE_MARGIN             9           30
+
+2026-08-03 13:03:55,844 INFO     Testing {'LMP_SCALE_STD_PCT': 135, 'LMP_SCALE_IMP_PCT': 106, 'LMR_C_PERCENT': 284, 'SE_BETA_MARGIN': 2, 'SE_DOUBLE_MARGIN': 24}
+2026-08-03 13:03:55,844 INFO     Start experiment
+2026-08-03 13:04:24,499 INFO     Experiment finished (28.655338s elapsed).
+2026-08-03 13:04:24,680 INFO     Got Elo: 66.99643491750541 +- 58.92904629738206
+2026-08-03 13:04:24,681 INFO     Estimated draw rate: 45.45%
+2026-08-03 13:04:24,681 INFO     Updating model
+2026-08-03 13:04:27,702 INFO     GP sampling finished (3.02178s)
+2026-08-03 13:04:27,774 INFO     Starting iteration 107
+2026-08-03 13:04:31,929 INFO     Current optimum:
+{'LMP_SCALE_STD_PCT': 126, 'LMP_SCALE_IMP_PCT': 105, 'LMR_C_PERCENT': 297, 'SE_BETA_MARGIN': 2, 'SE_DOUBLE_MARGIN': 24}
+2026-08-03 13:04:31,929 INFO     Estimated Elo: -2.8972 +- 5.6879
+2026-08-03 13:04:31,929 INFO     90.0% confidence interval of the Elo value: (-12.253, 6.4586)
+2026-08-03 13:04:31,983 INFO     90.0% confidence intervals of the parameters:
+Parameter          Lower bound  Upper bound
+-------------------------------------------
+LMP_SCALE_STD_PCT           60          160
+LMP_SCALE_IMP_PCT           61          156
+LMR_C_PERCENT              201          423
+SE_BETA_MARGIN               1            7
+SE_DOUBLE_MARGIN             9           30
+
+2026-08-03 13:04:31,983 INFO     Testing {'LMP_SCALE_STD_PCT': 107, 'LMP_SCALE_IMP_PCT': 90, 'LMR_C_PERCENT': 282, 'SE_BETA_MARGIN': 2, 'SE_DOUBLE_MARGIN': 17}
+2026-08-03 13:04:31,983 INFO     Start experiment
+2026-08-03 13:05:01,005 INFO     Experiment finished (29.021727s elapsed).
+2026-08-03 13:05:01,164 INFO     Got Elo: 16.557074063289978 +- 58.089207835800885
+2026-08-03 13:05:01,164 INFO     Estimated draw rate: 50.00%
+2026-08-03 13:05:01,164 INFO     Updating model
+2026-08-03 13:05:04,156 INFO     GP sampling finished (2.99231s)
+2026-08-03 13:05:04,181 INFO     Starting iteration 108
+2026-08-03 13:05:08,814 INFO     Current optimum:
+{'LMP_SCALE_STD_PCT': 126, 'LMP_SCALE_IMP_PCT': 104, 'LMR_C_PERCENT': 297, 'SE_BETA_MARGIN': 2, 'SE_DOUBLE_MARGIN': 24}
+2026-08-03 13:05:08,814 INFO     Estimated Elo: -2.7283 +- 5.676
+2026-08-03 13:05:08,814 INFO     90.0% confidence interval of the Elo value: (-12.0645, 6.6079)
+2026-08-03 13:05:08,867 INFO     90.0% confidence intervals of the parameters:
+Parameter          Lower bound  Upper bound
+-------------------------------------------
+LMP_SCALE_STD_PCT           62          160
+LMP_SCALE_IMP_PCT           62          159
+LMR_C_PERCENT              204          433
+SE_BETA_MARGIN               1            7
+SE_DOUBLE_MARGIN             9           30
+
+2026-08-03 13:05:08,867 INFO     Testing {'LMP_SCALE_STD_PCT': 122, 'LMP_SCALE_IMP_PCT': 102, 'LMR_C_PERCENT': 314, 'SE_BETA_MARGIN': 2, 'SE_DOUBLE_MARGIN': 22}
+2026-08-03 13:05:08,868 INFO     Start experiment
+2026-08-03 13:05:40,286 INFO     Experiment finished (31.41872s elapsed).
+2026-08-03 13:05:40,474 INFO     Got Elo: 16.55707406329004 +- 47.84139210729665
+2026-08-03 13:05:40,474 INFO     Estimated draw rate: 40.91%
+2026-08-03 13:05:40,474 INFO     Updating model
+2026-08-03 13:05:43,527 INFO     GP sampling finished (3.05326s)
+2026-08-03 13:05:43,598 INFO     Starting iteration 109
+2026-08-03 13:05:47,675 INFO     Current optimum:
+{'LMP_SCALE_STD_PCT': 125, 'LMP_SCALE_IMP_PCT': 104, 'LMR_C_PERCENT': 299, 'SE_BETA_MARGIN': 2, 'SE_DOUBLE_MARGIN': 24}
+2026-08-03 13:05:47,675 INFO     Estimated Elo: -2.5346 +- 5.456
+2026-08-03 13:05:47,676 INFO     90.0% confidence interval of the Elo value: (-11.5088, 6.4396)
+2026-08-03 13:05:47,732 INFO     90.0% confidence intervals of the parameters:
+Parameter          Lower bound  Upper bound
+-------------------------------------------
+LMP_SCALE_STD_PCT           69          166
+LMP_SCALE_IMP_PCT           70          168
+LMR_C_PERCENT              219          442
+SE_BETA_MARGIN               1            7
+SE_DOUBLE_MARGIN             8           29
+
+2026-08-03 13:05:47,732 INFO     Testing {'LMP_SCALE_STD_PCT': 96, 'LMP_SCALE_IMP_PCT': 96, 'LMR_C_PERCENT': 324, 'SE_BETA_MARGIN': 2, 'SE_DOUBLE_MARGIN': 19}
+2026-08-03 13:05:47,733 INFO     Start experiment
+2026-08-03 13:06:21,755 INFO     Experiment finished (34.02229s elapsed).
+2026-08-03 13:06:21,946 INFO     Got Elo: -102.10900204132254 +- 50.68715562451052
+2026-08-03 13:06:21,946 INFO     Estimated draw rate: 45.45%
+2026-08-03 13:06:21,947 INFO     Updating model
+2026-08-03 13:06:25,127 INFO     GP sampling finished (3.180221s)
+2026-08-03 13:06:25,197 INFO     Starting iteration 110
+2026-08-03 13:06:29,111 INFO     Current optimum:
+{'LMP_SCALE_STD_PCT': 126, 'LMP_SCALE_IMP_PCT': 104, 'LMR_C_PERCENT': 296, 'SE_BETA_MARGIN': 2, 'SE_DOUBLE_MARGIN': 24}
+2026-08-03 13:06:29,111 INFO     Estimated Elo: -3.2059 +- 5.5628
+2026-08-03 13:06:29,111 INFO     90.0% confidence interval of the Elo value: (-12.3559, 5.944)
+2026-08-03 13:06:29,169 INFO     90.0% confidence intervals of the parameters:
+Parameter          Lower bound  Upper bound
+-------------------------------------------
+LMP_SCALE_STD_PCT           68          165
+LMP_SCALE_IMP_PCT           63          160
+LMR_C_PERCENT              201          422
+SE_BETA_MARGIN               1            7
+SE_DOUBLE_MARGIN             9           30
+
+2026-08-03 13:06:29,169 INFO     Testing {'LMP_SCALE_STD_PCT': 128, 'LMP_SCALE_IMP_PCT': 106, 'LMR_C_PERCENT': 307, 'SE_BETA_MARGIN': 2, 'SE_DOUBLE_MARGIN': 20}
+2026-08-03 13:06:29,170 INFO     Start experiment
+2026-08-03 13:07:06,941 INFO     Experiment finished (37.771361s elapsed).
+2026-08-03 13:07:07,111 INFO     Got Elo: 49.975494643319976 +- 57.25866323724388
+2026-08-03 13:07:07,111 INFO     Estimated draw rate: 40.91%
+2026-08-03 13:07:07,111 INFO     Updating model
+2026-08-03 13:07:10,097 INFO     GP sampling finished (2.986108s)
+2026-08-03 13:07:10,167 INFO     Starting iteration 111
+2026-08-03 13:07:13,985 INFO     Current optimum:
+{'LMP_SCALE_STD_PCT': 126, 'LMP_SCALE_IMP_PCT': 104, 'LMR_C_PERCENT': 297, 'SE_BETA_MARGIN': 2, 'SE_DOUBLE_MARGIN': 23}
+2026-08-03 13:07:13,985 INFO     Estimated Elo: -2.2984 +- 5.766
+2026-08-03 13:07:13,986 INFO     90.0% confidence interval of the Elo value: (-11.7826, 7.1858)
+2026-08-03 13:07:14,040 INFO     90.0% confidence intervals of the parameters:
+Parameter          Lower bound  Upper bound
+-------------------------------------------
+LMP_SCALE_STD_PCT           71          165
+LMP_SCALE_IMP_PCT           65          160
+LMR_C_PERCENT              215          431
+SE_BETA_MARGIN               1            7
+SE_DOUBLE_MARGIN             8           29
+
+2026-08-03 13:07:14,040 INFO     Testing {'LMP_SCALE_STD_PCT': 118, 'LMP_SCALE_IMP_PCT': 85, 'LMR_C_PERCENT': 327, 'SE_BETA_MARGIN': 3, 'SE_DOUBLE_MARGIN': 17}
+2026-08-03 13:07:14,041 INFO     Start experiment
+2026-08-03 13:07:42,937 INFO     Experiment finished (28.896785s elapsed).
+2026-08-03 13:07:43,127 INFO     Got Elo: -16.557074063290028 +- 47.50963779969916
+2026-08-03 13:07:43,127 INFO     Estimated draw rate: 50.00%
+2026-08-03 13:07:43,127 INFO     Updating model
+2026-08-03 13:07:46,136 INFO     GP sampling finished (3.008611s)
+2026-08-03 13:07:46,208 INFO     Starting iteration 112
+2026-08-03 13:07:49,678 INFO     Current optimum:
+{'LMP_SCALE_STD_PCT': 126, 'LMP_SCALE_IMP_PCT': 104, 'LMR_C_PERCENT': 297, 'SE_BETA_MARGIN': 2, 'SE_DOUBLE_MARGIN': 23}
+2026-08-03 13:07:49,679 INFO     Estimated Elo: -2.6054 +- 5.539
+2026-08-03 13:07:49,679 INFO     90.0% confidence interval of the Elo value: (-11.7162, 6.5054)
+2026-08-03 13:07:49,733 INFO     90.0% confidence intervals of the parameters:
+Parameter          Lower bound  Upper bound
+-------------------------------------------
+LMP_SCALE_STD_PCT           70          169
+LMP_SCALE_IMP_PCT           62          159
+LMR_C_PERCENT              223          449
+SE_BETA_MARGIN               1            7
+SE_DOUBLE_MARGIN            10           31
+
+2026-08-03 13:07:49,733 INFO     Testing {'LMP_SCALE_STD_PCT': 124, 'LMP_SCALE_IMP_PCT': 124, 'LMR_C_PERCENT': 350, 'SE_BETA_MARGIN': 2, 'SE_DOUBLE_MARGIN': 14}
+2026-08-03 13:07:49,733 INFO     Start experiment
+2026-08-03 13:08:15,138 INFO     Experiment finished (25.404712s elapsed).
+2026-08-03 13:08:15,333 INFO     Got Elo: -33.189694025905595 +- 49.78823663455029
+2026-08-03 13:08:15,333 INFO     Estimated draw rate: 54.55%
+2026-08-03 13:08:15,333 INFO     Updating model
+2026-08-03 13:08:18,409 INFO     GP sampling finished (3.076653s)
+2026-08-03 13:08:18,434 INFO     Starting iteration 113
+2026-08-03 13:08:22,282 INFO     Current optimum:
+{'LMP_SCALE_STD_PCT': 126, 'LMP_SCALE_IMP_PCT': 104, 'LMR_C_PERCENT': 296, 'SE_BETA_MARGIN': 2, 'SE_DOUBLE_MARGIN': 24}
+2026-08-03 13:08:22,282 INFO     Estimated Elo: -2.9754 +- 5.4
+2026-08-03 13:08:22,282 INFO     90.0% confidence interval of the Elo value: (-11.8575, 5.9068)
+2026-08-03 13:08:22,349 INFO     90.0% confidence intervals of the parameters:
+Parameter          Lower bound  Upper bound
+-------------------------------------------
+LMP_SCALE_STD_PCT           76          169
+LMP_SCALE_IMP_PCT           66          162
+LMR_C_PERCENT              224          441
+SE_BETA_MARGIN               1            7
+SE_DOUBLE_MARGIN             8           30
+
+2026-08-03 13:08:22,349 INFO     Testing {'LMP_SCALE_STD_PCT': 127, 'LMP_SCALE_IMP_PCT': 121, 'LMR_C_PERCENT': 298, 'SE_BETA_MARGIN': 2, 'SE_DOUBLE_MARGIN': 17}
+2026-08-03 13:08:22,350 INFO     Start experiment
+2026-08-03 13:08:54,065 INFO     Experiment finished (31.714571s elapsed).
+2026-08-03 13:08:54,246 INFO     Got Elo: 33.18969402590559 +- 44.04743044324357
+2026-08-03 13:08:54,246 INFO     Estimated draw rate: 54.55%
+2026-08-03 13:08:54,246 INFO     Updating model
+2026-08-03 13:08:57,240 INFO     GP sampling finished (2.99336s)
+2026-08-03 13:08:57,262 INFO     Starting iteration 114
+2026-08-03 13:09:01,056 INFO     Current optimum:
+{'LMP_SCALE_STD_PCT': 126, 'LMP_SCALE_IMP_PCT': 104, 'LMR_C_PERCENT': 298, 'SE_BETA_MARGIN': 2, 'SE_DOUBLE_MARGIN': 23}
+2026-08-03 13:09:01,056 INFO     Estimated Elo: -2.3598 +- 5.5438
+2026-08-03 13:09:01,056 INFO     90.0% confidence interval of the Elo value: (-11.4785, 6.7589)
+2026-08-03 13:09:01,113 INFO     90.0% confidence intervals of the parameters:
+Parameter          Lower bound  Upper bound
+-------------------------------------------
+LMP_SCALE_STD_PCT           78          169
+LMP_SCALE_IMP_PCT           63          160
+LMR_C_PERCENT              207          432
+SE_BETA_MARGIN               1            7
+SE_DOUBLE_MARGIN             9           30
+
+2026-08-03 13:09:01,113 INFO     Testing {'LMP_SCALE_STD_PCT': 123, 'LMP_SCALE_IMP_PCT': 103, 'LMR_C_PERCENT': 244, 'SE_BETA_MARGIN': 1, 'SE_DOUBLE_MARGIN': 24}
+2026-08-03 13:09:01,114 INFO     Start experiment
+2026-08-03 13:09:29,732 INFO     Experiment finished (28.618388s elapsed).
+2026-08-03 13:09:29,926 INFO     Got Elo: 33.18969402590559 +- 44.0824601385911
+2026-08-03 13:09:29,926 INFO     Estimated draw rate: 45.45%
+2026-08-03 13:09:29,926 INFO     Updating model
+2026-08-03 13:09:33,059 INFO     GP sampling finished (3.133076s)
+2026-08-03 13:09:33,083 INFO     Starting iteration 115
+2026-08-03 13:09:36,949 INFO     Current optimum:
+{'LMP_SCALE_STD_PCT': 126, 'LMP_SCALE_IMP_PCT': 104, 'LMR_C_PERCENT': 295, 'SE_BETA_MARGIN': 2, 'SE_DOUBLE_MARGIN': 23}
+2026-08-03 13:09:36,950 INFO     Estimated Elo: -2.0945 +- 5.417
+2026-08-03 13:09:36,950 INFO     90.0% confidence interval of the Elo value: (-11.0047, 6.8157)
+2026-08-03 13:09:37,002 INFO     90.0% confidence intervals of the parameters:
+Parameter          Lower bound  Upper bound
+-------------------------------------------
+LMP_SCALE_STD_PCT           64          158
+LMP_SCALE_IMP_PCT           60          162
+LMR_C_PERCENT              207          422
+SE_BETA_MARGIN               1            7
+SE_DOUBLE_MARGIN             8           29
+
+2026-08-03 13:09:37,002 INFO     Testing {'LMP_SCALE_STD_PCT': 105, 'LMP_SCALE_IMP_PCT': 96, 'LMR_C_PERCENT': 259, 'SE_BETA_MARGIN': 2, 'SE_DOUBLE_MARGIN': 21}
+2026-08-03 13:09:37,003 INFO     Start experiment
+2026-08-03 13:10:04,311 INFO     Experiment finished (27.307873s elapsed).
+2026-08-03 13:10:04,488 INFO     Got Elo: 102.10900204132238 +- 50.70773968314873
+2026-08-03 13:10:04,489 INFO     Estimated draw rate: 54.55%
+2026-08-03 13:10:04,489 INFO     Updating model
+2026-08-03 13:10:07,674 INFO     GP sampling finished (3.185426s)
+2026-08-03 13:10:07,700 INFO     Starting iteration 116
+2026-08-03 13:10:11,610 INFO     Current optimum:
+{'LMP_SCALE_STD_PCT': 122, 'LMP_SCALE_IMP_PCT': 103, 'LMR_C_PERCENT': 289, 'SE_BETA_MARGIN': 2, 'SE_DOUBLE_MARGIN': 22}
+2026-08-03 13:10:11,610 INFO     Estimated Elo: -0.3794 +- 5.8278
+2026-08-03 13:10:11,610 INFO     90.0% confidence interval of the Elo value: (-9.9652, 9.2065)
+2026-08-03 13:10:11,665 INFO     90.0% confidence intervals of the parameters:
+Parameter          Lower bound  Upper bound
+-------------------------------------------
+LMP_SCALE_STD_PCT           72          168
+LMP_SCALE_IMP_PCT           62          157
+LMR_C_PERCENT              200          428
+SE_BETA_MARGIN               2            8
+SE_DOUBLE_MARGIN             8           30
+
+2026-08-03 13:10:11,665 INFO     Testing {'LMP_SCALE_STD_PCT': 129, 'LMP_SCALE_IMP_PCT': 112, 'LMR_C_PERCENT': 283, 'SE_BETA_MARGIN': 2, 'SE_DOUBLE_MARGIN': 23}
+2026-08-03 13:10:11,666 INFO     Start experiment
+2026-08-03 13:10:42,282 INFO     Experiment finished (30.616207s elapsed).
+2026-08-03 13:10:42,452 INFO     Got Elo: -33.189694025905595 +- 55.399503969091946
+2026-08-03 13:10:42,452 INFO     Estimated draw rate: 45.45%
+2026-08-03 13:10:42,452 INFO     Updating model
+2026-08-03 13:10:45,476 INFO     GP sampling finished (3.023882s)
+2026-08-03 13:10:45,549 INFO     Starting iteration 117
+2026-08-03 13:10:48,976 INFO     Current optimum:
+{'LMP_SCALE_STD_PCT': 121, 'LMP_SCALE_IMP_PCT': 102, 'LMR_C_PERCENT': 288, 'SE_BETA_MARGIN': 2, 'SE_DOUBLE_MARGIN': 22}
+2026-08-03 13:10:48,977 INFO     Estimated Elo: -0.6474 +- 5.9293
+2026-08-03 13:10:48,977 INFO     90.0% confidence interval of the Elo value: (-10.4002, 9.1055)
+2026-08-03 13:10:49,031 INFO     90.0% confidence intervals of the parameters:
+Parameter          Lower bound  Upper bound
+-------------------------------------------
+LMP_SCALE_STD_PCT           64          161
+LMP_SCALE_IMP_PCT           60          158
+LMR_C_PERCENT              212          437
+SE_BETA_MARGIN               1            7
+SE_DOUBLE_MARGIN             8           29
+
+2026-08-03 13:10:49,031 INFO     Testing {'LMP_SCALE_STD_PCT': 123, 'LMP_SCALE_IMP_PCT': 106, 'LMR_C_PERCENT': 269, 'SE_BETA_MARGIN': 2, 'SE_DOUBLE_MARGIN': 19}
+2026-08-03 13:10:49,031 INFO     Start experiment
+2026-08-03 13:11:19,375 INFO     Experiment finished (30.343668s elapsed).
+2026-08-03 13:11:19,554 INFO     Got Elo: 33.18969402590559 +- 65.16543082154726
+2026-08-03 13:11:19,554 INFO     Estimated draw rate: 27.27%
+2026-08-03 13:11:19,554 INFO     Updating model
+2026-08-03 13:11:22,631 INFO     GP sampling finished (3.076914s)
+2026-08-03 13:11:22,703 INFO     Starting iteration 118
+2026-08-03 13:11:26,454 INFO     Current optimum:
+{'LMP_SCALE_STD_PCT': 121, 'LMP_SCALE_IMP_PCT': 102, 'LMR_C_PERCENT': 286, 'SE_BETA_MARGIN': 2, 'SE_DOUBLE_MARGIN': 21}
+2026-08-03 13:11:26,454 INFO     Estimated Elo: -0.0386 +- 6.0833
+2026-08-03 13:11:26,454 INFO     90.0% confidence interval of the Elo value: (-10.0448, 9.9676)
+2026-08-03 13:11:26,511 INFO     90.0% confidence intervals of the parameters:
+Parameter          Lower bound  Upper bound
+-------------------------------------------
+LMP_SCALE_STD_PCT           69          168
+LMP_SCALE_IMP_PCT           60          157
+LMR_C_PERCENT              202          425
+SE_BETA_MARGIN               1            7
+SE_DOUBLE_MARGIN             9           30
+
+2026-08-03 13:11:26,511 INFO     Testing {'LMP_SCALE_STD_PCT': 114, 'LMP_SCALE_IMP_PCT': 110, 'LMR_C_PERCENT': 289, 'SE_BETA_MARGIN': 2, 'SE_DOUBLE_MARGIN': 21}
+2026-08-03 13:11:26,511 INFO     Start experiment
+2026-08-03 13:11:57,726 INFO     Experiment finished (31.214935s elapsed).
+2026-08-03 13:11:57,877 INFO     Got Elo: -16.55707406328996 +- 62.82582601565
+2026-08-03 13:11:57,877 INFO     Estimated draw rate: 50.00%
+2026-08-03 13:11:57,877 INFO     Updating model
+2026-08-03 13:12:01,240 INFO     GP sampling finished (3.36306s)
+2026-08-03 13:12:01,314 INFO     Starting iteration 119
+2026-08-03 13:12:04,996 INFO     Current optimum:
+{'LMP_SCALE_STD_PCT': 121, 'LMP_SCALE_IMP_PCT': 102, 'LMR_C_PERCENT': 286, 'SE_BETA_MARGIN': 2, 'SE_DOUBLE_MARGIN': 21}
+2026-08-03 13:12:04,996 INFO     Estimated Elo: -0.3335 +- 5.9702
+2026-08-03 13:12:04,996 INFO     90.0% confidence interval of the Elo value: (-10.1535, 9.4865)
+2026-08-03 13:12:05,049 INFO     90.0% confidence intervals of the parameters:
+Parameter          Lower bound  Upper bound
+-------------------------------------------
+LMP_SCALE_STD_PCT           68          166
+LMP_SCALE_IMP_PCT           64          160
+LMR_C_PERCENT              231          450
+SE_BETA_MARGIN               1            7
+SE_DOUBLE_MARGIN             8           29
+
+2026-08-03 13:12:05,049 INFO     Testing {'LMP_SCALE_STD_PCT': 133, 'LMP_SCALE_IMP_PCT': 114, 'LMR_C_PERCENT': 312, 'SE_BETA_MARGIN': 2, 'SE_DOUBLE_MARGIN': 21}
+2026-08-03 13:12:05,050 INFO     Start experiment
+2026-08-03 13:12:38,974 INFO     Experiment finished (33.923858s elapsed).
+2026-08-03 13:12:39,151 INFO     Got Elo: -84.3413461259573 +- 70.20275845087053
+2026-08-03 13:12:39,151 INFO     Estimated draw rate: 40.91%
+2026-08-03 13:12:39,151 INFO     Updating model
+2026-08-03 13:12:42,293 INFO     GP sampling finished (3.141964s)
+2026-08-03 13:12:42,317 INFO     Starting iteration 120
+2026-08-03 13:12:46,070 INFO     Current optimum:
+{'LMP_SCALE_STD_PCT': 118, 'LMP_SCALE_IMP_PCT': 101, 'LMR_C_PERCENT': 280, 'SE_BETA_MARGIN': 2, 'SE_DOUBLE_MARGIN': 21}
+2026-08-03 13:12:46,070 INFO     Estimated Elo: -1.2486 +- 5.8793
+2026-08-03 13:12:46,070 INFO     90.0% confidence interval of the Elo value: (-10.9191, 8.422)
+2026-08-03 13:12:46,130 INFO     90.0% confidence intervals of the parameters:
+Parameter          Lower bound  Upper bound
+-------------------------------------------
+LMP_SCALE_STD_PCT           61          157
+LMP_SCALE_IMP_PCT           70          169
+LMR_C_PERCENT              202          423
+SE_BETA_MARGIN               1            7
+SE_DOUBLE_MARGIN             9           30
+
+2026-08-03 13:12:46,130 INFO     Testing {'LMP_SCALE_STD_PCT': 101, 'LMP_SCALE_IMP_PCT': 91, 'LMR_C_PERCENT': 259, 'SE_BETA_MARGIN': 1, 'SE_DOUBLE_MARGIN': 19}
+2026-08-03 13:12:46,131 INFO     Start experiment
+2026-08-03 13:13:26,204 INFO     Experiment finished (40.073621s elapsed).
+2026-08-03 13:13:26,374 INFO     Got Elo: -33.189694025905595 +- 50.28883217723724
+2026-08-03 13:13:26,374 INFO     Estimated draw rate: 54.55%
+2026-08-03 13:13:26,374 INFO     Updating model
+2026-08-03 13:13:29,447 INFO     GP sampling finished (3.072779s)
+2026-08-03 13:13:29,518 INFO     Starting iteration 121
+2026-08-03 13:13:33,214 INFO     Current optimum:
+{'LMP_SCALE_STD_PCT': 120, 'LMP_SCALE_IMP_PCT': 102, 'LMR_C_PERCENT': 284, 'SE_BETA_MARGIN': 2, 'SE_DOUBLE_MARGIN': 21}
+2026-08-03 13:13:33,214 INFO     Estimated Elo: -1.5778 +- 5.8533
+2026-08-03 13:13:33,214 INFO     90.0% confidence interval of the Elo value: (-11.2056, 8.0499)
+2026-08-03 13:13:33,272 INFO     90.0% confidence intervals of the parameters:
+Parameter          Lower bound  Upper bound
+-------------------------------------------
+LMP_SCALE_STD_PCT           70          168
+LMP_SCALE_IMP_PCT           62          160
+LMR_C_PERCENT              205          427
+SE_BETA_MARGIN               1            7
+SE_DOUBLE_MARGIN             8           30
+
+2026-08-03 13:13:33,272 INFO     Testing {'LMP_SCALE_STD_PCT': 101, 'LMP_SCALE_IMP_PCT': 95, 'LMR_C_PERCENT': 217, 'SE_BETA_MARGIN': 1, 'SE_DOUBLE_MARGIN': 18}
+2026-08-03 13:13:33,273 INFO     Start experiment
+2026-08-03 13:14:02,448 INFO     Experiment finished (29.175308s elapsed).
+2026-08-03 13:14:02,634 INFO     Got Elo: 16.557074063289978 +- 58.0028494553423
+2026-08-03 13:14:02,635 INFO     Estimated draw rate: 40.91%
+2026-08-03 13:14:02,635 INFO     Updating model
+2026-08-03 13:14:05,671 INFO     GP sampling finished (3.036365s)
+2026-08-03 13:14:05,742 INFO     Starting iteration 122
+2026-08-03 13:14:09,453 INFO     Current optimum:
+{'LMP_SCALE_STD_PCT': 120, 'LMP_SCALE_IMP_PCT': 102, 'LMR_C_PERCENT': 284, 'SE_BETA_MARGIN': 2, 'SE_DOUBLE_MARGIN': 22}
+2026-08-03 13:14:09,453 INFO     Estimated Elo: -1.7574 +- 5.5409
+2026-08-03 13:14:09,453 INFO     90.0% confidence interval of the Elo value: (-10.8713, 7.3566)
+2026-08-03 13:14:09,512 INFO     90.0% confidence intervals of the parameters:
+Parameter          Lower bound  Upper bound
+-------------------------------------------
+LMP_SCALE_STD_PCT           60          157
+LMP_SCALE_IMP_PCT           61          157
+LMR_C_PERCENT              213          438
+SE_BETA_MARGIN               1            7
+SE_DOUBLE_MARGIN            10           31
+
+2026-08-03 13:14:09,512 INFO     Testing {'LMP_SCALE_STD_PCT': 109, 'LMP_SCALE_IMP_PCT': 85, 'LMR_C_PERCENT': 231, 'SE_BETA_MARGIN': 1, 'SE_DOUBLE_MARGIN': 20}
+2026-08-03 13:14:09,512 INFO     Start experiment
+2026-08-03 13:14:42,299 INFO     Experiment finished (32.787177s elapsed).
+2026-08-03 13:14:42,489 INFO     Got Elo: -16.55707406328996 +- 41.56906591708013
+2026-08-03 13:14:42,489 INFO     Estimated draw rate: 68.18%
+2026-08-03 13:14:42,489 INFO     Updating model
+2026-08-03 13:14:46,279 INFO     GP sampling finished (3.789441s)
+2026-08-03 13:14:46,351 INFO     Starting iteration 123
+2026-08-03 13:14:50,104 INFO     Current optimum:
+{'LMP_SCALE_STD_PCT': 121, 'LMP_SCALE_IMP_PCT': 102, 'LMR_C_PERCENT': 287, 'SE_BETA_MARGIN': 2, 'SE_DOUBLE_MARGIN': 22}
+2026-08-03 13:14:50,104 INFO     Estimated Elo: -1.7784 +- 5.6215
+2026-08-03 13:14:50,104 INFO     90.0% confidence interval of the Elo value: (-11.0249, 7.4682)
+2026-08-03 13:14:50,171 INFO     90.0% confidence intervals of the parameters:
+Parameter          Lower bound  Upper bound
+-------------------------------------------
+LMP_SCALE_STD_PCT           66          163
+LMP_SCALE_IMP_PCT           68          165
+LMR_C_PERCENT              226          448
+SE_BETA_MARGIN               1            7
+SE_DOUBLE_MARGIN             9           30
+
+2026-08-03 13:14:50,171 INFO     Testing {'LMP_SCALE_STD_PCT': 91, 'LMP_SCALE_IMP_PCT': 96, 'LMR_C_PERCENT': 232, 'SE_BETA_MARGIN': 2, 'SE_DOUBLE_MARGIN': 18}
+2026-08-03 13:14:50,171 INFO     Start experiment
+2026-08-03 13:15:20,930 INFO     Experiment finished (30.759133s elapsed).
+2026-08-03 13:15:21,104 INFO     Got Elo: -0.0 +- 55.758895162459034
+2026-08-03 13:15:21,104 INFO     Estimated draw rate: 54.55%
+2026-08-03 13:15:21,104 INFO     Updating model
+2026-08-03 13:15:24,212 INFO     GP sampling finished (3.107698s)
+2026-08-03 13:15:24,243 INFO     Starting iteration 124
+2026-08-03 13:15:27,944 INFO     Current optimum:
+{'LMP_SCALE_STD_PCT': 121, 'LMP_SCALE_IMP_PCT': 102, 'LMR_C_PERCENT': 285, 'SE_BETA_MARGIN': 2, 'SE_DOUBLE_MARGIN': 22}
+2026-08-03 13:15:27,944 INFO     Estimated Elo: -1.9832 +- 5.4618
+2026-08-03 13:15:27,944 INFO     90.0% confidence interval of the Elo value: (-10.967, 7.0006)
+2026-08-03 13:15:28,002 INFO     90.0% confidence intervals of the parameters:
+Parameter          Lower bound  Upper bound
+-------------------------------------------
+LMP_SCALE_STD_PCT           70          168
+LMP_SCALE_IMP_PCT           61          158
+LMR_C_PERCENT              220          444
+SE_BETA_MARGIN               1            7
+SE_DOUBLE_MARGIN             9           30
+
+2026-08-03 13:15:28,002 INFO     Testing {'LMP_SCALE_STD_PCT': 120, 'LMP_SCALE_IMP_PCT': 99, 'LMR_C_PERCENT': 281, 'SE_BETA_MARGIN': 2, 'SE_DOUBLE_MARGIN': 22}
+2026-08-03 13:15:28,002 INFO     Start experiment
+2026-08-03 13:15:59,259 INFO     Experiment finished (31.256281s elapsed).
+2026-08-03 13:15:59,432 INFO     Got Elo: -49.97549464331997 +- 62.53885285933194
+2026-08-03 13:15:59,432 INFO     Estimated draw rate: 40.91%
+2026-08-03 13:15:59,432 INFO     Updating model
+2026-08-03 13:16:02,400 INFO     GP sampling finished (2.967515s)
+2026-08-03 13:16:02,473 INFO     Starting iteration 125
+2026-08-03 13:16:06,209 INFO     Current optimum:
+{'LMP_SCALE_STD_PCT': 122, 'LMP_SCALE_IMP_PCT': 102, 'LMR_C_PERCENT': 287, 'SE_BETA_MARGIN': 2, 'SE_DOUBLE_MARGIN': 22}
+2026-08-03 13:16:06,209 INFO     Estimated Elo: -2.6383 +- 5.3351
+2026-08-03 13:16:06,209 INFO     90.0% confidence interval of the Elo value: (-11.4137, 6.1371)
+2026-08-03 13:16:06,265 INFO     90.0% confidence intervals of the parameters:
+Parameter          Lower bound  Upper bound
+-------------------------------------------
+LMP_SCALE_STD_PCT           71          168
+LMP_SCALE_IMP_PCT           60          159
+LMR_C_PERCENT              200          430
+SE_BETA_MARGIN               1            7
+SE_DOUBLE_MARGIN             8           29
+
+2026-08-03 13:16:06,265 INFO     Testing {'LMP_SCALE_STD_PCT': 119, 'LMP_SCALE_IMP_PCT': 87, 'LMR_C_PERCENT': 266, 'SE_BETA_MARGIN': 2, 'SE_DOUBLE_MARGIN': 21}
+2026-08-03 13:16:06,265 INFO     Start experiment
+2026-08-03 13:16:35,766 INFO     Experiment finished (29.500487s elapsed).
+2026-08-03 13:16:35,933 INFO     Got Elo: 16.55707406329004 +- 62.76140177595012
+2026-08-03 13:16:35,933 INFO     Estimated draw rate: 40.91%
+2026-08-03 13:16:35,933 INFO     Updating model
+2026-08-03 13:16:39,057 INFO     GP sampling finished (3.12352s)
+2026-08-03 13:16:39,133 INFO     Starting iteration 126
+2026-08-03 13:16:42,927 INFO     Current optimum:
+{'LMP_SCALE_STD_PCT': 120, 'LMP_SCALE_IMP_PCT': 102, 'LMR_C_PERCENT': 284, 'SE_BETA_MARGIN': 2, 'SE_DOUBLE_MARGIN': 21}
+2026-08-03 13:16:42,927 INFO     Estimated Elo: -2.2507 +- 5.4539
+2026-08-03 13:16:42,928 INFO     90.0% confidence interval of the Elo value: (-11.2215, 6.7201)
+2026-08-03 13:16:42,982 INFO     90.0% confidence intervals of the parameters:
+Parameter          Lower bound  Upper bound
+-------------------------------------------
+LMP_SCALE_STD_PCT           62          161
+LMP_SCALE_IMP_PCT           64          158
+LMR_C_PERCENT              202          424
+SE_BETA_MARGIN               1            7
+SE_DOUBLE_MARGIN             8           30
+
+2026-08-03 13:16:42,982 INFO     Testing {'LMP_SCALE_STD_PCT': 76, 'LMP_SCALE_IMP_PCT': 100, 'LMR_C_PERCENT': 248, 'SE_BETA_MARGIN': 2, 'SE_DOUBLE_MARGIN': 20}
+2026-08-03 13:16:42,982 INFO     Start experiment
+2026-08-03 13:17:17,522 INFO     Experiment finished (34.539962s elapsed).
+2026-08-03 13:17:17,699 INFO     Got Elo: 49.97549464331993 +- 46.02865897192123
+2026-08-03 13:17:17,699 INFO     Estimated draw rate: 40.91%
+2026-08-03 13:17:17,699 INFO     Updating model
+2026-08-03 13:17:21,049 INFO     GP sampling finished (3.349005s)
+2026-08-03 13:17:21,074 INFO     Starting iteration 127
+2026-08-03 13:17:24,889 INFO     Current optimum:
+{'LMP_SCALE_STD_PCT': 113, 'LMP_SCALE_IMP_PCT': 101, 'LMR_C_PERCENT': 272, 'SE_BETA_MARGIN': 2, 'SE_DOUBLE_MARGIN': 21}
+2026-08-03 13:17:24,889 INFO     Estimated Elo: -1.8816 +- 5.4441
+2026-08-03 13:17:24,890 INFO     90.0% confidence interval of the Elo value: (-10.8364, 7.0732)
+2026-08-03 13:17:24,943 INFO     90.0% confidence intervals of the parameters:
+Parameter          Lower bound  Upper bound
+-------------------------------------------
+LMP_SCALE_STD_PCT           71          169
+LMP_SCALE_IMP_PCT           60          160
+LMR_C_PERCENT              215          442
+SE_BETA_MARGIN               1            7
+SE_DOUBLE_MARGIN             8           30
+
+2026-08-03 13:17:24,943 INFO     Testing {'LMP_SCALE_STD_PCT': 118, 'LMP_SCALE_IMP_PCT': 84, 'LMR_C_PERCENT': 308, 'SE_BETA_MARGIN': 2, 'SE_DOUBLE_MARGIN': 23}
+2026-08-03 13:17:24,943 INFO     Start experiment
+2026-08-03 13:18:05,339 INFO     Experiment finished (40.395325s elapsed).
+2026-08-03 13:18:05,487 INFO     Got Elo: 102.10900204132241 +- 62.39558245502342
+2026-08-03 13:18:05,487 INFO     Estimated draw rate: 45.45%
+2026-08-03 13:18:05,487 INFO     Updating model
+2026-08-03 13:18:08,384 INFO     GP sampling finished (2.897546s)
+2026-08-03 13:18:08,410 INFO     Starting iteration 128
+2026-08-03 13:18:12,148 INFO     Current optimum:
+{'LMP_SCALE_STD_PCT': 118, 'LMP_SCALE_IMP_PCT': 99, 'LMR_C_PERCENT': 286, 'SE_BETA_MARGIN': 2, 'SE_DOUBLE_MARGIN': 21}
+2026-08-03 13:18:12,148 INFO     Estimated Elo: -0.9234 +- 5.4216
+2026-08-03 13:18:12,148 INFO     90.0% confidence interval of the Elo value: (-9.8412, 7.9944)
+2026-08-03 13:18:12,201 INFO     90.0% confidence intervals of the parameters:
+Parameter          Lower bound  Upper bound
+-------------------------------------------
+LMP_SCALE_STD_PCT           60          157
+LMP_SCALE_IMP_PCT           71          168
+LMR_C_PERCENT              209          430
+SE_BETA_MARGIN               1            7
+SE_DOUBLE_MARGIN             9           30
+
+2026-08-03 13:18:12,201 INFO     Testing {'LMP_SCALE_STD_PCT': 120, 'LMP_SCALE_IMP_PCT': 100, 'LMR_C_PERCENT': 285, 'SE_BETA_MARGIN': 2, 'SE_DOUBLE_MARGIN': 23}
+2026-08-03 13:18:12,201 INFO     Start experiment
+2026-08-03 13:18:41,790 INFO     Experiment finished (29.588312s elapsed).
+2026-08-03 13:18:41,965 INFO     Got Elo: -49.97549464331997 +- 52.148331064618034
+2026-08-03 13:18:41,965 INFO     Estimated draw rate: 59.09%
+2026-08-03 13:18:41,965 INFO     Updating model
+2026-08-03 13:18:44,996 INFO     GP sampling finished (3.030327s)
+2026-08-03 13:18:45,021 INFO     Starting iteration 129
+2026-08-03 13:18:48,932 INFO     Current optimum:
+{'LMP_SCALE_STD_PCT': 110, 'LMP_SCALE_IMP_PCT': 99, 'LMR_C_PERCENT': 272, 'SE_BETA_MARGIN': 2, 'SE_DOUBLE_MARGIN': 21}
+2026-08-03 13:18:48,932 INFO     Estimated Elo: -1.5586 +- 5.478
+2026-08-03 13:18:48,932 INFO     90.0% confidence interval of the Elo value: (-10.5692, 7.452)
+2026-08-03 13:18:48,985 INFO     90.0% confidence intervals of the parameters:
+Parameter          Lower bound  Upper bound
+-------------------------------------------
+LMP_SCALE_STD_PCT           62          160
+LMP_SCALE_IMP_PCT           66          164
+LMR_C_PERCENT              200          423
+SE_BETA_MARGIN               1            7
+SE_DOUBLE_MARGIN             8           29
+
+2026-08-03 13:18:48,985 INFO     Testing {'LMP_SCALE_STD_PCT': 132, 'LMP_SCALE_IMP_PCT': 98, 'LMR_C_PERCENT': 318, 'SE_BETA_MARGIN': 3, 'SE_DOUBLE_MARGIN': 20}
+2026-08-03 13:18:48,985 INFO     Start experiment
+2026-08-03 13:19:21,783 INFO     Experiment finished (32.797489s elapsed).
+2026-08-03 13:19:21,954 INFO     Got Elo: 16.55707406328996 +- 57.953020632378916
+2026-08-03 13:19:21,954 INFO     Estimated draw rate: 50.00%
+2026-08-03 13:19:21,954 INFO     Updating model
+2026-08-03 13:19:25,038 INFO     GP sampling finished (3.08334s)
+2026-08-03 13:19:25,064 INFO     Starting iteration 130
+2026-08-03 13:19:29,376 INFO     Current optimum:
+{'LMP_SCALE_STD_PCT': 120, 'LMP_SCALE_IMP_PCT': 99, 'LMR_C_PERCENT': 292, 'SE_BETA_MARGIN': 2, 'SE_DOUBLE_MARGIN': 21}
+2026-08-03 13:19:29,376 INFO     Estimated Elo: -1.5236 +- 5.2964
+2026-08-03 13:19:29,376 INFO     90.0% confidence interval of the Elo value: (-10.2355, 7.1883)
+2026-08-03 13:19:29,442 INFO     90.0% confidence intervals of the parameters:
+Parameter          Lower bound  Upper bound
+-------------------------------------------
+LMP_SCALE_STD_PCT           60          157
+LMP_SCALE_IMP_PCT           64          162
+LMR_C_PERCENT              208          430
+SE_BETA_MARGIN               1            7
+SE_DOUBLE_MARGIN             8           29
+
+2026-08-03 13:19:29,442 INFO     Testing {'LMP_SCALE_STD_PCT': 124, 'LMP_SCALE_IMP_PCT': 96, 'LMR_C_PERCENT': 338, 'SE_BETA_MARGIN': 3, 'SE_DOUBLE_MARGIN': 20}
+2026-08-03 13:19:29,442 INFO     Start experiment
+2026-08-03 13:20:00,068 INFO     Experiment finished (30.62541s elapsed).
+2026-08-03 13:20:00,232 INFO     Got Elo: 16.55707406329004 +- 79.18748253082262
+2026-08-03 13:20:00,232 INFO     Estimated draw rate: 31.82%
+2026-08-03 13:20:00,233 INFO     Updating model
+2026-08-03 13:20:04,145 INFO     GP sampling finished (3.912184s)
+2026-08-03 13:20:04,167 INFO     Starting iteration 131
+2026-08-03 13:20:08,289 INFO     Current optimum:
+{'LMP_SCALE_STD_PCT': 120, 'LMP_SCALE_IMP_PCT': 99, 'LMR_C_PERCENT': 293, 'SE_BETA_MARGIN': 2, 'SE_DOUBLE_MARGIN': 20}
+2026-08-03 13:20:08,289 INFO     Estimated Elo: -1.593 +- 5.1108
+2026-08-03 13:20:08,289 INFO     90.0% confidence interval of the Elo value: (-9.9995, 6.8134)
+2026-08-03 13:20:08,342 INFO     90.0% confidence intervals of the parameters:
+Parameter          Lower bound  Upper bound
+-------------------------------------------
+LMP_SCALE_STD_PCT           70          167
+LMP_SCALE_IMP_PCT           62          160
+LMR_C_PERCENT              214          434
+SE_BETA_MARGIN               1            7
+SE_DOUBLE_MARGIN             9           30
+
+2026-08-03 13:20:08,343 INFO     Testing {'LMP_SCALE_STD_PCT': 129, 'LMP_SCALE_IMP_PCT': 99, 'LMR_C_PERCENT': 374, 'SE_BETA_MARGIN': 2, 'SE_DOUBLE_MARGIN': 21}
+2026-08-03 13:20:08,343 INFO     Start experiment
+2026-08-03 13:20:37,278 INFO     Experiment finished (28.935112s elapsed).
+2026-08-03 13:20:37,452 INFO     Got Elo: 49.975494643319955 +- 52.26089104458953
+2026-08-03 13:20:37,452 INFO     Estimated draw rate: 31.82%
+2026-08-03 13:20:37,452 INFO     Updating model
+2026-08-03 13:20:40,770 INFO     GP sampling finished (3.318151s)
+2026-08-03 13:20:40,795 INFO     Starting iteration 132
+2026-08-03 13:20:44,718 INFO     Current optimum:
+{'LMP_SCALE_STD_PCT': 122, 'LMP_SCALE_IMP_PCT': 98, 'LMR_C_PERCENT': 301, 'SE_BETA_MARGIN': 2, 'SE_DOUBLE_MARGIN': 20}
+2026-08-03 13:20:44,718 INFO     Estimated Elo: -1.1657 +- 5.1299
+2026-08-03 13:20:44,718 INFO     90.0% confidence interval of the Elo value: (-9.6036, 7.2723)
+2026-08-03 13:20:44,773 INFO     90.0% confidence intervals of the parameters:
+Parameter          Lower bound  Upper bound
+-------------------------------------------
+LMP_SCALE_STD_PCT           60          159
+LMP_SCALE_IMP_PCT           60          159
+LMR_C_PERCENT              215          439
+SE_BETA_MARGIN               1            7
+SE_DOUBLE_MARGIN            10           30
+
+2026-08-03 13:20:44,773 INFO     Testing {'LMP_SCALE_STD_PCT': 113, 'LMP_SCALE_IMP_PCT': 105, 'LMR_C_PERCENT': 273, 'SE_BETA_MARGIN': 2, 'SE_DOUBLE_MARGIN': 17}
+2026-08-03 13:20:44,774 INFO     Start experiment
+2026-08-03 13:21:19,656 INFO     Experiment finished (34.882594s elapsed).
+2026-08-03 13:21:19,859 INFO     Got Elo: -16.557074063290028 +- 34.7079950202608
+2026-08-03 13:21:19,859 INFO     Estimated draw rate: 40.91%
+2026-08-03 13:21:19,859 INFO     Updating model
+2026-08-03 13:21:22,971 INFO     GP sampling finished (3.111598s)
+2026-08-03 13:21:23,044 INFO     Starting iteration 133
+2026-08-03 13:21:27,100 INFO     Current optimum:
+{'LMP_SCALE_STD_PCT': 123, 'LMP_SCALE_IMP_PCT': 98, 'LMR_C_PERCENT': 305, 'SE_BETA_MARGIN': 2, 'SE_DOUBLE_MARGIN': 21}
+2026-08-03 13:21:27,101 INFO     Estimated Elo: -1.2064 +- 5.3003
+2026-08-03 13:21:27,101 INFO     90.0% confidence interval of the Elo value: (-9.9246, 7.5118)
+2026-08-03 13:21:27,166 INFO     90.0% confidence intervals of the parameters:
+Parameter          Lower bound  Upper bound
+-------------------------------------------
+LMP_SCALE_STD_PCT           72          168
+LMP_SCALE_IMP_PCT           64          162
+LMR_C_PERCENT              207          433
+SE_BETA_MARGIN               1            7
+SE_DOUBLE_MARGIN             8           29
+
+2026-08-03 13:21:27,166 INFO     Testing {'LMP_SCALE_STD_PCT': 130, 'LMP_SCALE_IMP_PCT': 95, 'LMR_C_PERCENT': 320, 'SE_BETA_MARGIN': 1, 'SE_DOUBLE_MARGIN': 21}
+2026-08-03 13:21:27,167 INFO     Start experiment
+2026-08-03 13:21:59,931 INFO     Experiment finished (32.764247s elapsed).
+2026-08-03 13:22:00,076 INFO     Got Elo: 16.55707406329004 +- 62.79153219309058
+2026-08-03 13:22:00,076 INFO     Estimated draw rate: 40.91%
+2026-08-03 13:22:00,077 INFO     Updating model
+2026-08-03 13:22:03,473 INFO     GP sampling finished (3.396001s)
+2026-08-03 13:22:03,548 INFO     Starting iteration 134
+2026-08-03 13:22:07,719 INFO     Current optimum:
+{'LMP_SCALE_STD_PCT': 124, 'LMP_SCALE_IMP_PCT': 98, 'LMR_C_PERCENT': 306, 'SE_BETA_MARGIN': 2, 'SE_DOUBLE_MARGIN': 21}
+2026-08-03 13:22:07,719 INFO     Estimated Elo: -1.3468 +- 4.9528
+2026-08-03 13:22:07,719 INFO     90.0% confidence interval of the Elo value: (-9.4933, 6.7998)
+2026-08-03 13:22:07,773 INFO     90.0% confidence intervals of the parameters:
+Parameter          Lower bound  Upper bound
+-------------------------------------------
+LMP_SCALE_STD_PCT           72          170
+LMP_SCALE_IMP_PCT           65          156
+LMR_C_PERCENT              204          428
+SE_BETA_MARGIN               1            7
+SE_DOUBLE_MARGIN             8           29
+
+2026-08-03 13:22:07,773 INFO     Testing {'LMP_SCALE_STD_PCT': 131, 'LMP_SCALE_IMP_PCT': 99, 'LMR_C_PERCENT': 246, 'SE_BETA_MARGIN': 2, 'SE_DOUBLE_MARGIN': 23}
+2026-08-03 13:22:07,773 INFO     Start experiment
+2026-08-03 13:22:47,815 INFO     Experiment finished (40.041423s elapsed).
+2026-08-03 13:22:48,007 INFO     Got Elo: 84.3413461259573 +- 49.676874293603106
+2026-08-03 13:22:48,007 INFO     Estimated draw rate: 40.91%
+2026-08-03 13:22:48,007 INFO     Updating model
+2026-08-03 13:22:50,971 INFO     GP sampling finished (2.963337s)
+2026-08-03 13:22:51,041 INFO     Starting iteration 135
+2026-08-03 13:22:54,837 INFO     Current optimum:
+{'LMP_SCALE_STD_PCT': 124, 'LMP_SCALE_IMP_PCT': 99, 'LMR_C_PERCENT': 295, 'SE_BETA_MARGIN': 2, 'SE_DOUBLE_MARGIN': 22}
+2026-08-03 13:22:54,838 INFO     Estimated Elo: -0.4878 +- 4.9965
+2026-08-03 13:22:54,838 INFO     90.0% confidence interval of the Elo value: (-8.7063, 7.7307)
+2026-08-03 13:22:54,891 INFO     90.0% confidence intervals of the parameters:
+Parameter          Lower bound  Upper bound
+-------------------------------------------
+LMP_SCALE_STD_PCT           60          160
+LMP_SCALE_IMP_PCT           70          166
+LMR_C_PERCENT              231          450
+SE_BETA_MARGIN               1            7
+SE_DOUBLE_MARGIN             8           29
+
+2026-08-03 13:22:54,891 INFO     Testing {'LMP_SCALE_STD_PCT': 131, 'LMP_SCALE_IMP_PCT': 99, 'LMR_C_PERCENT': 311, 'SE_BETA_MARGIN': 1, 'SE_DOUBLE_MARGIN': 18}
+2026-08-03 13:22:54,891 INFO     Start experiment
+2026-08-03 13:23:28,151 INFO     Experiment finished (33.259263s elapsed).
+2026-08-03 13:23:28,303 INFO     Got Elo: -49.97549464331997 +- 61.98872390581093
+2026-08-03 13:23:28,304 INFO     Estimated draw rate: 40.91%
+2026-08-03 13:23:28,304 INFO     Updating model
+2026-08-03 13:23:31,376 INFO     GP sampling finished (3.072127s)
+2026-08-03 13:23:31,402 INFO     Starting iteration 136
+2026-08-03 13:23:35,499 INFO     Current optimum:
+{'LMP_SCALE_STD_PCT': 124, 'LMP_SCALE_IMP_PCT': 99, 'LMR_C_PERCENT': 291, 'SE_BETA_MARGIN': 2, 'SE_DOUBLE_MARGIN': 22}
+2026-08-03 13:23:35,499 INFO     Estimated Elo: -0.9941 +- 4.9
+2026-08-03 13:23:35,499 INFO     90.0% confidence interval of the Elo value: (-9.0539, 7.0657)
+2026-08-03 13:23:35,554 INFO     90.0% confidence intervals of the parameters:
+Parameter          Lower bound  Upper bound
+-------------------------------------------
+LMP_SCALE_STD_PCT           64          162
+LMP_SCALE_IMP_PCT           64          161
+LMR_C_PERCENT              201          424
+SE_BETA_MARGIN               1            7
+SE_DOUBLE_MARGIN             9           30
+
+2026-08-03 13:23:35,554 INFO     Testing {'LMP_SCALE_STD_PCT': 115, 'LMP_SCALE_IMP_PCT': 73, 'LMR_C_PERCENT': 418, 'SE_BETA_MARGIN': 2, 'SE_DOUBLE_MARGIN': 15}
+2026-08-03 13:23:35,554 INFO     Start experiment
+2026-08-03 13:24:09,087 INFO     Experiment finished (33.532824s elapsed).
+2026-08-03 13:24:09,259 INFO     Got Elo: 49.975494643319976 +- 57.37400505479171
+2026-08-03 13:24:09,259 INFO     Estimated draw rate: 50.00%
+2026-08-03 13:24:09,259 INFO     Updating model
+2026-08-03 13:24:12,895 INFO     GP sampling finished (3.636385s)
+2026-08-03 13:24:12,969 INFO     Starting iteration 137
+2026-08-03 13:24:16,866 INFO     Current optimum:
+{'LMP_SCALE_STD_PCT': 124, 'LMP_SCALE_IMP_PCT': 99, 'LMR_C_PERCENT': 295, 'SE_BETA_MARGIN': 2, 'SE_DOUBLE_MARGIN': 22}
+2026-08-03 13:24:16,866 INFO     Estimated Elo: -0.7685 +- 4.8901
+2026-08-03 13:24:16,866 INFO     90.0% confidence interval of the Elo value: (-8.8119, 7.275)
+2026-08-03 13:24:16,920 INFO     90.0% confidence intervals of the parameters:
+Parameter          Lower bound  Upper bound
+-------------------------------------------
+LMP_SCALE_STD_PCT           62          162
+LMP_SCALE_IMP_PCT           64          161
+LMR_C_PERCENT              208          429
+SE_BETA_MARGIN               1            7
+SE_DOUBLE_MARGIN             9           30
+
+2026-08-03 13:24:16,920 INFO     Testing {'LMP_SCALE_STD_PCT': 68, 'LMP_SCALE_IMP_PCT': 64, 'LMR_C_PERCENT': 201, 'SE_BETA_MARGIN': 2, 'SE_DOUBLE_MARGIN': 18}
+2026-08-03 13:24:16,920 INFO     Start experiment
+2026-08-03 13:24:49,756 INFO     Experiment finished (32.835671s elapsed).
+2026-08-03 13:24:49,938 INFO     Got Elo: 33.18969402590552 +- 49.832500683203435
+2026-08-03 13:24:49,938 INFO     Estimated draw rate: 54.55%
+2026-08-03 13:24:49,938 INFO     Updating model
+2026-08-03 13:24:53,340 INFO     GP sampling finished (3.401608s)
+2026-08-03 13:24:53,414 INFO     Starting iteration 138
+2026-08-03 13:24:57,464 INFO     Current optimum:
+{'LMP_SCALE_STD_PCT': 124, 'LMP_SCALE_IMP_PCT': 99, 'LMR_C_PERCENT': 292, 'SE_BETA_MARGIN': 2, 'SE_DOUBLE_MARGIN': 22}
+2026-08-03 13:24:57,464 INFO     Estimated Elo: -0.6651 +- 4.7657
+2026-08-03 13:24:57,464 INFO     90.0% confidence interval of the Elo value: (-8.504, 7.1737)
+2026-08-03 13:24:57,518 INFO     90.0% confidence intervals of the parameters:
+Parameter          Lower bound  Upper bound
+-------------------------------------------
+LMP_SCALE_STD_PCT           71          169
+LMP_SCALE_IMP_PCT           70          168
+LMR_C_PERCENT              218          445
+SE_BETA_MARGIN               1            7
+SE_DOUBLE_MARGIN             9           30
+
+2026-08-03 13:24:57,518 INFO     Testing {'LMP_SCALE_STD_PCT': 129, 'LMP_SCALE_IMP_PCT': 101, 'LMR_C_PERCENT': 277, 'SE_BETA_MARGIN': 1, 'SE_DOUBLE_MARGIN': 24}
+2026-08-03 13:24:57,518 INFO     Start experiment
+2026-08-03 13:25:29,151 INFO     Experiment finished (31.633318s elapsed).
+2026-08-03 13:25:29,334 INFO     Got Elo: -0.0 +- 50.44732472881983
+2026-08-03 13:25:29,334 INFO     Estimated draw rate: 45.45%
+2026-08-03 13:25:29,334 INFO     Updating model
+2026-08-03 13:25:32,700 INFO     GP sampling finished (3.365834s)
+2026-08-03 13:25:32,725 INFO     Starting iteration 139
+2026-08-03 13:25:36,886 INFO     Current optimum:
+{'LMP_SCALE_STD_PCT': 124, 'LMP_SCALE_IMP_PCT': 99, 'LMR_C_PERCENT': 290, 'SE_BETA_MARGIN': 2, 'SE_DOUBLE_MARGIN': 22}
+2026-08-03 13:25:36,886 INFO     Estimated Elo: -0.7469 +- 4.6037
+2026-08-03 13:25:36,886 INFO     90.0% confidence interval of the Elo value: (-8.3193, 6.8254)
+2026-08-03 13:25:36,941 INFO     90.0% confidence intervals of the parameters:
+Parameter          Lower bound  Upper bound
+-------------------------------------------
+LMP_SCALE_STD_PCT           71          167
+LMP_SCALE_IMP_PCT           60          156
+LMR_C_PERCENT              211          436
+SE_BETA_MARGIN               1            7
+SE_DOUBLE_MARGIN             8           29
+
+2026-08-03 13:25:36,941 INFO     Testing {'LMP_SCALE_STD_PCT': 128, 'LMP_SCALE_IMP_PCT': 90, 'LMR_C_PERCENT': 302, 'SE_BETA_MARGIN': 2, 'SE_DOUBLE_MARGIN': 18}
+2026-08-03 13:25:36,941 INFO     Start experiment
+2026-08-03 13:26:14,534 INFO     Experiment finished (37.59301s elapsed).
+2026-08-03 13:26:14,692 INFO     Got Elo: -16.557074063290028 +- 53.20364766429013
+2026-08-03 13:26:14,692 INFO     Estimated draw rate: 50.00%
+2026-08-03 13:26:14,692 INFO     Updating model
+2026-08-03 13:26:17,950 INFO     GP sampling finished (3.2571s)
+2026-08-03 13:26:17,977 INFO     Starting iteration 140
+2026-08-03 13:26:21,839 INFO     Current optimum:
+{'LMP_SCALE_STD_PCT': 125, 'LMP_SCALE_IMP_PCT': 100, 'LMR_C_PERCENT': 289, 'SE_BETA_MARGIN': 2, 'SE_DOUBLE_MARGIN': 23}
+2026-08-03 13:26:21,839 INFO     Estimated Elo: -0.9873 +- 4.4634
+2026-08-03 13:26:21,839 INFO     90.0% confidence interval of the Elo value: (-8.3289, 6.3543)
+2026-08-03 13:26:21,891 INFO     90.0% confidence intervals of the parameters:
+Parameter          Lower bound  Upper bound
+-------------------------------------------
+LMP_SCALE_STD_PCT           65          162
+LMP_SCALE_IMP_PCT           68          165
+LMR_C_PERCENT              207          432
+SE_BETA_MARGIN               1            7
+SE_DOUBLE_MARGIN             8           29
+
+2026-08-03 13:26:21,891 INFO     Testing {'LMP_SCALE_STD_PCT': 150, 'LMP_SCALE_IMP_PCT': 107, 'LMR_C_PERCENT': 255, 'SE_BETA_MARGIN': 2, 'SE_DOUBLE_MARGIN': 17}
+2026-08-03 13:26:21,892 INFO     Start experiment
+2026-08-03 13:26:52,031 INFO     Experiment finished (30.139589s elapsed).
+2026-08-03 13:26:52,205 INFO     Got Elo: -33.189694025905595 +- 68.96652200136981
+2026-08-03 13:26:52,205 INFO     Estimated draw rate: 36.36%
+2026-08-03 13:26:52,205 INFO     Updating model
+2026-08-03 13:26:55,388 INFO     GP sampling finished (3.183091s)
+2026-08-03 13:26:55,464 INFO     Starting iteration 141
+2026-08-03 13:26:59,588 INFO     Current optimum:
+{'LMP_SCALE_STD_PCT': 124, 'LMP_SCALE_IMP_PCT': 100, 'LMR_C_PERCENT': 286, 'SE_BETA_MARGIN': 2, 'SE_DOUBLE_MARGIN': 23}
+2026-08-03 13:26:59,588 INFO     Estimated Elo: -0.9166 +- 4.7226
+2026-08-03 13:26:59,588 INFO     90.0% confidence interval of the Elo value: (-8.6846, 6.8513)
+2026-08-03 13:26:59,653 INFO     90.0% confidence intervals of the parameters:
+Parameter          Lower bound  Upper bound
+-------------------------------------------
+LMP_SCALE_STD_PCT           61          158
+LMP_SCALE_IMP_PCT           61          160
+LMR_C_PERCENT              219          442
+SE_BETA_MARGIN               1            7
+SE_DOUBLE_MARGIN             8           29
+
+2026-08-03 13:26:59,654 INFO     Testing {'LMP_SCALE_STD_PCT': 93, 'LMP_SCALE_IMP_PCT': 94, 'LMR_C_PERCENT': 248, 'SE_BETA_MARGIN': 2, 'SE_DOUBLE_MARGIN': 20}
+2026-08-03 13:26:59,654 INFO     Start experiment
+2026-08-03 13:27:27,346 INFO     Experiment finished (27.691578s elapsed).
+2026-08-03 13:27:27,530 INFO     Got Elo: -0.0 +- 38.54140742231699
+2026-08-03 13:27:27,530 INFO     Estimated draw rate: 54.55%
+2026-08-03 13:27:27,530 INFO     Updating model
+2026-08-03 13:27:30,805 INFO     GP sampling finished (3.274872s)
+2026-08-03 13:27:30,832 INFO     Starting iteration 142
+2026-08-03 13:27:35,010 INFO     Current optimum:
+{'LMP_SCALE_STD_PCT': 122, 'LMP_SCALE_IMP_PCT': 100, 'LMR_C_PERCENT': 278, 'SE_BETA_MARGIN': 2, 'SE_DOUBLE_MARGIN': 22}
+2026-08-03 13:27:35,010 INFO     Estimated Elo: -1.0837 +- 4.4971
+2026-08-03 13:27:35,010 INFO     90.0% confidence interval of the Elo value: (-8.4807, 6.3134)
+2026-08-03 13:27:35,064 INFO     90.0% confidence intervals of the parameters:
+Parameter          Lower bound  Upper bound
+-------------------------------------------
+LMP_SCALE_STD_PCT           61          160
+LMP_SCALE_IMP_PCT           61          156
+LMR_C_PERCENT              222          448
+SE_BETA_MARGIN               1            7
+SE_DOUBLE_MARGIN             8           29
+
+2026-08-03 13:27:35,064 INFO     Testing {'LMP_SCALE_STD_PCT': 62, 'LMP_SCALE_IMP_PCT': 86, 'LMR_C_PERCENT': 249, 'SE_BETA_MARGIN': 3, 'SE_DOUBLE_MARGIN': 19}
+2026-08-03 13:27:35,065 INFO     Start experiment
+2026-08-03 13:28:06,867 INFO     Experiment finished (31.802092s elapsed).
+2026-08-03 13:28:07,054 INFO     Got Elo: 16.55707406329004 +- 52.930244084548924
+2026-08-03 13:28:07,054 INFO     Estimated draw rate: 40.91%
+2026-08-03 13:28:07,054 INFO     Updating model
+2026-08-03 13:28:10,238 INFO     GP sampling finished (3.183042s)
+2026-08-03 13:28:10,313 INFO     Starting iteration 143
+2026-08-03 13:28:15,201 INFO     Current optimum:
+{'LMP_SCALE_STD_PCT': 118, 'LMP_SCALE_IMP_PCT': 99, 'LMR_C_PERCENT': 271, 'SE_BETA_MARGIN': 2, 'SE_DOUBLE_MARGIN': 22}
+2026-08-03 13:28:15,201 INFO     Estimated Elo: -0.9013 +- 4.6014
+2026-08-03 13:28:15,201 INFO     90.0% confidence interval of the Elo value: (-8.4699, 6.6673)
+2026-08-03 13:28:15,255 INFO     90.0% confidence intervals of the parameters:
+Parameter          Lower bound  Upper bound
+-------------------------------------------
+LMP_SCALE_STD_PCT           63          158
+LMP_SCALE_IMP_PCT           73          169
+LMR_C_PERCENT              224          445
+SE_BETA_MARGIN               1            7
+SE_DOUBLE_MARGIN             9           29
+
+2026-08-03 13:28:15,255 INFO     Testing {'LMP_SCALE_STD_PCT': 125, 'LMP_SCALE_IMP_PCT': 90, 'LMR_C_PERCENT': 320, 'SE_BETA_MARGIN': 2, 'SE_DOUBLE_MARGIN': 20}
+2026-08-03 13:28:15,256 INFO     Start experiment
+2026-08-03 13:28:49,540 INFO     Experiment finished (34.283858s elapsed).
+2026-08-03 13:28:49,722 INFO     Got Elo: -33.189694025905595 +- 44.01718485995182
+2026-08-03 13:28:49,722 INFO     Estimated draw rate: 63.64%
+2026-08-03 13:28:49,722 INFO     Updating model
+2026-08-03 13:28:52,814 INFO     GP sampling finished (3.091827s)
+2026-08-03 13:28:52,888 INFO     Starting iteration 144
+2026-08-03 13:28:57,064 INFO     Current optimum:
+{'LMP_SCALE_STD_PCT': 112, 'LMP_SCALE_IMP_PCT': 99, 'LMR_C_PERCENT': 263, 'SE_BETA_MARGIN': 2, 'SE_DOUBLE_MARGIN': 22}
+2026-08-03 13:28:57,065 INFO     Estimated Elo: -1.0763 +- 4.7328
+2026-08-03 13:28:57,065 INFO     90.0% confidence interval of the Elo value: (-8.8611, 6.7085)
+2026-08-03 13:28:57,123 INFO     90.0% confidence intervals of the parameters:
+Parameter          Lower bound  Upper bound
+-------------------------------------------
+LMP_SCALE_STD_PCT           69          165
+LMP_SCALE_IMP_PCT           61          156
+LMR_C_PERCENT              201          426
+SE_BETA_MARGIN               1            7
+SE_DOUBLE_MARGIN            10           31
+
+2026-08-03 13:28:57,123 INFO     Testing {'LMP_SCALE_STD_PCT': 60, 'LMP_SCALE_IMP_PCT': 88, 'LMR_C_PERCENT': 222, 'SE_BETA_MARGIN': 3, 'SE_DOUBLE_MARGIN': 18}
+2026-08-03 13:28:57,124 INFO     Start experiment
+2026-08-03 13:29:28,423 INFO     Experiment finished (31.298936s elapsed).
+2026-08-03 13:29:28,584 INFO     Got Elo: -16.557074063290028 +- 71.47386306515355
+2026-08-03 13:29:28,584 INFO     Estimated draw rate: 31.82%
+2026-08-03 13:29:28,584 INFO     Updating model
+2026-08-03 13:29:32,130 INFO     GP sampling finished (3.546127s)
+2026-08-03 13:29:32,204 INFO     Starting iteration 145
+2026-08-03 13:29:36,473 INFO     Current optimum:
+{'LMP_SCALE_STD_PCT': 114, 'LMP_SCALE_IMP_PCT': 100, 'LMR_C_PERCENT': 263, 'SE_BETA_MARGIN': 2, 'SE_DOUBLE_MARGIN': 22}
+2026-08-03 13:29:36,473 INFO     Estimated Elo: -1.212 +- 4.6552
+2026-08-03 13:29:36,473 INFO     90.0% confidence interval of the Elo value: (-8.8691, 6.4451)
+2026-08-03 13:29:36,528 INFO     90.0% confidence intervals of the parameters:
+Parameter          Lower bound  Upper bound
+-------------------------------------------
+LMP_SCALE_STD_PCT           60          159
+LMP_SCALE_IMP_PCT           69          167
+LMR_C_PERCENT              201          423
+SE_BETA_MARGIN               1            7
+SE_DOUBLE_MARGIN             9           30
+
+2026-08-03 13:29:36,528 INFO     Testing {'LMP_SCALE_STD_PCT': 127, 'LMP_SCALE_IMP_PCT': 106, 'LMR_C_PERCENT': 234, 'SE_BETA_MARGIN': 2, 'SE_DOUBLE_MARGIN': 22}
+2026-08-03 13:29:36,528 INFO     Start experiment
+2026-08-03 13:30:03,244 INFO     Experiment finished (26.715814s elapsed).
+2026-08-03 13:30:03,421 INFO     Got Elo: -84.3413461259573 +- 65.97744929571559
+2026-08-03 13:30:03,421 INFO     Estimated draw rate: 40.91%
+2026-08-03 13:30:03,421 INFO     Updating model
+2026-08-03 13:30:07,113 INFO     GP sampling finished (3.69107s)
+2026-08-03 13:30:07,190 INFO     Starting iteration 146
+2026-08-03 13:30:11,279 INFO     Current optimum:
+{'LMP_SCALE_STD_PCT': 124, 'LMP_SCALE_IMP_PCT': 101, 'LMR_C_PERCENT': 291, 'SE_BETA_MARGIN': 2, 'SE_DOUBLE_MARGIN': 24}
+2026-08-03 13:30:11,279 INFO     Estimated Elo: -1.8087 +- 4.6212
+2026-08-03 13:30:11,279 INFO     90.0% confidence interval of the Elo value: (-9.4099, 5.7926)
+2026-08-03 13:30:11,332 INFO     90.0% confidence intervals of the parameters:
+Parameter          Lower bound  Upper bound
+-------------------------------------------
+LMP_SCALE_STD_PCT           70          168
+LMP_SCALE_IMP_PCT           71          169
+LMR_C_PERCENT              226          449
+SE_BETA_MARGIN               1            7
+SE_DOUBLE_MARGIN             9           30
+
+2026-08-03 13:30:11,332 INFO     Testing {'LMP_SCALE_STD_PCT': 134, 'LMP_SCALE_IMP_PCT': 96, 'LMR_C_PERCENT': 273, 'SE_BETA_MARGIN': 2, 'SE_DOUBLE_MARGIN': 23}
+2026-08-03 13:30:11,333 INFO     Start experiment
+2026-08-03 13:30:42,624 INFO     Experiment finished (31.291686s elapsed).
+2026-08-03 13:30:42,787 INFO     Got Elo: -0.0 +- 55.65425784106704
+2026-08-03 13:30:42,787 INFO     Estimated draw rate: 54.55%
+2026-08-03 13:30:42,787 INFO     Updating model
+2026-08-03 13:30:46,007 INFO     GP sampling finished (3.220332s)
+2026-08-03 13:30:46,034 INFO     Starting iteration 147
+2026-08-03 13:30:50,269 INFO     Current optimum:
+{'LMP_SCALE_STD_PCT': 124, 'LMP_SCALE_IMP_PCT': 101, 'LMR_C_PERCENT': 290, 'SE_BETA_MARGIN': 2, 'SE_DOUBLE_MARGIN': 24}
+2026-08-03 13:30:50,269 INFO     Estimated Elo: -1.761 +- 4.6429
+2026-08-03 13:30:50,269 INFO     90.0% confidence interval of the Elo value: (-9.398, 5.8759)
+2026-08-03 13:30:50,323 INFO     90.0% confidence intervals of the parameters:
+Parameter          Lower bound  Upper bound
+-------------------------------------------
+LMP_SCALE_STD_PCT           73          170
+LMP_SCALE_IMP_PCT           64          160
+LMR_C_PERCENT              200          420
+SE_BETA_MARGIN               1            7
+SE_DOUBLE_MARGIN             9           30
+
+2026-08-03 13:30:50,323 INFO     Testing {'LMP_SCALE_STD_PCT': 130, 'LMP_SCALE_IMP_PCT': 109, 'LMR_C_PERCENT': 276, 'SE_BETA_MARGIN': 2, 'SE_DOUBLE_MARGIN': 21}
+2026-08-03 13:30:50,324 INFO     Start experiment
+2026-08-03 13:31:27,123 INFO     Experiment finished (36.799425s elapsed).
+2026-08-03 13:31:27,312 INFO     Got Elo: -0.0 +- 44.828238301554755
+2026-08-03 13:31:27,312 INFO     Estimated draw rate: 45.45%
+2026-08-03 13:31:27,312 INFO     Updating model
+2026-08-03 13:31:30,428 INFO     GP sampling finished (3.116212s)
+2026-08-03 13:31:30,454 INFO     Starting iteration 148
+2026-08-03 13:31:34,596 INFO     Current optimum:
+{'LMP_SCALE_STD_PCT': 124, 'LMP_SCALE_IMP_PCT': 101, 'LMR_C_PERCENT': 289, 'SE_BETA_MARGIN': 2, 'SE_DOUBLE_MARGIN': 24}
+2026-08-03 13:31:34,596 INFO     Estimated Elo: -1.7155 +- 4.6385
+2026-08-03 13:31:34,596 INFO     90.0% confidence interval of the Elo value: (-9.345, 5.9141)
+2026-08-03 13:31:34,668 INFO     90.0% confidence intervals of the parameters:
+Parameter          Lower bound  Upper bound
+-------------------------------------------
+LMP_SCALE_STD_PCT           69          166
+LMP_SCALE_IMP_PCT           60          160
+LMR_C_PERCENT              201          421
+SE_BETA_MARGIN               1            7
+SE_DOUBLE_MARGIN             8           29
+
+2026-08-03 13:31:34,668 INFO     Testing {'LMP_SCALE_STD_PCT': 69, 'LMP_SCALE_IMP_PCT': 86, 'LMR_C_PERCENT': 240, 'SE_BETA_MARGIN': 1, 'SE_DOUBLE_MARGIN': 20}
+2026-08-03 13:31:34,669 INFO     Start experiment
+2026-08-03 13:32:06,223 INFO     Experiment finished (31.553911s elapsed).
+2026-08-03 13:32:06,407 INFO     Got Elo: 84.34134612595726 +- 55.236170421820454
+2026-08-03 13:32:06,408 INFO     Estimated draw rate: 40.91%
+2026-08-03 13:32:06,408 INFO     Updating model
+2026-08-03 13:32:09,944 INFO     GP sampling finished (3.53679s)
+2026-08-03 13:32:10,021 INFO     Starting iteration 149
+2026-08-03 13:32:14,061 INFO     Current optimum:
+{'LMP_SCALE_STD_PCT': 103, 'LMP_SCALE_IMP_PCT': 97, 'LMR_C_PERCENT': 263, 'SE_BETA_MARGIN': 2, 'SE_DOUBLE_MARGIN': 21}
+2026-08-03 13:32:14,062 INFO     Estimated Elo: -1.1221 +- 4.843
+2026-08-03 13:32:14,062 INFO     90.0% confidence interval of the Elo value: (-9.0882, 6.844)
+2026-08-03 13:32:14,116 INFO     90.0% confidence intervals of the parameters:
+Parameter          Lower bound  Upper bound
+-------------------------------------------
+LMP_SCALE_STD_PCT           69          168
+LMP_SCALE_IMP_PCT           66          163
+LMR_C_PERCENT              226          447
+SE_BETA_MARGIN               1            7
+SE_DOUBLE_MARGIN             9           30
+
+2026-08-03 13:32:14,116 INFO     Testing {'LMP_SCALE_STD_PCT': 78, 'LMP_SCALE_IMP_PCT': 88, 'LMR_C_PERCENT': 232, 'SE_BETA_MARGIN': 2, 'SE_DOUBLE_MARGIN': 24}
+2026-08-03 13:32:14,117 INFO     Start experiment
+2026-08-03 13:32:47,512 INFO     Experiment finished (33.394954s elapsed).
+2026-08-03 13:32:47,701 INFO     Got Elo: 66.99643491750547 +- 47.62576324562991
+2026-08-03 13:32:47,701 INFO     Estimated draw rate: 54.55%
+2026-08-03 13:32:47,701 INFO     Updating model
+2026-08-03 13:32:51,091 INFO     GP sampling finished (3.389617s)
+2026-08-03 13:32:51,119 INFO     Starting iteration 150
+2026-08-03 13:32:55,210 INFO     Current optimum:
+{'LMP_SCALE_STD_PCT': 82, 'LMP_SCALE_IMP_PCT': 92, 'LMR_C_PERCENT': 245, 'SE_BETA_MARGIN': 2, 'SE_DOUBLE_MARGIN': 21}
+2026-08-03 13:32:55,210 INFO     Estimated Elo: -0.1905 +- 5.3192
+2026-08-03 13:32:55,210 INFO     90.0% confidence interval of the Elo value: (-8.9397, 8.5587)
+2026-08-03 13:32:55,265 INFO     90.0% confidence intervals of the parameters:
+Parameter          Lower bound  Upper bound
+-------------------------------------------
+LMP_SCALE_STD_PCT           64          161
+LMP_SCALE_IMP_PCT           61          160
+LMR_C_PERCENT              203          427
+SE_BETA_MARGIN               1            7
+SE_DOUBLE_MARGIN             9           30
+
+2026-08-03 13:32:55,265 INFO     Testing {'LMP_SCALE_STD_PCT': 66, 'LMP_SCALE_IMP_PCT': 84, 'LMR_C_PERCENT': 242, 'SE_BETA_MARGIN': 2, 'SE_DOUBLE_MARGIN': 19}
+2026-08-03 13:32:55,265 INFO     Start experiment
+2026-08-03 13:33:24,108 INFO     Experiment finished (28.843385s elapsed).
+2026-08-03 13:33:24,302 INFO     Got Elo: -49.97549464331997 +- 45.99051545273214
+2026-08-03 13:33:24,302 INFO     Estimated draw rate: 40.91%
+2026-08-03 13:33:24,302 INFO     Updating model
+2026-08-03 13:33:27,652 INFO     GP sampling finished (3.350128s)
+2026-08-03 13:33:27,728 INFO     Starting iteration 151
+2026-08-03 13:33:31,984 INFO     Current optimum:
+{'LMP_SCALE_STD_PCT': 98, 'LMP_SCALE_IMP_PCT': 96, 'LMR_C_PERCENT': 258, 'SE_BETA_MARGIN': 2, 'SE_DOUBLE_MARGIN': 21}
+2026-08-03 13:33:31,984 INFO     Estimated Elo: -0.7263 +- 5.1453
+2026-08-03 13:33:31,984 INFO     90.0% confidence interval of the Elo value: (-9.1896, 7.7371)
+2026-08-03 13:33:32,039 INFO     90.0% confidence intervals of the parameters:
+Parameter          Lower bound  Upper bound
+-------------------------------------------
+LMP_SCALE_STD_PCT           60          158
+LMP_SCALE_IMP_PCT           68          164
+LMR_C_PERCENT              201          425
+SE_BETA_MARGIN               1            7
+SE_DOUBLE_MARGIN            10           31
+
+2026-08-03 13:33:32,039 INFO     Testing {'LMP_SCALE_STD_PCT': 76, 'LMP_SCALE_IMP_PCT': 93, 'LMR_C_PERCENT': 255, 'SE_BETA_MARGIN': 2, 'SE_DOUBLE_MARGIN': 20}
+2026-08-03 13:33:32,040 INFO     Start experiment
+2026-08-03 13:34:01,377 INFO     Experiment finished (29.337408s elapsed).
+2026-08-03 13:34:01,577 INFO     Got Elo: -66.99643491750554 +- 41.432919938162655
+2026-08-03 13:34:01,578 INFO     Estimated draw rate: 45.45%
+2026-08-03 13:34:01,578 INFO     Updating model
+2026-08-03 13:34:04,789 INFO     GP sampling finished (3.210777s)
+2026-08-03 13:34:04,865 INFO     Starting iteration 152
+2026-08-03 13:34:08,915 INFO     Current optimum:
+{'LMP_SCALE_STD_PCT': 125, 'LMP_SCALE_IMP_PCT': 101, 'LMR_C_PERCENT': 293, 'SE_BETA_MARGIN': 2, 'SE_DOUBLE_MARGIN': 24}
+2026-08-03 13:34:08,915 INFO     Estimated Elo: -1.2987 +- 4.8803
+2026-08-03 13:34:08,915 INFO     90.0% confidence interval of the Elo value: (-9.3261, 6.7286)
+2026-08-03 13:34:08,969 INFO     90.0% confidence intervals of the parameters:
+Parameter          Lower bound  Upper bound
+-------------------------------------------
+LMP_SCALE_STD_PCT           67          163
+LMP_SCALE_IMP_PCT           72          168
+LMR_C_PERCENT              204          424
+SE_BETA_MARGIN               1            7
+SE_DOUBLE_MARGIN             9           30
+
+2026-08-03 13:34:08,969 INFO     Testing {'LMP_SCALE_STD_PCT': 115, 'LMP_SCALE_IMP_PCT': 112, 'LMR_C_PERCENT': 269, 'SE_BETA_MARGIN': 2, 'SE_DOUBLE_MARGIN': 27}
+2026-08-03 13:34:08,969 INFO     Start experiment
+2026-08-03 13:34:45,214 INFO     Experiment finished (36.244233s elapsed).
+2026-08-03 13:34:45,395 INFO     Got Elo: 16.55707406328996 +- 52.900456923406544
+2026-08-03 13:34:45,395 INFO     Estimated draw rate: 50.00%
+2026-08-03 13:34:45,395 INFO     Updating model
+2026-08-03 13:34:49,254 INFO     GP sampling finished (3.858097s)
+2026-08-03 13:34:49,307 INFO     Starting iteration 153
+2026-08-03 13:34:53,707 INFO     Current optimum:
+{'LMP_SCALE_STD_PCT': 125, 'LMP_SCALE_IMP_PCT': 101, 'LMR_C_PERCENT': 291, 'SE_BETA_MARGIN': 2, 'SE_DOUBLE_MARGIN': 24}
+2026-08-03 13:34:53,707 INFO     Estimated Elo: -1.3169 +- 4.6416
+2026-08-03 13:34:53,707 INFO     90.0% confidence interval of the Elo value: (-8.9517, 6.3179)
+2026-08-03 13:34:53,769 INFO     90.0% confidence intervals of the parameters:
+Parameter          Lower bound  Upper bound
+-------------------------------------------
+LMP_SCALE_STD_PCT           62          156
+LMP_SCALE_IMP_PCT           67          164
+LMR_C_PERCENT              227          447
+SE_BETA_MARGIN               1            7
+SE_DOUBLE_MARGIN             9           30
+
+2026-08-03 13:34:53,769 INFO     Testing {'LMP_SCALE_STD_PCT': 120, 'LMP_SCALE_IMP_PCT': 123, 'LMR_C_PERCENT': 318, 'SE_BETA_MARGIN': 2, 'SE_DOUBLE_MARGIN': 26}
+2026-08-03 13:34:53,770 INFO     Start experiment
+2026-08-03 13:35:29,403 INFO     Experiment finished (35.632903s elapsed).
+2026-08-03 13:35:29,572 INFO     Got Elo: -49.97549464331997 +- 46.04431601720574
+2026-08-03 13:35:29,573 INFO     Estimated draw rate: 59.09%
+2026-08-03 13:35:29,573 INFO     Updating model
+2026-08-03 13:35:33,006 INFO     GP sampling finished (3.433268s)
+2026-08-03 13:35:33,041 INFO     Starting iteration 154
+2026-08-03 13:35:37,034 INFO     Current optimum:
+{'LMP_SCALE_STD_PCT': 124, 'LMP_SCALE_IMP_PCT': 100, 'LMR_C_PERCENT': 286, 'SE_BETA_MARGIN': 2, 'SE_DOUBLE_MARGIN': 24}
+2026-08-03 13:35:37,034 INFO     Estimated Elo: -1.5487 +- 4.8338
+2026-08-03 13:35:37,034 INFO     90.0% confidence interval of the Elo value: (-9.4996, 6.4021)
+2026-08-03 13:35:37,110 INFO     90.0% confidence intervals of the parameters:
+Parameter          Lower bound  Upper bound
+-------------------------------------------
+LMP_SCALE_STD_PCT           69          166
+LMP_SCALE_IMP_PCT           62          160
+LMR_C_PERCENT              209          436
+SE_BETA_MARGIN               1            7
+SE_DOUBLE_MARGIN             9           30
+
+2026-08-03 13:35:37,110 INFO     Testing {'LMP_SCALE_STD_PCT': 61, 'LMP_SCALE_IMP_PCT': 63, 'LMR_C_PERCENT': 298, 'SE_BETA_MARGIN': 2, 'SE_DOUBLE_MARGIN': 30}
+2026-08-03 13:35:37,110 INFO     Start experiment
+2026-08-03 13:36:08,210 INFO     Experiment finished (31.100053s elapsed).
+2026-08-03 13:36:08,400 INFO     Got Elo: -33.189694025905595 +- 43.95791327146178
+2026-08-03 13:36:08,400 INFO     Estimated draw rate: 45.45%
+2026-08-03 13:36:08,400 INFO     Updating model
+2026-08-03 13:36:11,933 INFO     GP sampling finished (3.532283s)
+2026-08-03 13:36:11,961 INFO     Starting iteration 155
+2026-08-03 13:36:16,100 INFO     Current optimum:
+{'LMP_SCALE_STD_PCT': 124, 'LMP_SCALE_IMP_PCT': 100, 'LMR_C_PERCENT': 287, 'SE_BETA_MARGIN': 2, 'SE_DOUBLE_MARGIN': 24}
+2026-08-03 13:36:16,100 INFO     Estimated Elo: -1.5832 +- 4.9517
+2026-08-03 13:36:16,100 INFO     90.0% confidence interval of the Elo value: (-9.728, 6.5615)
+2026-08-03 13:36:16,180 INFO     90.0% confidence intervals of the parameters:
+Parameter          Lower bound  Upper bound
+-------------------------------------------
+LMP_SCALE_STD_PCT           63          160
+LMP_SCALE_IMP_PCT           61          158
+LMR_C_PERCENT              229          449
+SE_BETA_MARGIN               1            7
+SE_DOUBLE_MARGIN             9           30
+
+2026-08-03 13:36:16,180 INFO     Testing {'LMP_SCALE_STD_PCT': 111, 'LMP_SCALE_IMP_PCT': 64, 'LMR_C_PERCENT': 427, 'SE_BETA_MARGIN': 2, 'SE_DOUBLE_MARGIN': 15}
+2026-08-03 13:36:16,180 INFO     Start experiment

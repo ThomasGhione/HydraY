@@ -1,0 +1,2749 @@
+2026-08-03 09:36:25,753 INFO     chess-tuning-tools version: 0.9.5
+2026-08-03 09:36:25,757 INFO     Starting iteration 0
+2026-08-03 09:36:25,757 INFO     Testing {'RFP_MARGIN_PER_DEPTH': 88, 'NMP_EVAL_DIV': 113, 'NMP_EVAL_MAX': 6, 'FUTILITY_MID_STEP': 353, 'PROBCUT_MARGIN': 40}
+2026-08-03 09:36:25,758 INFO     Start experiment
+2026-08-03 09:37:00,507 INFO     Experiment finished (34.749503s elapsed).
+2026-08-03 09:37:00,665 INFO     Got Elo: -84.3413461259572 +- 48.771417184277205
+2026-08-03 09:37:00,665 INFO     Estimated draw rate: 50.00%
+2026-08-03 09:37:00,665 INFO     Updating model
+2026-08-03 09:37:00,665 INFO     GP sampling finished (6.1e-05s)
+2026-08-03 09:37:00,672 INFO     Starting iteration 1
+2026-08-03 09:37:00,696 INFO     Testing {'RFP_MARGIN_PER_DEPTH': 143, 'NMP_EVAL_DIV': 223, 'NMP_EVAL_MAX': 3, 'FUTILITY_MID_STEP': 228, 'PROBCUT_MARGIN': 100}
+2026-08-03 09:37:00,697 INFO     Start experiment
+2026-08-03 09:37:32,143 INFO     Experiment finished (31.446505s elapsed).
+2026-08-03 09:37:32,290 INFO     Got Elo: -84.3413461259573 +- 61.155152685369764
+2026-08-03 09:37:32,290 INFO     Estimated draw rate: 40.91%
+2026-08-03 09:37:32,290 INFO     Updating model
+2026-08-03 09:37:32,290 INFO     GP sampling finished (6e-05s)
+2026-08-03 09:37:32,299 INFO     Starting iteration 2
+2026-08-03 09:37:32,334 INFO     Testing {'RFP_MARGIN_PER_DEPTH': 60, 'NMP_EVAL_DIV': 168, 'NMP_EVAL_MAX': 5, 'FUTILITY_MID_STEP': 290, 'PROBCUT_MARGIN': 70}
+2026-08-03 09:37:32,335 INFO     Start experiment
+2026-08-03 09:38:04,712 INFO     Experiment finished (32.377183s elapsed).
+2026-08-03 09:38:04,889 INFO     Got Elo: -49.97549464331997 +- 39.683924536710286
+2026-08-03 09:38:04,889 INFO     Estimated draw rate: 50.00%
+2026-08-03 09:38:04,889 INFO     Updating model
+2026-08-03 09:38:04,889 INFO     GP sampling finished (5.4e-05s)
+2026-08-03 09:38:04,896 INFO     Starting iteration 3
+2026-08-03 09:38:04,924 INFO     Testing {'RFP_MARGIN_PER_DEPTH': 115, 'NMP_EVAL_DIV': 278, 'NMP_EVAL_MAX': 8, 'FUTILITY_MID_STEP': 165, 'PROBCUT_MARGIN': 130}
+2026-08-03 09:38:04,925 INFO     Start experiment
+2026-08-03 09:38:38,223 INFO     Experiment finished (33.298071s elapsed).
+2026-08-03 09:38:38,392 INFO     Got Elo: -7.714619732426294e-14 +- 60.40379648665487
+2026-08-03 09:38:38,392 INFO     Estimated draw rate: 36.36%
+2026-08-03 09:38:38,392 INFO     Updating model
+2026-08-03 09:38:38,392 INFO     GP sampling finished (5.7e-05s)
+2026-08-03 09:38:38,401 INFO     Starting iteration 4
+2026-08-03 09:38:38,418 INFO     Testing {'RFP_MARGIN_PER_DEPTH': 104, 'NMP_EVAL_DIV': 81, 'NMP_EVAL_MAX': 4, 'FUTILITY_MID_STEP': 316, 'PROBCUT_MARGIN': 88}
+2026-08-03 09:38:38,419 INFO     Start experiment
+2026-08-03 09:39:06,277 INFO     Experiment finished (27.858575s elapsed).
+2026-08-03 09:39:06,457 INFO     Got Elo: -0.0 +- 50.6326012894234
+2026-08-03 09:39:06,457 INFO     Estimated draw rate: 45.45%
+2026-08-03 09:39:06,457 INFO     Updating model
+2026-08-03 09:39:06,457 INFO     GP sampling finished (5.8e-05s)
+2026-08-03 09:39:06,466 INFO     Starting iteration 5
+2026-08-03 09:39:06,481 INFO     Testing {'RFP_MARGIN_PER_DEPTH': 50, 'NMP_EVAL_DIV': 136, 'NMP_EVAL_MAX': 4, 'FUTILITY_MID_STEP': 188, 'PROBCUT_MARGIN': 146}
+2026-08-03 09:39:06,482 INFO     Start experiment
+2026-08-03 09:39:38,034 INFO     Experiment finished (31.551581s elapsed).
+2026-08-03 09:39:38,199 INFO     Got Elo: 49.975494643319955 +- 52.19463881640639
+2026-08-03 09:39:38,199 INFO     Estimated draw rate: 59.09%
+2026-08-03 09:39:38,199 INFO     Updating model
+2026-08-03 09:39:38,199 INFO     GP sampling finished (5.9e-05s)
+2026-08-03 09:39:38,209 INFO     Starting iteration 6
+2026-08-03 09:39:38,230 INFO     Testing {'RFP_MARGIN_PER_DEPTH': 153, 'NMP_EVAL_DIV': 95, 'NMP_EVAL_MAX': 7, 'FUTILITY_MID_STEP': 271, 'PROBCUT_MARGIN': 117}
+2026-08-03 09:39:38,231 INFO     Start experiment
+2026-08-03 09:40:07,677 INFO     Experiment finished (29.446664s elapsed).
+2026-08-03 09:40:07,842 INFO     Got Elo: 16.55707406329004 +- 79.27489571883874
+2026-08-03 09:40:07,842 INFO     Estimated draw rate: 22.73%
+2026-08-03 09:40:07,842 INFO     Updating model
+2026-08-03 09:40:07,842 INFO     GP sampling finished (7e-05s)
+2026-08-03 09:40:07,850 INFO     Starting iteration 7
+2026-08-03 09:40:07,874 INFO     Testing {'RFP_MARGIN_PER_DEPTH': 126, 'NMP_EVAL_DIV': 196, 'NMP_EVAL_MAX': 5, 'FUTILITY_MID_STEP': 369, 'PROBCUT_MARGIN': 121}
+2026-08-03 09:40:07,875 INFO     Start experiment
+2026-08-03 09:40:40,675 INFO     Experiment finished (32.799992s elapsed).
+2026-08-03 09:40:40,832 INFO     Got Elo: -16.55707406328996 +- 62.71112181965574
+2026-08-03 09:40:40,833 INFO     Estimated draw rate: 40.91%
+2026-08-03 09:40:40,833 INFO     Updating model
+2026-08-03 09:40:40,833 INFO     GP sampling finished (5.8e-05s)
+2026-08-03 09:40:40,840 INFO     Starting iteration 8
+2026-08-03 09:40:40,860 INFO     Testing {'RFP_MARGIN_PER_DEPTH': 75, 'NMP_EVAL_DIV': 244, 'NMP_EVAL_MAX': 3, 'FUTILITY_MID_STEP': 150, 'PROBCUT_MARGIN': 58}
+2026-08-03 09:40:40,860 INFO     Start experiment
+2026-08-03 09:41:13,872 INFO     Experiment finished (33.011569s elapsed).
+2026-08-03 09:41:14,051 INFO     Got Elo: 33.18969402590559 +- 55.38391610795986
+2026-08-03 09:41:14,051 INFO     Estimated draw rate: 36.36%
+2026-08-03 09:41:14,051 INFO     Updating model
+2026-08-03 09:41:14,051 INFO     GP sampling finished (5.7e-05s)
+2026-08-03 09:41:14,059 INFO     Starting iteration 9
+2026-08-03 09:41:14,078 INFO     Testing {'RFP_MARGIN_PER_DEPTH': 68, 'NMP_EVAL_DIV': 266, 'NMP_EVAL_MAX': 6, 'FUTILITY_MID_STEP': 202, 'PROBCUT_MARGIN': 91}
+2026-08-03 09:41:14,078 INFO     Start experiment
+2026-08-03 09:41:46,184 INFO     Experiment finished (32.105561s elapsed).
+2026-08-03 09:41:46,333 INFO     Got Elo: -33.189694025905595 +- 68.97710553573887
+2026-08-03 09:41:46,333 INFO     Estimated draw rate: 36.36%
+2026-08-03 09:41:46,333 INFO     Updating model
+2026-08-03 09:41:46,333 INFO     GP sampling finished (6.4e-05s)
+2026-08-03 09:41:46,341 INFO     Starting iteration 10
+2026-08-03 09:41:46,355 INFO     Testing {'RFP_MARGIN_PER_DEPTH': 119, 'NMP_EVAL_DIV': 166, 'NMP_EVAL_MAX': 7, 'FUTILITY_MID_STEP': 225, 'PROBCUT_MARGIN': 159}
+2026-08-03 09:41:46,356 INFO     Start experiment
+2026-08-03 09:42:18,354 INFO     Experiment finished (31.997876s elapsed).
+2026-08-03 09:42:18,531 INFO     Got Elo: 16.557074063289978 +- 58.02720523695479
+2026-08-03 09:42:18,531 INFO     Estimated draw rate: 50.00%
+2026-08-03 09:42:18,531 INFO     Updating model
+2026-08-03 09:42:18,531 INFO     GP sampling finished (5.9e-05s)
+2026-08-03 09:42:18,539 INFO     Starting iteration 11
+2026-08-03 09:42:18,551 INFO     Testing {'RFP_MARGIN_PER_DEPTH': 148, 'NMP_EVAL_DIV': 208, 'NMP_EVAL_MAX': 7, 'FUTILITY_MID_STEP': 380, 'PROBCUT_MARGIN': 65}
+2026-08-03 09:42:18,551 INFO     Start experiment
+2026-08-03 09:42:55,272 INFO     Experiment finished (36.720846s elapsed).
+2026-08-03 09:42:55,428 INFO     Got Elo: -33.189694025905595 +- 69.35266714985649
+2026-08-03 09:42:55,428 INFO     Estimated draw rate: 18.18%
+2026-08-03 09:42:55,428 INFO     Updating model
+2026-08-03 09:42:55,428 INFO     GP sampling finished (6.2e-05s)
+2026-08-03 09:42:55,436 INFO     Starting iteration 12
+2026-08-03 09:42:55,448 INFO     Testing {'RFP_MARGIN_PER_DEPTH': 54, 'NMP_EVAL_DIV': 102, 'NMP_EVAL_MAX': 3, 'FUTILITY_MID_STEP': 307, 'PROBCUT_MARGIN': 47}
+2026-08-03 09:42:55,449 INFO     Start experiment
+2026-08-03 09:43:31,879 INFO     Experiment finished (36.430302s elapsed).
+2026-08-03 09:43:32,044 INFO     Got Elo: -66.99643491750554 +- 64.2787891480772
+2026-08-03 09:43:32,044 INFO     Estimated draw rate: 45.45%
+2026-08-03 09:43:32,044 INFO     Updating model
+2026-08-03 09:43:32,044 INFO     GP sampling finished (7.4e-05s)
+2026-08-03 09:43:32,053 INFO     Starting iteration 13
+2026-08-03 09:43:32,075 INFO     Testing {'RFP_MARGIN_PER_DEPTH': 92, 'NMP_EVAL_DIV': 161, 'NMP_EVAL_MAX': 6, 'FUTILITY_MID_STEP': 388, 'PROBCUT_MARGIN': 98}
+2026-08-03 09:43:32,076 INFO     Start experiment
+2026-08-03 09:44:05,707 INFO     Experiment finished (33.630118s elapsed).
+2026-08-03 09:44:05,880 INFO     Got Elo: -33.189694025905595 +- 44.04587665382719
+2026-08-03 09:44:05,880 INFO     Estimated draw rate: 54.55%
+2026-08-03 09:44:05,880 INFO     Updating model
+2026-08-03 09:44:05,880 INFO     GP sampling finished (5.8e-05s)
+2026-08-03 09:44:05,894 INFO     Starting iteration 14
+2026-08-03 09:44:05,912 INFO     Testing {'RFP_MARGIN_PER_DEPTH': 132, 'NMP_EVAL_DIV': 151, 'NMP_EVAL_MAX': 2, 'FUTILITY_MID_STEP': 297, 'PROBCUT_MARGIN': 136}
+2026-08-03 09:44:05,912 INFO     Start experiment
+2026-08-03 09:44:41,299 INFO     Experiment finished (35.386151s elapsed).
+2026-08-03 09:44:41,476 INFO     Got Elo: 66.99643491750541 +- 63.554147120013205
+2026-08-03 09:44:41,476 INFO     Estimated draw rate: 45.45%
+2026-08-03 09:44:41,476 INFO     Updating model
+2026-08-03 09:44:41,476 INFO     GP sampling finished (7.5e-05s)
+2026-08-03 09:44:41,484 INFO     Starting iteration 15
+2026-08-03 09:44:41,497 INFO     Testing {'RFP_MARGIN_PER_DEPTH': 131, 'NMP_EVAL_DIV': 87, 'NMP_EVAL_MAX': 4, 'FUTILITY_MID_STEP': 250, 'PROBCUT_MARGIN': 156}
+2026-08-03 09:44:41,497 INFO     Start experiment
+2026-08-03 09:45:12,565 INFO     Experiment finished (31.067838s elapsed).
+2026-08-03 09:45:12,730 INFO     Got Elo: -33.189694025905595 +- 50.28533312741762
+2026-08-03 09:45:12,730 INFO     Estimated draw rate: 54.55%
+2026-08-03 09:45:12,730 INFO     Updating model
+2026-08-03 09:45:36,677 INFO     GP sampling finished (23.947149s)
+2026-08-03 09:45:36,689 INFO     Starting iteration 16
+2026-08-03 09:45:39,610 INFO     Current optimum:
+{'RFP_MARGIN_PER_DEPTH': 50, 'NMP_EVAL_DIV': 136, 'NMP_EVAL_MAX': 4, 'FUTILITY_MID_STEP': 188, 'PROBCUT_MARGIN': 146}
+2026-08-03 09:45:39,611 INFO     Estimated Elo: -11.4696 +- 13.2569
+2026-08-03 09:45:39,611 INFO     90.0% confidence interval of the Elo value: (-33.2752, 10.336)
+2026-08-03 09:45:39,682 INFO     90.0% confidence intervals of the parameters:
+Parameter             Lower bound  Upper bound
+----------------------------------------------
+RFP_MARGIN_PER_DEPTH           50          148
+NMP_EVAL_DIV                   92          289
+NMP_EVAL_MAX                    3            8
+FUTILITY_MID_STEP             152          376
+PROBCUT_MARGIN                 50          156
+
+2026-08-03 09:45:39,682 INFO     Testing {'RFP_MARGIN_PER_DEPTH': 56, 'NMP_EVAL_DIV': 131, 'NMP_EVAL_MAX': 3, 'FUTILITY_MID_STEP': 245, 'PROBCUT_MARGIN': 146}
+2026-08-03 09:45:39,682 INFO     Start experiment
+2026-08-03 09:46:08,345 INFO     Experiment finished (28.66296s elapsed).
+2026-08-03 09:46:08,508 INFO     Got Elo: -16.557074063290028 +- 47.51011116815616
+2026-08-03 09:46:08,508 INFO     Estimated draw rate: 59.09%
+2026-08-03 09:46:08,508 INFO     Updating model
+2026-08-03 09:46:10,710 INFO     GP sampling finished (2.201362s)
+2026-08-03 09:46:10,722 INFO     Starting iteration 17
+2026-08-03 09:46:13,769 INFO     Current optimum:
+{'RFP_MARGIN_PER_DEPTH': 50, 'NMP_EVAL_DIV': 136, 'NMP_EVAL_MAX': 4, 'FUTILITY_MID_STEP': 186, 'PROBCUT_MARGIN': 146}
+2026-08-03 09:46:13,769 INFO     Estimated Elo: -12.0797 +- 12.4375
+2026-08-03 09:46:13,769 INFO     90.0% confidence interval of the Elo value: (-32.5376, 8.3781)
+2026-08-03 09:46:13,854 INFO     90.0% confidence intervals of the parameters:
+Parameter             Lower bound  Upper bound
+----------------------------------------------
+RFP_MARGIN_PER_DEPTH           52          152
+NMP_EVAL_DIV                  103          300
+NMP_EVAL_MAX                    2            7
+FUTILITY_MID_STEP             163          388
+PROBCUT_MARGIN                 50          159
+
+2026-08-03 09:46:13,854 INFO     Testing {'RFP_MARGIN_PER_DEPTH': 55, 'NMP_EVAL_DIV': 168, 'NMP_EVAL_MAX': 4, 'FUTILITY_MID_STEP': 168, 'PROBCUT_MARGIN': 143}
+2026-08-03 09:46:13,855 INFO     Start experiment
+2026-08-03 09:46:43,505 INFO     Experiment finished (29.649754s elapsed).
+2026-08-03 09:46:43,653 INFO     Got Elo: 102.10900204132238 +- 71.64234858933395
+2026-08-03 09:46:43,653 INFO     Estimated draw rate: 36.36%
+2026-08-03 09:46:43,653 INFO     Updating model
+2026-08-03 09:46:45,841 INFO     GP sampling finished (2.187485s)
+2026-08-03 09:46:45,856 INFO     Starting iteration 18
+2026-08-03 09:46:49,201 INFO     Current optimum:
+{'RFP_MARGIN_PER_DEPTH': 52, 'NMP_EVAL_DIV': 155, 'NMP_EVAL_MAX': 4, 'FUTILITY_MID_STEP': 173, 'PROBCUT_MARGIN': 145}
+2026-08-03 09:46:49,201 INFO     Estimated Elo: -2.2532 +- 14.1302
+2026-08-03 09:46:49,202 INFO     90.0% confidence interval of the Elo value: (-25.4952, 20.9889)
+2026-08-03 09:46:49,263 INFO     90.0% confidence intervals of the parameters:
+Parameter             Lower bound  Upper bound
+----------------------------------------------
+RFP_MARGIN_PER_DEPTH           56          155
+NMP_EVAL_DIV                   96          292
+NMP_EVAL_MAX                    2            7
+FUTILITY_MID_STEP             167          398
+PROBCUT_MARGIN                 52          159
+
+2026-08-03 09:46:49,264 INFO     Testing {'RFP_MARGIN_PER_DEPTH': 50, 'NMP_EVAL_DIV': 118, 'NMP_EVAL_MAX': 3, 'FUTILITY_MID_STEP': 157, 'PROBCUT_MARGIN': 159}
+2026-08-03 09:46:49,264 INFO     Start experiment
+2026-08-03 09:47:18,315 INFO     Experiment finished (29.050624s elapsed).
+2026-08-03 09:47:18,506 INFO     Got Elo: -0.0 +- 44.80416880286831
+2026-08-03 09:47:18,506 INFO     Estimated draw rate: 63.64%
+2026-08-03 09:47:18,506 INFO     Updating model
+2026-08-03 09:47:20,685 INFO     GP sampling finished (2.179326s)
+2026-08-03 09:47:20,697 INFO     Starting iteration 19
+2026-08-03 09:47:23,787 INFO     Current optimum:
+{'RFP_MARGIN_PER_DEPTH': 52, 'NMP_EVAL_DIV': 153, 'NMP_EVAL_MAX': 4, 'FUTILITY_MID_STEP': 173, 'PROBCUT_MARGIN': 145}
+2026-08-03 09:47:23,787 INFO     Estimated Elo: -1.9383 +- 13.7359
+2026-08-03 09:47:23,787 INFO     90.0% confidence interval of the Elo value: (-24.5318, 20.6552)
+2026-08-03 09:47:23,861 INFO     90.0% confidence intervals of the parameters:
+Parameter             Lower bound  Upper bound
+----------------------------------------------
+RFP_MARGIN_PER_DEPTH           54          154
+NMP_EVAL_DIV                   96          293
+NMP_EVAL_MAX                    2            8
+FUTILITY_MID_STEP             156          382
+PROBCUT_MARGIN                 40          149
+
+2026-08-03 09:47:23,861 INFO     Testing {'RFP_MARGIN_PER_DEPTH': 75, 'NMP_EVAL_DIV': 151, 'NMP_EVAL_MAX': 4, 'FUTILITY_MID_STEP': 212, 'PROBCUT_MARGIN': 144}
+2026-08-03 09:47:23,862 INFO     Start experiment
+2026-08-03 09:47:53,970 INFO     Experiment finished (30.108151s elapsed).
+2026-08-03 09:47:54,136 INFO     Got Elo: 33.18969402590559 +- 60.13681631705795
+2026-08-03 09:47:54,137 INFO     Estimated draw rate: 45.45%
+2026-08-03 09:47:54,137 INFO     Updating model
+2026-08-03 09:47:56,317 INFO     GP sampling finished (2.180141s)
+2026-08-03 09:47:56,329 INFO     Starting iteration 20
+2026-08-03 09:47:59,986 INFO     Current optimum:
+{'RFP_MARGIN_PER_DEPTH': 55, 'NMP_EVAL_DIV': 155, 'NMP_EVAL_MAX': 4, 'FUTILITY_MID_STEP': 176, 'PROBCUT_MARGIN': 145}
+2026-08-03 09:47:59,986 INFO     Estimated Elo: 1.283 +- 14.1444
+2026-08-03 09:47:59,986 INFO     90.0% confidence interval of the Elo value: (-21.9824, 24.5484)
+2026-08-03 09:48:00,059 INFO     90.0% confidence intervals of the parameters:
+Parameter             Lower bound  Upper bound
+----------------------------------------------
+RFP_MARGIN_PER_DEPTH           53          150
+NMP_EVAL_DIV                   81          273
+NMP_EVAL_MAX                    2            7
+FUTILITY_MID_STEP             153          375
+PROBCUT_MARGIN                 46          151
+
+2026-08-03 09:48:00,059 INFO     Testing {'RFP_MARGIN_PER_DEPTH': 64, 'NMP_EVAL_DIV': 128, 'NMP_EVAL_MAX': 7, 'FUTILITY_MID_STEP': 168, 'PROBCUT_MARGIN': 146}
+2026-08-03 09:48:00,060 INFO     Start experiment
+2026-08-03 09:48:35,001 INFO     Experiment finished (34.941691s elapsed).
+2026-08-03 09:48:35,188 INFO     Got Elo: -16.55707406328996 +- 41.61003588603535
+2026-08-03 09:48:35,188 INFO     Estimated draw rate: 59.09%
+2026-08-03 09:48:35,188 INFO     Updating model
+2026-08-03 09:48:37,381 INFO     GP sampling finished (2.193268s)
+2026-08-03 09:48:37,393 INFO     Starting iteration 21
+2026-08-03 09:48:41,077 INFO     Current optimum:
+{'RFP_MARGIN_PER_DEPTH': 54, 'NMP_EVAL_DIV': 155, 'NMP_EVAL_MAX': 4, 'FUTILITY_MID_STEP': 176, 'PROBCUT_MARGIN': 145}
+2026-08-03 09:48:41,077 INFO     Estimated Elo: 0.5494 +- 13.9319
+2026-08-03 09:48:41,077 INFO     90.0% confidence interval of the Elo value: (-22.3665, 23.4653)
+2026-08-03 09:48:41,144 INFO     90.0% confidence intervals of the parameters:
+Parameter             Lower bound  Upper bound
+----------------------------------------------
+RFP_MARGIN_PER_DEPTH           58          158
+NMP_EVAL_DIV                   92          296
+NMP_EVAL_MAX                    2            7
+FUTILITY_MID_STEP             150          370
+PROBCUT_MARGIN                 42          149
+
+2026-08-03 09:48:41,144 INFO     Testing {'RFP_MARGIN_PER_DEPTH': 69, 'NMP_EVAL_DIV': 159, 'NMP_EVAL_MAX': 4, 'FUTILITY_MID_STEP': 154, 'PROBCUT_MARGIN': 128}
+2026-08-03 09:48:41,145 INFO     Start experiment
+2026-08-03 09:49:18,124 INFO     Experiment finished (36.979464s elapsed).
+2026-08-03 09:49:18,302 INFO     Got Elo: 139.38185823684773 +- 58.947485438461555
+2026-08-03 09:49:18,303 INFO     Estimated draw rate: 45.45%
+2026-08-03 09:49:18,303 INFO     Updating model
+2026-08-03 09:49:20,472 INFO     GP sampling finished (2.168987s)
+2026-08-03 09:49:20,483 INFO     Starting iteration 22
+2026-08-03 09:49:23,948 INFO     Current optimum:
+{'RFP_MARGIN_PER_DEPTH': 64, 'NMP_EVAL_DIV': 160, 'NMP_EVAL_MAX': 4, 'FUTILITY_MID_STEP': 160, 'PROBCUT_MARGIN': 134}
+2026-08-03 09:49:23,949 INFO     Estimated Elo: 16.5833 +- 16.5225
+2026-08-03 09:49:23,949 INFO     90.0% confidence interval of the Elo value: (-10.5938, 43.7604)
+2026-08-03 09:49:24,026 INFO     90.0% confidence intervals of the parameters:
+Parameter             Lower bound  Upper bound
+----------------------------------------------
+RFP_MARGIN_PER_DEPTH           52          148
+NMP_EVAL_DIV                   82          279
+NMP_EVAL_MAX                    3            8
+FUTILITY_MID_STEP             153          376
+PROBCUT_MARGIN                 52          160
+
+2026-08-03 09:49:24,026 INFO     Testing {'RFP_MARGIN_PER_DEPTH': 78, 'NMP_EVAL_DIV': 150, 'NMP_EVAL_MAX': 4, 'FUTILITY_MID_STEP': 162, 'PROBCUT_MARGIN': 131}
+2026-08-03 09:49:24,027 INFO     Start experiment
+2026-08-03 09:49:53,708 INFO     Experiment finished (29.680993s elapsed).
+2026-08-03 09:49:53,898 INFO     Got Elo: -33.189694025905595 +- 44.10512126102692
+2026-08-03 09:49:53,898 INFO     Estimated draw rate: 63.64%
+2026-08-03 09:49:53,898 INFO     Updating model
+2026-08-03 09:49:56,127 INFO     GP sampling finished (2.228248s)
+2026-08-03 09:49:56,139 INFO     Starting iteration 23
+2026-08-03 09:49:59,992 INFO     Current optimum:
+{'RFP_MARGIN_PER_DEPTH': 59, 'NMP_EVAL_DIV': 162, 'NMP_EVAL_MAX': 4, 'FUTILITY_MID_STEP': 164, 'PROBCUT_MARGIN': 137}
+2026-08-03 09:49:59,993 INFO     Estimated Elo: 11.7225 +- 16.0403
+2026-08-03 09:49:59,993 INFO     90.0% confidence interval of the Elo value: (-14.6614, 38.1065)
+2026-08-03 09:50:00,082 INFO     90.0% confidence intervals of the parameters:
+Parameter             Lower bound  Upper bound
+----------------------------------------------
+RFP_MARGIN_PER_DEPTH           50          149
+NMP_EVAL_DIV                   99          297
+NMP_EVAL_MAX                    2            7
+FUTILITY_MID_STEP             173          400
+PROBCUT_MARGIN                 53          158
+
+2026-08-03 09:50:00,082 INFO     Testing {'RFP_MARGIN_PER_DEPTH': 64, 'NMP_EVAL_DIV': 212, 'NMP_EVAL_MAX': 5, 'FUTILITY_MID_STEP': 176, 'PROBCUT_MARGIN': 128}
+2026-08-03 09:50:00,083 INFO     Start experiment
+2026-08-03 09:50:45,417 INFO     Experiment finished (45.33418s elapsed).
+2026-08-03 09:50:45,570 INFO     Got Elo: 16.55707406329004 +- 62.781970965151224
+2026-08-03 09:50:45,570 INFO     Estimated draw rate: 40.91%
+2026-08-03 09:50:45,570 INFO     Updating model
+2026-08-03 09:50:47,723 INFO     GP sampling finished (2.152414s)
+2026-08-03 09:50:47,733 INFO     Starting iteration 24
+2026-08-03 09:50:50,872 INFO     Current optimum:
+{'RFP_MARGIN_PER_DEPTH': 59, 'NMP_EVAL_DIV': 163, 'NMP_EVAL_MAX': 4, 'FUTILITY_MID_STEP': 164, 'PROBCUT_MARGIN': 137}
+2026-08-03 09:50:50,873 INFO     Estimated Elo: 12.8362 +- 16.2452
+2026-08-03 09:50:50,873 INFO     90.0% confidence interval of the Elo value: (-13.8847, 39.5572)
+2026-08-03 09:50:51,024 INFO     90.0% confidence intervals of the parameters:
+Parameter             Lower bound  Upper bound
+----------------------------------------------
+RFP_MARGIN_PER_DEPTH           55          150
+NMP_EVAL_DIV                  104          298
+NMP_EVAL_MAX                    2            7
+FUTILITY_MID_STEP             166          386
+PROBCUT_MARGIN                 52          160
+
+2026-08-03 09:50:51,024 INFO     Testing {'RFP_MARGIN_PER_DEPTH': 54, 'NMP_EVAL_DIV': 179, 'NMP_EVAL_MAX': 4, 'FUTILITY_MID_STEP': 168, 'PROBCUT_MARGIN': 129}
+2026-08-03 09:50:51,025 INFO     Start experiment
+2026-08-03 09:51:20,976 INFO     Experiment finished (29.950689s elapsed).
+2026-08-03 09:51:21,153 INFO     Got Elo: -66.99643491750545 +- 53.787937623357486
+2026-08-03 09:51:21,154 INFO     Estimated draw rate: 36.36%
+2026-08-03 09:51:21,154 INFO     Updating model
+2026-08-03 09:51:23,340 INFO     GP sampling finished (2.185918s)
+2026-08-03 09:51:23,352 INFO     Starting iteration 25
+2026-08-03 09:51:26,488 INFO     Current optimum:
+{'RFP_MARGIN_PER_DEPTH': 61, 'NMP_EVAL_DIV': 154, 'NMP_EVAL_MAX': 4, 'FUTILITY_MID_STEP': 166, 'PROBCUT_MARGIN': 140}
+2026-08-03 09:51:26,489 INFO     Estimated Elo: 7.267 +- 16.3451
+2026-08-03 09:51:26,489 INFO     90.0% confidence interval of the Elo value: (-19.6182, 34.1523)
+2026-08-03 09:51:26,643 INFO     90.0% confidence intervals of the parameters:
+Parameter             Lower bound  Upper bound
+----------------------------------------------
+RFP_MARGIN_PER_DEPTH           51          151
+NMP_EVAL_DIV                   96          291
+NMP_EVAL_MAX                    2            7
+FUTILITY_MID_STEP             161          390
+PROBCUT_MARGIN                 40          148
+
+2026-08-03 09:51:26,643 INFO     Testing {'RFP_MARGIN_PER_DEPTH': 140, 'NMP_EVAL_DIV': 152, 'NMP_EVAL_MAX': 2, 'FUTILITY_MID_STEP': 297, 'PROBCUT_MARGIN': 132}
+2026-08-03 09:51:26,644 INFO     Start experiment
+2026-08-03 09:51:57,660 INFO     Experiment finished (31.015846s elapsed).
+2026-08-03 09:51:57,817 INFO     Got Elo: -102.10900204132241 +- 56.36259518862383
+2026-08-03 09:51:57,817 INFO     Estimated draw rate: 36.36%
+2026-08-03 09:51:57,817 INFO     Updating model
+2026-08-03 09:52:00,037 INFO     GP sampling finished (2.219749s)
+2026-08-03 09:52:00,049 INFO     Starting iteration 26
+2026-08-03 09:52:03,906 INFO     Current optimum:
+{'RFP_MARGIN_PER_DEPTH': 61, 'NMP_EVAL_DIV': 154, 'NMP_EVAL_MAX': 4, 'FUTILITY_MID_STEP': 167, 'PROBCUT_MARGIN': 140}
+2026-08-03 09:52:03,906 INFO     Estimated Elo: 5.8471 +- 16.8348
+2026-08-03 09:52:03,906 INFO     90.0% confidence interval of the Elo value: (-21.8437, 33.5379)
+2026-08-03 09:52:03,980 INFO     90.0% confidence intervals of the parameters:
+Parameter             Lower bound  Upper bound
+----------------------------------------------
+RFP_MARGIN_PER_DEPTH           51          150
+NMP_EVAL_DIV                   93          291
+NMP_EVAL_MAX                    2            7
+FUTILITY_MID_STEP             155          376
+PROBCUT_MARGIN                 51          155
+
+2026-08-03 09:52:03,980 INFO     Testing {'RFP_MARGIN_PER_DEPTH': 63, 'NMP_EVAL_DIV': 167, 'NMP_EVAL_MAX': 6, 'FUTILITY_MID_STEP': 163, 'PROBCUT_MARGIN': 148}
+2026-08-03 09:52:03,980 INFO     Start experiment
+2026-08-03 09:52:37,811 INFO     Experiment finished (33.830907s elapsed).
+2026-08-03 09:52:37,981 INFO     Got Elo: -33.189694025905595 +- 44.034457857057575
+2026-08-03 09:52:37,981 INFO     Estimated draw rate: 54.55%
+2026-08-03 09:52:37,981 INFO     Updating model
+2026-08-03 09:52:40,103 INFO     GP sampling finished (2.122045s)
+2026-08-03 09:52:40,115 INFO     Starting iteration 27
+2026-08-03 09:52:43,385 INFO     Current optimum:
+{'RFP_MARGIN_PER_DEPTH': 61, 'NMP_EVAL_DIV': 153, 'NMP_EVAL_MAX': 4, 'FUTILITY_MID_STEP': 167, 'PROBCUT_MARGIN': 139}
+2026-08-03 09:52:43,385 INFO     Estimated Elo: 4.253 +- 16.7302
+2026-08-03 09:52:43,385 INFO     90.0% confidence interval of the Elo value: (-23.2656, 31.7717)
+2026-08-03 09:52:43,462 INFO     90.0% confidence intervals of the parameters:
+Parameter             Lower bound  Upper bound
+----------------------------------------------
+RFP_MARGIN_PER_DEPTH           51          150
+NMP_EVAL_DIV                   81          280
+NMP_EVAL_MAX                    3            8
+FUTILITY_MID_STEP             151          372
+PROBCUT_MARGIN                 50          157
+
+2026-08-03 09:52:43,462 INFO     Testing {'RFP_MARGIN_PER_DEPTH': 65, 'NMP_EVAL_DIV': 158, 'NMP_EVAL_MAX': 3, 'FUTILITY_MID_STEP': 195, 'PROBCUT_MARGIN': 147}
+2026-08-03 09:52:43,462 INFO     Start experiment
+2026-08-03 09:53:15,085 INFO     Experiment finished (31.622299s elapsed).
+2026-08-03 09:53:15,264 INFO     Got Elo: -16.557074063290028 +- 53.235305151192236
+2026-08-03 09:53:15,264 INFO     Estimated draw rate: 50.00%
+2026-08-03 09:53:15,264 INFO     Updating model
+2026-08-03 09:53:17,433 INFO     GP sampling finished (2.168802s)
+2026-08-03 09:53:17,445 INFO     Starting iteration 28
+2026-08-03 09:53:20,518 INFO     Current optimum:
+{'RFP_MARGIN_PER_DEPTH': 61, 'NMP_EVAL_DIV': 152, 'NMP_EVAL_MAX': 4, 'FUTILITY_MID_STEP': 165, 'PROBCUT_MARGIN': 138}
+2026-08-03 09:53:20,518 INFO     Estimated Elo: 2.6456 +- 16.0526
+2026-08-03 09:53:20,518 INFO     90.0% confidence interval of the Elo value: (-23.7586, 29.0498)
+2026-08-03 09:53:20,588 INFO     90.0% confidence intervals of the parameters:
+Parameter             Lower bound  Upper bound
+----------------------------------------------
+RFP_MARGIN_PER_DEPTH           56          152
+NMP_EVAL_DIV                   97          297
+NMP_EVAL_MAX                    2            7
+FUTILITY_MID_STEP             165          387
+PROBCUT_MARGIN                 54          160
+
+2026-08-03 09:53:20,589 INFO     Testing {'RFP_MARGIN_PER_DEPTH': 52, 'NMP_EVAL_DIV': 137, 'NMP_EVAL_MAX': 4, 'FUTILITY_MID_STEP': 208, 'PROBCUT_MARGIN': 152}
+2026-08-03 09:53:20,589 INFO     Start experiment
+2026-08-03 09:53:54,223 INFO     Experiment finished (33.633664s elapsed).
+2026-08-03 09:53:54,414 INFO     Got Elo: -16.557074063290028 +- 47.55124375723716
+2026-08-03 09:53:54,414 INFO     Estimated draw rate: 50.00%
+2026-08-03 09:53:54,414 INFO     Updating model
+2026-08-03 09:53:56,640 INFO     GP sampling finished (2.225556s)
+2026-08-03 09:53:56,651 INFO     Starting iteration 29
+2026-08-03 09:53:59,823 INFO     Current optimum:
+{'RFP_MARGIN_PER_DEPTH': 63, 'NMP_EVAL_DIV': 155, 'NMP_EVAL_MAX': 4, 'FUTILITY_MID_STEP': 160, 'PROBCUT_MARGIN': 135}
+2026-08-03 09:53:59,823 INFO     Estimated Elo: 1.5198 +- 15.5613
+2026-08-03 09:53:59,824 INFO     90.0% confidence interval of the Elo value: (-24.0763, 27.1159)
+2026-08-03 09:53:59,931 INFO     90.0% confidence intervals of the parameters:
+Parameter             Lower bound  Upper bound
+----------------------------------------------
+RFP_MARGIN_PER_DEPTH           61          158
+NMP_EVAL_DIV                   87          286
+NMP_EVAL_MAX                    2            7
+FUTILITY_MID_STEP             163          388
+PROBCUT_MARGIN                 48          157
+
+2026-08-03 09:53:59,931 INFO     Testing {'RFP_MARGIN_PER_DEPTH': 79, 'NMP_EVAL_DIV': 184, 'NMP_EVAL_MAX': 4, 'FUTILITY_MID_STEP': 200, 'PROBCUT_MARGIN': 150}
+2026-08-03 09:53:59,932 INFO     Start experiment
+2026-08-03 09:54:26,079 INFO     Experiment finished (26.146689s elapsed).
+2026-08-03 09:54:26,265 INFO     Got Elo: 33.18969402590552 +- 49.72948535634277
+2026-08-03 09:54:26,265 INFO     Estimated draw rate: 45.45%
+2026-08-03 09:54:26,265 INFO     Updating model
+2026-08-03 09:54:28,520 INFO     GP sampling finished (2.254853s)
+2026-08-03 09:54:28,532 INFO     Starting iteration 30
+2026-08-03 09:54:32,032 INFO     Current optimum:
+{'RFP_MARGIN_PER_DEPTH': 66, 'NMP_EVAL_DIV': 160, 'NMP_EVAL_MAX': 4, 'FUTILITY_MID_STEP': 164, 'PROBCUT_MARGIN': 137}
+2026-08-03 09:54:32,032 INFO     Estimated Elo: 3.4017 +- 15.2643
+2026-08-03 09:54:32,032 INFO     90.0% confidence interval of the Elo value: (-21.7058, 28.5092)
+2026-08-03 09:54:32,168 INFO     90.0% confidence intervals of the parameters:
+Parameter             Lower bound  Upper bound
+----------------------------------------------
+RFP_MARGIN_PER_DEPTH           59          157
+NMP_EVAL_DIV                   86          284
+NMP_EVAL_MAX                    3            8
+FUTILITY_MID_STEP             159          385
+PROBCUT_MARGIN                 46          154
+
+2026-08-03 09:54:32,168 INFO     Testing {'RFP_MARGIN_PER_DEPTH': 53, 'NMP_EVAL_DIV': 111, 'NMP_EVAL_MAX': 3, 'FUTILITY_MID_STEP': 169, 'PROBCUT_MARGIN': 123}
+2026-08-03 09:54:32,169 INFO     Start experiment
+2026-08-03 09:55:10,440 INFO     Experiment finished (38.271692s elapsed).
+2026-08-03 09:55:10,605 INFO     Got Elo: -0.0 +- 55.782651606101496
+2026-08-03 09:55:10,605 INFO     Estimated draw rate: 45.45%
+2026-08-03 09:55:10,605 INFO     Updating model
+2026-08-03 09:55:12,771 INFO     GP sampling finished (2.166606s)
+2026-08-03 09:55:12,783 INFO     Starting iteration 31
+2026-08-03 09:55:15,797 INFO     Current optimum:
+{'RFP_MARGIN_PER_DEPTH': 66, 'NMP_EVAL_DIV': 160, 'NMP_EVAL_MAX': 4, 'FUTILITY_MID_STEP': 163, 'PROBCUT_MARGIN': 136}
+2026-08-03 09:55:15,797 INFO     Estimated Elo: 3.1569 +- 15.0606
+2026-08-03 09:55:15,797 INFO     90.0% confidence interval of the Elo value: (-21.6155, 27.9293)
+2026-08-03 09:55:15,891 INFO     90.0% confidence intervals of the parameters:
+Parameter             Lower bound  Upper bound
+----------------------------------------------
+RFP_MARGIN_PER_DEPTH           53          154
+NMP_EVAL_DIV                   80          276
+NMP_EVAL_MAX                    2            7
+FUTILITY_MID_STEP             151          370
+PROBCUT_MARGIN                 52          154
+
+2026-08-03 09:55:15,891 INFO     Testing {'RFP_MARGIN_PER_DEPTH': 73, 'NMP_EVAL_DIV': 204, 'NMP_EVAL_MAX': 3, 'FUTILITY_MID_STEP': 205, 'PROBCUT_MARGIN': 116}
+2026-08-03 09:55:15,892 INFO     Start experiment
+2026-08-03 09:55:50,908 INFO     Experiment finished (35.016312s elapsed).
+2026-08-03 09:55:51,076 INFO     Got Elo: -33.189694025905595 +- 55.411564341354314
+2026-08-03 09:55:51,077 INFO     Estimated draw rate: 54.55%
+2026-08-03 09:55:51,077 INFO     Updating model
+2026-08-03 09:55:53,248 INFO     GP sampling finished (2.171428s)
+2026-08-03 09:55:53,260 INFO     Starting iteration 32
+2026-08-03 09:55:56,363 INFO     Current optimum:
+{'RFP_MARGIN_PER_DEPTH': 65, 'NMP_EVAL_DIV': 157, 'NMP_EVAL_MAX': 4, 'FUTILITY_MID_STEP': 163, 'PROBCUT_MARGIN': 138}
+2026-08-03 09:55:56,363 INFO     Estimated Elo: 2.3044 +- 14.9674
+2026-08-03 09:55:56,363 INFO     90.0% confidence interval of the Elo value: (-22.3148, 26.9236)
+2026-08-03 09:55:56,472 INFO     90.0% confidence intervals of the parameters:
+Parameter             Lower bound  Upper bound
+----------------------------------------------
+RFP_MARGIN_PER_DEPTH           55          155
+NMP_EVAL_DIV                   86          281
+NMP_EVAL_MAX                    3            8
+FUTILITY_MID_STEP             152          377
+PROBCUT_MARGIN                 42          152
+
+2026-08-03 09:55:56,473 INFO     Testing {'RFP_MARGIN_PER_DEPTH': 65, 'NMP_EVAL_DIV': 160, 'NMP_EVAL_MAX': 7, 'FUTILITY_MID_STEP': 198, 'PROBCUT_MARGIN': 117}
+2026-08-03 09:55:56,473 INFO     Start experiment
+2026-08-03 09:56:24,672 INFO     Experiment finished (28.198492s elapsed).
+2026-08-03 09:56:24,812 INFO     Got Elo: -0.0 +- 65.11980342356439
+2026-08-03 09:56:24,812 INFO     Estimated draw rate: 45.45%
+2026-08-03 09:56:24,813 INFO     Updating model
+2026-08-03 09:56:27,071 INFO     GP sampling finished (2.258707s)
+2026-08-03 09:56:27,085 INFO     Starting iteration 33
+2026-08-03 09:56:30,185 INFO     Current optimum:
+{'RFP_MARGIN_PER_DEPTH': 65, 'NMP_EVAL_DIV': 157, 'NMP_EVAL_MAX': 4, 'FUTILITY_MID_STEP': 163, 'PROBCUT_MARGIN': 137}
+2026-08-03 09:56:30,185 INFO     Estimated Elo: 2.2905 +- 14.8103
+2026-08-03 09:56:30,185 INFO     90.0% confidence interval of the Elo value: (-22.0704, 26.6513)
+2026-08-03 09:56:30,247 INFO     90.0% confidence intervals of the parameters:
+Parameter             Lower bound  Upper bound
+----------------------------------------------
+RFP_MARGIN_PER_DEPTH           58          158
+NMP_EVAL_DIV                   98          292
+NMP_EVAL_MAX                    2            7
+FUTILITY_MID_STEP             151          376
+PROBCUT_MARGIN                 47          154
+
+2026-08-03 09:56:30,247 INFO     Testing {'RFP_MARGIN_PER_DEPTH': 84, 'NMP_EVAL_DIV': 215, 'NMP_EVAL_MAX': 3, 'FUTILITY_MID_STEP': 165, 'PROBCUT_MARGIN': 52}
+2026-08-03 09:56:30,247 INFO     Start experiment
+2026-08-03 09:57:01,644 INFO     Experiment finished (31.396487s elapsed).
+2026-08-03 09:57:01,824 INFO     Got Elo: -33.189694025905595 +- 50.19796009788351
+2026-08-03 09:57:01,825 INFO     Estimated draw rate: 54.55%
+2026-08-03 09:57:01,825 INFO     Updating model
+2026-08-03 09:57:04,034 INFO     GP sampling finished (2.209291s)
+2026-08-03 09:57:04,046 INFO     Starting iteration 34
+2026-08-03 09:57:07,160 INFO     Current optimum:
+{'RFP_MARGIN_PER_DEPTH': 65, 'NMP_EVAL_DIV': 157, 'NMP_EVAL_MAX': 4, 'FUTILITY_MID_STEP': 164, 'PROBCUT_MARGIN': 138}
+2026-08-03 09:57:07,160 INFO     Estimated Elo: 1.3819 +- 14.3682
+2026-08-03 09:57:07,160 INFO     90.0% confidence interval of the Elo value: (-22.2517, 25.0154)
+2026-08-03 09:57:07,239 INFO     90.0% confidence intervals of the parameters:
+Parameter             Lower bound  Upper bound
+----------------------------------------------
+RFP_MARGIN_PER_DEPTH           60          157
+NMP_EVAL_DIV                   80          278
+NMP_EVAL_MAX                    2            7
+FUTILITY_MID_STEP             151          372
+PROBCUT_MARGIN                 42          152
+
+2026-08-03 09:57:07,239 INFO     Testing {'RFP_MARGIN_PER_DEPTH': 62, 'NMP_EVAL_DIV': 145, 'NMP_EVAL_MAX': 3, 'FUTILITY_MID_STEP': 224, 'PROBCUT_MARGIN': 140}
+2026-08-03 09:57:07,239 INFO     Start experiment
+2026-08-03 09:57:38,087 INFO     Experiment finished (30.847197s elapsed).
+2026-08-03 09:57:38,263 INFO     Got Elo: -16.557074063290028 +- 47.5358363753772
+2026-08-03 09:57:38,263 INFO     Estimated draw rate: 50.00%
+2026-08-03 09:57:38,263 INFO     Updating model
+2026-08-03 09:57:40,475 INFO     GP sampling finished (2.211504s)
+2026-08-03 09:57:40,490 INFO     Starting iteration 35
+2026-08-03 09:57:43,537 INFO     Current optimum:
+{'RFP_MARGIN_PER_DEPTH': 65, 'NMP_EVAL_DIV': 157, 'NMP_EVAL_MAX': 4, 'FUTILITY_MID_STEP': 162, 'PROBCUT_MARGIN': 138}
+2026-08-03 09:57:43,537 INFO     Estimated Elo: 0.4902 +- 13.8905
+2026-08-03 09:57:43,537 INFO     90.0% confidence interval of the Elo value: (-22.3576, 23.338)
+2026-08-03 09:57:43,864 INFO     90.0% confidence intervals of the parameters:
+Parameter             Lower bound  Upper bound
+----------------------------------------------
+RFP_MARGIN_PER_DEPTH           50          147
+NMP_EVAL_DIV                  100          295
+NMP_EVAL_MAX                    2            8
+FUTILITY_MID_STEP             168          393
+PROBCUT_MARGIN                 43          149
+
+2026-08-03 09:57:43,864 INFO     Testing {'RFP_MARGIN_PER_DEPTH': 86, 'NMP_EVAL_DIV': 197, 'NMP_EVAL_MAX': 4, 'FUTILITY_MID_STEP': 246, 'PROBCUT_MARGIN': 157}
+2026-08-03 09:57:43,865 INFO     Start experiment
+2026-08-03 09:58:17,588 INFO     Experiment finished (33.722856s elapsed).
+2026-08-03 09:58:17,766 INFO     Got Elo: 16.55707406329004 +- 67.24042773289091
+2026-08-03 09:58:17,766 INFO     Estimated draw rate: 40.91%
+2026-08-03 09:58:17,766 INFO     Updating model
+2026-08-03 09:58:19,965 INFO     GP sampling finished (2.198855s)
+2026-08-03 09:58:19,977 INFO     Starting iteration 36
+2026-08-03 09:58:23,167 INFO     Current optimum:
+{'RFP_MARGIN_PER_DEPTH': 65, 'NMP_EVAL_DIV': 158, 'NMP_EVAL_MAX': 4, 'FUTILITY_MID_STEP': 163, 'PROBCUT_MARGIN': 138}
+2026-08-03 09:58:23,167 INFO     Estimated Elo: 0.8755 +- 13.8574
+2026-08-03 09:58:23,167 INFO     90.0% confidence interval of the Elo value: (-21.9179, 23.669)
+2026-08-03 09:58:23,324 INFO     90.0% confidence intervals of the parameters:
+Parameter             Lower bound  Upper bound
+----------------------------------------------
+RFP_MARGIN_PER_DEPTH           51          150
+NMP_EVAL_DIV                   82          280
+NMP_EVAL_MAX                    3            8
+FUTILITY_MID_STEP             151          374
+PROBCUT_MARGIN                 42          153
+
+2026-08-03 09:58:23,324 INFO     Testing {'RFP_MARGIN_PER_DEPTH': 103, 'NMP_EVAL_DIV': 270, 'NMP_EVAL_MAX': 4, 'FUTILITY_MID_STEP': 199, 'PROBCUT_MARGIN': 157}
+2026-08-03 09:58:23,325 INFO     Start experiment
+2026-08-03 09:58:52,643 INFO     Experiment finished (29.318529s elapsed).
+2026-08-03 09:58:52,843 INFO     Got Elo: 16.55707406329004 +- 34.772789361050236
+2026-08-03 09:58:52,843 INFO     Estimated draw rate: 59.09%
+2026-08-03 09:58:52,843 INFO     Updating model
+2026-08-03 09:58:55,082 INFO     GP sampling finished (2.239052s)
+2026-08-03 09:58:55,097 INFO     Starting iteration 37
+2026-08-03 09:58:58,653 INFO     Current optimum:
+{'RFP_MARGIN_PER_DEPTH': 65, 'NMP_EVAL_DIV': 158, 'NMP_EVAL_MAX': 4, 'FUTILITY_MID_STEP': 162, 'PROBCUT_MARGIN': 138}
+2026-08-03 09:58:58,653 INFO     Estimated Elo: 1.0765 +- 13.6917
+2026-08-03 09:58:58,653 INFO     90.0% confidence interval of the Elo value: (-21.4444, 23.5974)
+2026-08-03 09:58:58,756 INFO     90.0% confidence intervals of the parameters:
+Parameter             Lower bound  Upper bound
+----------------------------------------------
+RFP_MARGIN_PER_DEPTH           50          151
+NMP_EVAL_DIV                   98          298
+NMP_EVAL_MAX                    3            8
+FUTILITY_MID_STEP             161          377
+PROBCUT_MARGIN                 48          156
+
+2026-08-03 09:58:58,756 INFO     Testing {'RFP_MARGIN_PER_DEPTH': 72, 'NMP_EVAL_DIV': 262, 'NMP_EVAL_MAX': 4, 'FUTILITY_MID_STEP': 192, 'PROBCUT_MARGIN': 150}
+2026-08-03 09:58:58,756 INFO     Start experiment
+2026-08-03 09:59:29,557 INFO     Experiment finished (30.801236s elapsed).
+2026-08-03 09:59:29,728 INFO     Got Elo: 66.99643491750547 +- 47.63596539053793
+2026-08-03 09:59:29,728 INFO     Estimated draw rate: 45.45%
+2026-08-03 09:59:29,728 INFO     Updating model
+2026-08-03 09:59:31,996 INFO     GP sampling finished (2.267883s)
+2026-08-03 09:59:32,008 INFO     Starting iteration 38
+2026-08-03 09:59:35,410 INFO     Current optimum:
+{'RFP_MARGIN_PER_DEPTH': 76, 'NMP_EVAL_DIV': 259, 'NMP_EVAL_MAX': 4, 'FUTILITY_MID_STEP': 192, 'PROBCUT_MARGIN': 152}
+2026-08-03 09:59:35,410 INFO     Estimated Elo: 3.9503 +- 15.185
+2026-08-03 09:59:35,410 INFO     90.0% confidence interval of the Elo value: (-21.0268, 28.9274)
+2026-08-03 09:59:35,501 INFO     90.0% confidence intervals of the parameters:
+Parameter             Lower bound  Upper bound
+----------------------------------------------
+RFP_MARGIN_PER_DEPTH           51          147
+NMP_EVAL_DIV                   99          297
+NMP_EVAL_MAX                    2            7
+FUTILITY_MID_STEP             156          372
+PROBCUT_MARGIN                 50          159
+
+2026-08-03 09:59:35,501 INFO     Testing {'RFP_MARGIN_PER_DEPTH': 67, 'NMP_EVAL_DIV': 298, 'NMP_EVAL_MAX': 4, 'FUTILITY_MID_STEP': 177, 'PROBCUT_MARGIN': 154}
+2026-08-03 09:59:35,502 INFO     Start experiment
+2026-08-03 10:00:13,709 INFO     Experiment finished (38.207174s elapsed).
+2026-08-03 10:00:13,887 INFO     Got Elo: 16.55707406329004 +- 41.581893661080485
+2026-08-03 10:00:13,887 INFO     Estimated draw rate: 31.82%
+2026-08-03 10:00:13,887 INFO     Updating model
+2026-08-03 10:00:16,054 INFO     GP sampling finished (2.167227s)
+2026-08-03 10:00:16,067 INFO     Starting iteration 39
+2026-08-03 10:00:19,511 INFO     Current optimum:
+{'RFP_MARGIN_PER_DEPTH': 75, 'NMP_EVAL_DIV': 263, 'NMP_EVAL_MAX': 4, 'FUTILITY_MID_STEP': 191, 'PROBCUT_MARGIN': 152}
+2026-08-03 10:00:19,511 INFO     Estimated Elo: 4.0923 +- 13.9742
+2026-08-03 10:00:19,511 INFO     90.0% confidence interval of the Elo value: (-18.8932, 27.0778)
+2026-08-03 10:00:19,594 INFO     90.0% confidence intervals of the parameters:
+Parameter             Lower bound  Upper bound
+----------------------------------------------
+RFP_MARGIN_PER_DEPTH           59          156
+NMP_EVAL_DIV                   86          281
+NMP_EVAL_MAX                    2            7
+FUTILITY_MID_STEP             155          380
+PROBCUT_MARGIN                 50          156
+
+2026-08-03 10:00:19,594 INFO     Testing {'RFP_MARGIN_PER_DEPTH': 81, 'NMP_EVAL_DIV': 257, 'NMP_EVAL_MAX': 6, 'FUTILITY_MID_STEP': 189, 'PROBCUT_MARGIN': 148}
+2026-08-03 10:00:19,595 INFO     Start experiment
+2026-08-03 10:00:47,908 INFO     Experiment finished (28.312932s elapsed).
+2026-08-03 10:00:48,079 INFO     Got Elo: 84.3413461259573 +- 61.19557555700693
+2026-08-03 10:00:48,079 INFO     Estimated draw rate: 50.00%
+2026-08-03 10:00:48,079 INFO     Updating model
+2026-08-03 10:00:50,388 INFO     GP sampling finished (2.309358s)
+2026-08-03 10:00:50,402 INFO     Starting iteration 40
+2026-08-03 10:00:53,525 INFO     Current optimum:
+{'RFP_MARGIN_PER_DEPTH': 76, 'NMP_EVAL_DIV': 262, 'NMP_EVAL_MAX': 4, 'FUTILITY_MID_STEP': 191, 'PROBCUT_MARGIN': 151}
+2026-08-03 10:00:53,525 INFO     Estimated Elo: 7.3103 +- 13.9526
+2026-08-03 10:00:53,525 INFO     90.0% confidence interval of the Elo value: (-15.6396, 30.2603)
+2026-08-03 10:00:53,630 INFO     90.0% confidence intervals of the parameters:
+Parameter             Lower bound  Upper bound
+----------------------------------------------
+RFP_MARGIN_PER_DEPTH           54          154
+NMP_EVAL_DIV                   99          295
+NMP_EVAL_MAX                    3            8
+FUTILITY_MID_STEP             162          393
+PROBCUT_MARGIN                 52          160
+
+2026-08-03 10:00:53,630 INFO     Testing {'RFP_MARGIN_PER_DEPTH': 69, 'NMP_EVAL_DIV': 246, 'NMP_EVAL_MAX': 3, 'FUTILITY_MID_STEP': 179, 'PROBCUT_MARGIN': 120}
+2026-08-03 10:00:53,630 INFO     Start experiment
+2026-08-03 10:01:23,391 INFO     Experiment finished (29.760819s elapsed).
+2026-08-03 10:01:23,574 INFO     Got Elo: 49.975494643319955 +- 52.16994419888018
+2026-08-03 10:01:23,574 INFO     Estimated draw rate: 31.82%
+2026-08-03 10:01:23,574 INFO     Updating model
+2026-08-03 10:01:25,826 INFO     GP sampling finished (2.251595s)
+2026-08-03 10:01:25,887 INFO     Starting iteration 41
+2026-08-03 10:01:29,073 INFO     Current optimum:
+{'RFP_MARGIN_PER_DEPTH': 75, 'NMP_EVAL_DIV': 260, 'NMP_EVAL_MAX': 4, 'FUTILITY_MID_STEP': 190, 'PROBCUT_MARGIN': 149}
+2026-08-03 10:01:29,073 INFO     Estimated Elo: 9.3797 +- 13.9503
+2026-08-03 10:01:29,073 INFO     90.0% confidence interval of the Elo value: (-13.5666, 32.326)
+2026-08-03 10:01:29,131 INFO     90.0% confidence intervals of the parameters:
+Parameter             Lower bound  Upper bound
+----------------------------------------------
+RFP_MARGIN_PER_DEPTH           56          153
+NMP_EVAL_DIV                  104          299
+NMP_EVAL_MAX                    3            8
+FUTILITY_MID_STEP             152          373
+PROBCUT_MARGIN                 47          154
+
+2026-08-03 10:01:29,131 INFO     Testing {'RFP_MARGIN_PER_DEPTH': 77, 'NMP_EVAL_DIV': 262, 'NMP_EVAL_MAX': 3, 'FUTILITY_MID_STEP': 173, 'PROBCUT_MARGIN': 158}
+2026-08-03 10:01:29,132 INFO     Start experiment
+2026-08-03 10:02:00,449 INFO     Experiment finished (31.316888s elapsed).
+2026-08-03 10:02:00,627 INFO     Got Elo: 66.99643491750547 +- 53.80918764725051
+2026-08-03 10:02:00,627 INFO     Estimated draw rate: 36.36%
+2026-08-03 10:02:00,627 INFO     Updating model
+2026-08-03 10:02:02,892 INFO     GP sampling finished (2.264305s)
+2026-08-03 10:02:02,904 INFO     Starting iteration 42
+2026-08-03 10:02:05,971 INFO     Current optimum:
+{'RFP_MARGIN_PER_DEPTH': 75, 'NMP_EVAL_DIV': 261, 'NMP_EVAL_MAX': 4, 'FUTILITY_MID_STEP': 185, 'PROBCUT_MARGIN': 151}
+2026-08-03 10:02:05,971 INFO     Estimated Elo: 13.0922 +- 13.8108
+2026-08-03 10:02:05,971 INFO     90.0% confidence interval of the Elo value: (-9.6246, 35.809)
+2026-08-03 10:02:06,063 INFO     90.0% confidence intervals of the parameters:
+Parameter             Lower bound  Upper bound
+----------------------------------------------
+RFP_MARGIN_PER_DEPTH           50          146
+NMP_EVAL_DIV                  101          296
+NMP_EVAL_MAX                    2            7
+FUTILITY_MID_STEP             169          394
+PROBCUT_MARGIN                 52          154
+
+2026-08-03 10:02:06,063 INFO     Testing {'RFP_MARGIN_PER_DEPTH': 56, 'NMP_EVAL_DIV': 277, 'NMP_EVAL_MAX': 3, 'FUTILITY_MID_STEP': 182, 'PROBCUT_MARGIN': 140}
+2026-08-03 10:02:06,064 INFO     Start experiment
+2026-08-03 10:02:37,548 INFO     Experiment finished (31.484033s elapsed).
+2026-08-03 10:02:37,720 INFO     Got Elo: 102.10900204132241 +- 68.31389251398308
+2026-08-03 10:02:37,720 INFO     Estimated draw rate: 45.45%
+2026-08-03 10:02:37,720 INFO     Updating model
+2026-08-03 10:02:39,994 INFO     GP sampling finished (2.273912s)
+2026-08-03 10:02:40,007 INFO     Starting iteration 43
+2026-08-03 10:02:43,029 INFO     Current optimum:
+{'RFP_MARGIN_PER_DEPTH': 72, 'NMP_EVAL_DIV': 264, 'NMP_EVAL_MAX': 4, 'FUTILITY_MID_STEP': 184, 'PROBCUT_MARGIN': 149}
+2026-08-03 10:02:43,030 INFO     Estimated Elo: 17.1766 +- 14.1564
+2026-08-03 10:02:43,030 INFO     90.0% confidence interval of the Elo value: (-6.1086, 40.4617)
+2026-08-03 10:02:43,124 INFO     90.0% confidence intervals of the parameters:
+Parameter             Lower bound  Upper bound
+----------------------------------------------
+RFP_MARGIN_PER_DEPTH           58          155
+NMP_EVAL_DIV                   97          296
+NMP_EVAL_MAX                    2            7
+FUTILITY_MID_STEP             152          377
+PROBCUT_MARGIN                 50          159
+
+2026-08-03 10:02:43,125 INFO     Testing {'RFP_MARGIN_PER_DEPTH': 69, 'NMP_EVAL_DIV': 279, 'NMP_EVAL_MAX': 4, 'FUTILITY_MID_STEP': 166, 'PROBCUT_MARGIN': 146}
+2026-08-03 10:02:43,125 INFO     Start experiment
+2026-08-03 10:03:14,894 INFO     Experiment finished (31.768492s elapsed).
+2026-08-03 10:03:15,057 INFO     Got Elo: 66.99643491750547 +- 47.638498895017726
+2026-08-03 10:03:15,057 INFO     Estimated draw rate: 45.45%
+2026-08-03 10:03:15,057 INFO     Updating model
+2026-08-03 10:03:17,344 INFO     GP sampling finished (2.286085s)
+2026-08-03 10:03:17,356 INFO     Starting iteration 44
+2026-08-03 10:03:20,485 INFO     Current optimum:
+{'RFP_MARGIN_PER_DEPTH': 71, 'NMP_EVAL_DIV': 268, 'NMP_EVAL_MAX': 4, 'FUTILITY_MID_STEP': 179, 'PROBCUT_MARGIN': 148}
+2026-08-03 10:03:20,485 INFO     Estimated Elo: 21.2205 +- 13.573
+2026-08-03 10:03:20,485 INFO     90.0% confidence interval of the Elo value: (-1.1052, 43.5461)
+2026-08-03 10:03:20,609 INFO     90.0% confidence intervals of the parameters:
+Parameter             Lower bound  Upper bound
+----------------------------------------------
+RFP_MARGIN_PER_DEPTH           62          158
+NMP_EVAL_DIV                  107          298
+NMP_EVAL_MAX                    2            7
+FUTILITY_MID_STEP             150          366
+PROBCUT_MARGIN                 46          152
+
+2026-08-03 10:03:20,609 INFO     Testing {'RFP_MARGIN_PER_DEPTH': 61, 'NMP_EVAL_DIV': 257, 'NMP_EVAL_MAX': 3, 'FUTILITY_MID_STEP': 176, 'PROBCUT_MARGIN': 115}
+2026-08-03 10:03:20,609 INFO     Start experiment
+2026-08-03 10:03:54,913 INFO     Experiment finished (34.304107s elapsed).
+2026-08-03 10:03:55,077 INFO     Got Elo: 66.99643491750547 +- 53.82929076485411
+2026-08-03 10:03:55,077 INFO     Estimated draw rate: 45.45%
+2026-08-03 10:03:55,077 INFO     Updating model
+2026-08-03 10:03:57,295 INFO     GP sampling finished (2.217507s)
+2026-08-03 10:03:57,308 INFO     Starting iteration 45
+2026-08-03 10:04:00,097 INFO     Current optimum:
+{'RFP_MARGIN_PER_DEPTH': 69, 'NMP_EVAL_DIV': 268, 'NMP_EVAL_MAX': 4, 'FUTILITY_MID_STEP': 178, 'PROBCUT_MARGIN': 145}
+2026-08-03 10:04:00,097 INFO     Estimated Elo: 22.8609 +- 13.4447
+2026-08-03 10:04:00,097 INFO     90.0% confidence interval of the Elo value: (0.7464, 44.9755)
+2026-08-03 10:04:00,175 INFO     90.0% confidence intervals of the parameters:
+Parameter             Lower bound  Upper bound
+----------------------------------------------
+RFP_MARGIN_PER_DEPTH           50          146
+NMP_EVAL_DIV                   96          296
+NMP_EVAL_MAX                    2            7
+FUTILITY_MID_STEP             150          380
+PROBCUT_MARGIN                 51          159
+
+2026-08-03 10:04:00,175 INFO     Testing {'RFP_MARGIN_PER_DEPTH': 85, 'NMP_EVAL_DIV': 253, 'NMP_EVAL_MAX': 3, 'FUTILITY_MID_STEP': 154, 'PROBCUT_MARGIN': 139}
+2026-08-03 10:04:00,175 INFO     Start experiment
+2026-08-03 10:04:31,198 INFO     Experiment finished (31.022917s elapsed).
+2026-08-03 10:04:31,370 INFO     Got Elo: -0.0 +- 55.74547644666041
+2026-08-03 10:04:31,370 INFO     Estimated draw rate: 36.36%
+2026-08-03 10:04:31,370 INFO     Updating model
+2026-08-03 10:04:33,617 INFO     GP sampling finished (2.246904s)
+2026-08-03 10:04:33,682 INFO     Starting iteration 46
+2026-08-03 10:04:36,657 INFO     Current optimum:
+{'RFP_MARGIN_PER_DEPTH': 69, 'NMP_EVAL_DIV': 268, 'NMP_EVAL_MAX': 4, 'FUTILITY_MID_STEP': 179, 'PROBCUT_MARGIN': 145}
+2026-08-03 10:04:36,657 INFO     Estimated Elo: 21.8522 +- 13.1755
+2026-08-03 10:04:36,657 INFO     90.0% confidence interval of the Elo value: (0.1804, 43.5239)
+2026-08-03 10:04:36,825 INFO     90.0% confidence intervals of the parameters:
+Parameter             Lower bound  Upper bound
+----------------------------------------------
+RFP_MARGIN_PER_DEPTH           52          150
+NMP_EVAL_DIV                  105          299
+NMP_EVAL_MAX                    2            7
+FUTILITY_MID_STEP             150          374
+PROBCUT_MARGIN                 49          158
+
+2026-08-03 10:04:36,825 INFO     Testing {'RFP_MARGIN_PER_DEPTH': 66, 'NMP_EVAL_DIV': 252, 'NMP_EVAL_MAX': 4, 'FUTILITY_MID_STEP': 178, 'PROBCUT_MARGIN': 149}
+2026-08-03 10:04:36,825 INFO     Start experiment
+2026-08-03 10:05:08,516 INFO     Experiment finished (31.690179s elapsed).
+2026-08-03 10:05:08,696 INFO     Got Elo: -16.557074063290028 +- 58.087166673079714
+2026-08-03 10:05:08,696 INFO     Estimated draw rate: 50.00%
+2026-08-03 10:05:08,696 INFO     Updating model
+2026-08-03 10:05:10,971 INFO     GP sampling finished (2.275011s)
+2026-08-03 10:05:10,985 INFO     Starting iteration 47
+2026-08-03 10:05:13,751 INFO     Current optimum:
+{'RFP_MARGIN_PER_DEPTH': 69, 'NMP_EVAL_DIV': 271, 'NMP_EVAL_MAX': 4, 'FUTILITY_MID_STEP': 179, 'PROBCUT_MARGIN': 145}
+2026-08-03 10:05:13,751 INFO     Estimated Elo: 19.5191 +- 12.6513
+2026-08-03 10:05:13,751 INFO     90.0% confidence interval of the Elo value: (-1.2904, 40.3287)
+2026-08-03 10:05:13,828 INFO     90.0% confidence intervals of the parameters:
+Parameter             Lower bound  Upper bound
+----------------------------------------------
+RFP_MARGIN_PER_DEPTH           50          148
+NMP_EVAL_DIV                  101          299
+NMP_EVAL_MAX                    2            7
+FUTILITY_MID_STEP             164          388
+PROBCUT_MARGIN                 42          147
+
+2026-08-03 10:05:13,828 INFO     Testing {'RFP_MARGIN_PER_DEPTH': 57, 'NMP_EVAL_DIV': 253, 'NMP_EVAL_MAX': 3, 'FUTILITY_MID_STEP': 184, 'PROBCUT_MARGIN': 153}
+2026-08-03 10:05:13,829 INFO     Start experiment
+2026-08-03 10:05:49,557 INFO     Experiment finished (35.728524s elapsed).
+2026-08-03 10:05:49,728 INFO     Got Elo: 49.975494643319955 +- 52.19382373588817
+2026-08-03 10:05:49,728 INFO     Estimated draw rate: 50.00%
+2026-08-03 10:05:49,728 INFO     Updating model
+2026-08-03 10:05:51,956 INFO     GP sampling finished (2.227883s)
+2026-08-03 10:05:51,969 INFO     Starting iteration 48
+2026-08-03 10:05:54,827 INFO     Current optimum:
+{'RFP_MARGIN_PER_DEPTH': 67, 'NMP_EVAL_DIV': 269, 'NMP_EVAL_MAX': 4, 'FUTILITY_MID_STEP': 180, 'PROBCUT_MARGIN': 145}
+2026-08-03 10:05:54,827 INFO     Estimated Elo: 21.4123 +- 12.6329
+2026-08-03 10:05:54,827 INFO     90.0% confidence interval of the Elo value: (0.6331, 42.1916)
+2026-08-03 10:05:54,948 INFO     90.0% confidence intervals of the parameters:
+Parameter             Lower bound  Upper bound
+----------------------------------------------
+RFP_MARGIN_PER_DEPTH           54          149
+NMP_EVAL_DIV                  100          299
+NMP_EVAL_MAX                    3            8
+FUTILITY_MID_STEP             156          372
+PROBCUT_MARGIN                 54          159
+
+2026-08-03 10:05:54,948 INFO     Testing {'RFP_MARGIN_PER_DEPTH': 71, 'NMP_EVAL_DIV': 225, 'NMP_EVAL_MAX': 4, 'FUTILITY_MID_STEP': 228, 'PROBCUT_MARGIN': 144}
+2026-08-03 10:05:54,948 INFO     Start experiment
+2026-08-03 10:06:32,857 INFO     Experiment finished (37.908981s elapsed).
+2026-08-03 10:06:33,034 INFO     Got Elo: -16.557074063290028 +- 52.938587794384105
+2026-08-03 10:06:33,035 INFO     Estimated draw rate: 40.91%
+2026-08-03 10:06:33,035 INFO     Updating model
+2026-08-03 10:06:35,280 INFO     GP sampling finished (2.244966s)
+2026-08-03 10:06:35,295 INFO     Starting iteration 49
+2026-08-03 10:06:38,104 INFO     Current optimum:
+{'RFP_MARGIN_PER_DEPTH': 67, 'NMP_EVAL_DIV': 270, 'NMP_EVAL_MAX': 3, 'FUTILITY_MID_STEP': 178, 'PROBCUT_MARGIN': 145}
+2026-08-03 10:06:38,105 INFO     Estimated Elo: 20.089 +- 12.5557
+2026-08-03 10:06:38,105 INFO     90.0% confidence interval of the Elo value: (-0.5632, 40.7412)
+2026-08-03 10:06:38,209 INFO     90.0% confidence intervals of the parameters:
+Parameter             Lower bound  Upper bound
+----------------------------------------------
+RFP_MARGIN_PER_DEPTH           50          148
+NMP_EVAL_DIV                  107          298
+NMP_EVAL_MAX                    3            8
+FUTILITY_MID_STEP             151          377
+PROBCUT_MARGIN                 55          159
+
+2026-08-03 10:06:38,209 INFO     Testing {'RFP_MARGIN_PER_DEPTH': 94, 'NMP_EVAL_DIV': 284, 'NMP_EVAL_MAX': 3, 'FUTILITY_MID_STEP': 228, 'PROBCUT_MARGIN': 130}
+2026-08-03 10:06:38,209 INFO     Start experiment
+2026-08-03 10:07:06,494 INFO     Experiment finished (28.284839s elapsed).
+2026-08-03 10:07:06,665 INFO     Got Elo: 49.975494643319955 +- 52.22492011084549
+2026-08-03 10:07:06,665 INFO     Estimated draw rate: 59.09%
+2026-08-03 10:07:06,665 INFO     Updating model
+2026-08-03 10:07:08,921 INFO     GP sampling finished (2.255762s)
+2026-08-03 10:07:08,939 INFO     Starting iteration 50
+2026-08-03 10:07:11,835 INFO     Current optimum:
+{'RFP_MARGIN_PER_DEPTH': 68, 'NMP_EVAL_DIV': 271, 'NMP_EVAL_MAX': 3, 'FUTILITY_MID_STEP': 180, 'PROBCUT_MARGIN': 144}
+2026-08-03 10:07:11,835 INFO     Estimated Elo: 20.4591 +- 12.1518
+2026-08-03 10:07:11,835 INFO     90.0% confidence interval of the Elo value: (0.4712, 40.4471)
+2026-08-03 10:07:11,926 INFO     90.0% confidence intervals of the parameters:
+Parameter             Lower bound  Upper bound
+----------------------------------------------
+RFP_MARGIN_PER_DEPTH           58          157
+NMP_EVAL_DIV                  105          299
+NMP_EVAL_MAX                    2            7
+FUTILITY_MID_STEP             150          376
+PROBCUT_MARGIN                 54          159
+
+2026-08-03 10:07:11,926 INFO     Testing {'RFP_MARGIN_PER_DEPTH': 73, 'NMP_EVAL_DIV': 276, 'NMP_EVAL_MAX': 2, 'FUTILITY_MID_STEP': 214, 'PROBCUT_MARGIN': 138}
+2026-08-03 10:07:11,926 INFO     Start experiment
+2026-08-03 10:07:42,527 INFO     Experiment finished (30.600018s elapsed).
+2026-08-03 10:07:42,702 INFO     Got Elo: 49.975494643319976 +- 62.591760075532434
+2026-08-03 10:07:42,703 INFO     Estimated draw rate: 31.82%
+2026-08-03 10:07:42,703 INFO     Updating model
+2026-08-03 10:07:44,981 INFO     GP sampling finished (2.278273s)
+2026-08-03 10:07:44,997 INFO     Starting iteration 51
+2026-08-03 10:07:47,614 INFO     Current optimum:
+{'RFP_MARGIN_PER_DEPTH': 68, 'NMP_EVAL_DIV': 271, 'NMP_EVAL_MAX': 3, 'FUTILITY_MID_STEP': 182, 'PROBCUT_MARGIN': 144}
+2026-08-03 10:07:47,614 INFO     Estimated Elo: 20.9558 +- 11.837
+2026-08-03 10:07:47,614 INFO     90.0% confidence interval of the Elo value: (1.4857, 40.4258)
+2026-08-03 10:07:47,692 INFO     90.0% confidence intervals of the parameters:
+Parameter             Lower bound  Upper bound
+----------------------------------------------
+RFP_MARGIN_PER_DEPTH           51          150
+NMP_EVAL_DIV                  110          299
+NMP_EVAL_MAX                    3            8
+FUTILITY_MID_STEP             154          386
+PROBCUT_MARGIN                 42          151
+
+2026-08-03 10:07:47,692 INFO     Testing {'RFP_MARGIN_PER_DEPTH': 52, 'NMP_EVAL_DIV': 278, 'NMP_EVAL_MAX': 4, 'FUTILITY_MID_STEP': 162, 'PROBCUT_MARGIN': 139}
+2026-08-03 10:07:47,692 INFO     Start experiment
+2026-08-03 10:08:18,822 INFO     Experiment finished (31.129636s elapsed).
+2026-08-03 10:08:19,009 INFO     Got Elo: -16.557074063290028 +- 47.523365899180696
+2026-08-03 10:08:19,009 INFO     Estimated draw rate: 50.00%
+2026-08-03 10:08:19,010 INFO     Updating model
+2026-08-03 10:08:21,259 INFO     GP sampling finished (2.249437s)
+2026-08-03 10:08:21,325 INFO     Starting iteration 52
+2026-08-03 10:08:24,030 INFO     Current optimum:
+{'RFP_MARGIN_PER_DEPTH': 70, 'NMP_EVAL_DIV': 270, 'NMP_EVAL_MAX': 3, 'FUTILITY_MID_STEP': 183, 'PROBCUT_MARGIN': 145}
+2026-08-03 10:08:24,030 INFO     Estimated Elo: 19.2422 +- 11.566
+2026-08-03 10:08:24,030 INFO     90.0% confidence interval of the Elo value: (0.2178, 38.2666)
+2026-08-03 10:08:24,107 INFO     90.0% confidence intervals of the parameters:
+Parameter             Lower bound  Upper bound
+----------------------------------------------
+RFP_MARGIN_PER_DEPTH           59          158
+NMP_EVAL_DIV                   95          288
+NMP_EVAL_MAX                    3            8
+FUTILITY_MID_STEP             151          368
+PROBCUT_MARGIN                 52          158
+
+2026-08-03 10:08:24,107 INFO     Testing {'RFP_MARGIN_PER_DEPTH': 74, 'NMP_EVAL_DIV': 264, 'NMP_EVAL_MAX': 4, 'FUTILITY_MID_STEP': 170, 'PROBCUT_MARGIN': 156}
+2026-08-03 10:08:24,107 INFO     Start experiment
+2026-08-03 10:08:51,444 INFO     Experiment finished (27.336812s elapsed).
+2026-08-03 10:08:51,595 INFO     Got Elo: 66.99643491750547 +- 59.602364608444155
+2026-08-03 10:08:51,595 INFO     Estimated draw rate: 45.45%
+2026-08-03 10:08:51,595 INFO     Updating model
+2026-08-03 10:08:53,875 INFO     GP sampling finished (2.28005s)
+2026-08-03 10:08:53,889 INFO     Starting iteration 53
+2026-08-03 10:08:56,833 INFO     Current optimum:
+{'RFP_MARGIN_PER_DEPTH': 71, 'NMP_EVAL_DIV': 270, 'NMP_EVAL_MAX': 3, 'FUTILITY_MID_STEP': 181, 'PROBCUT_MARGIN': 147}
+2026-08-03 10:08:56,833 INFO     Estimated Elo: 20.8581 +- 11.362
+2026-08-03 10:08:56,833 INFO     90.0% confidence interval of the Elo value: (2.1693, 39.5469)
+2026-08-03 10:08:56,914 INFO     90.0% confidence intervals of the parameters:
+Parameter             Lower bound  Upper bound
+----------------------------------------------
+RFP_MARGIN_PER_DEPTH           56          154
+NMP_EVAL_DIV                  100          294
+NMP_EVAL_MAX                    3            8
+FUTILITY_MID_STEP             151          365
+PROBCUT_MARGIN                 42          152
+
+2026-08-03 10:08:56,914 INFO     Testing {'RFP_MARGIN_PER_DEPTH': 68, 'NMP_EVAL_DIV': 263, 'NMP_EVAL_MAX': 4, 'FUTILITY_MID_STEP': 159, 'PROBCUT_MARGIN': 153}
+2026-08-03 10:08:56,914 INFO     Start experiment
+2026-08-03 10:09:35,609 INFO     Experiment finished (38.694022s elapsed).
+2026-08-03 10:09:35,792 INFO     Got Elo: -33.189694025905595 +- 44.048594607200506
+2026-08-03 10:09:35,792 INFO     Estimated draw rate: 45.45%
+2026-08-03 10:09:35,792 INFO     Updating model
+2026-08-03 10:09:38,028 INFO     GP sampling finished (2.236065s)
+2026-08-03 10:09:38,042 INFO     Starting iteration 54
+2026-08-03 10:09:40,864 INFO     Current optimum:
+{'RFP_MARGIN_PER_DEPTH': 71, 'NMP_EVAL_DIV': 271, 'NMP_EVAL_MAX': 3, 'FUTILITY_MID_STEP': 187, 'PROBCUT_MARGIN': 144}
+2026-08-03 10:09:40,864 INFO     Estimated Elo: 18.3168 +- 11.2917
+2026-08-03 10:09:40,864 INFO     90.0% confidence interval of the Elo value: (-0.2563, 36.89)
+2026-08-03 10:09:40,967 INFO     90.0% confidence intervals of the parameters:
+Parameter             Lower bound  Upper bound
+----------------------------------------------
+RFP_MARGIN_PER_DEPTH           50          149
+NMP_EVAL_DIV                  109          299
+NMP_EVAL_MAX                    2            8
+FUTILITY_MID_STEP             151          373
+PROBCUT_MARGIN                 41          148
+
+2026-08-03 10:09:40,967 INFO     Testing {'RFP_MARGIN_PER_DEPTH': 71, 'NMP_EVAL_DIV': 252, 'NMP_EVAL_MAX': 4, 'FUTILITY_MID_STEP': 166, 'PROBCUT_MARGIN': 124}
+2026-08-03 10:09:40,968 INFO     Start experiment
+2026-08-03 10:10:16,494 INFO     Experiment finished (35.525776s elapsed).
+2026-08-03 10:10:16,663 INFO     Got Elo: -16.557074063290028 +- 53.162399819902184
+2026-08-03 10:10:16,663 INFO     Estimated draw rate: 40.91%
+2026-08-03 10:10:16,663 INFO     Updating model
+2026-08-03 10:10:18,923 INFO     GP sampling finished (2.260542s)
+2026-08-03 10:10:18,942 INFO     Starting iteration 55
+2026-08-03 10:10:21,631 INFO     Current optimum:
+{'RFP_MARGIN_PER_DEPTH': 71, 'NMP_EVAL_DIV': 271, 'NMP_EVAL_MAX': 3, 'FUTILITY_MID_STEP': 188, 'PROBCUT_MARGIN': 146}
+2026-08-03 10:10:21,631 INFO     Estimated Elo: 16.6262 +- 10.7248
+2026-08-03 10:10:21,631 INFO     90.0% confidence interval of the Elo value: (-1.0144, 34.2669)
+2026-08-03 10:10:21,696 INFO     90.0% confidence intervals of the parameters:
+Parameter             Lower bound  Upper bound
+----------------------------------------------
+RFP_MARGIN_PER_DEPTH           63          159
+NMP_EVAL_DIV                  104          295
+NMP_EVAL_MAX                    3            8
+FUTILITY_MID_STEP             150          374
+PROBCUT_MARGIN                 48          154
+
+2026-08-03 10:10:21,697 INFO     Testing {'RFP_MARGIN_PER_DEPTH': 57, 'NMP_EVAL_DIV': 248, 'NMP_EVAL_MAX': 3, 'FUTILITY_MID_STEP': 186, 'PROBCUT_MARGIN': 139}
+2026-08-03 10:10:21,697 INFO     Start experiment
+2026-08-03 10:10:49,737 INFO     Experiment finished (28.039671s elapsed).
+2026-08-03 10:10:49,899 INFO     Got Elo: -33.18969402590553 +- 59.695904965607596
+2026-08-03 10:10:49,899 INFO     Estimated draw rate: 45.45%
+2026-08-03 10:10:49,899 INFO     Updating model
+2026-08-03 10:10:52,257 INFO     GP sampling finished (2.357973s)
+2026-08-03 10:10:52,272 INFO     Starting iteration 56
+2026-08-03 10:10:55,299 INFO     Current optimum:
+{'RFP_MARGIN_PER_DEPTH': 73, 'NMP_EVAL_DIV': 273, 'NMP_EVAL_MAX': 3, 'FUTILITY_MID_STEP': 187, 'PROBCUT_MARGIN': 147}
+2026-08-03 10:10:55,299 INFO     Estimated Elo: 15.037 +- 10.3969
+2026-08-03 10:10:55,299 INFO     90.0% confidence interval of the Elo value: (-2.0644, 32.1384)
+2026-08-03 10:10:55,397 INFO     90.0% confidence intervals of the parameters:
+Parameter             Lower bound  Upper bound
+----------------------------------------------
+RFP_MARGIN_PER_DEPTH           58          154
+NMP_EVAL_DIV                  105          300
+NMP_EVAL_MAX                    2            8
+FUTILITY_MID_STEP             152          372
+PROBCUT_MARGIN                 52          157
+
+2026-08-03 10:10:55,397 INFO     Testing {'RFP_MARGIN_PER_DEPTH': 85, 'NMP_EVAL_DIV': 262, 'NMP_EVAL_MAX': 2, 'FUTILITY_MID_STEP': 182, 'PROBCUT_MARGIN': 148}
+2026-08-03 10:10:55,397 INFO     Start experiment
+2026-08-03 10:11:23,545 INFO     Experiment finished (28.147475s elapsed).
+2026-08-03 10:11:23,733 INFO     Got Elo: -7.714619732426294e-14 +- 69.23231106660525
+2026-08-03 10:11:23,733 INFO     Estimated draw rate: 36.36%
+2026-08-03 10:11:23,733 INFO     Updating model
+2026-08-03 10:11:26,025 INFO     GP sampling finished (2.292383s)
+2026-08-03 10:11:26,040 INFO     Starting iteration 57
+2026-08-03 10:11:28,634 INFO     Current optimum:
+{'RFP_MARGIN_PER_DEPTH': 73, 'NMP_EVAL_DIV': 273, 'NMP_EVAL_MAX': 3, 'FUTILITY_MID_STEP': 187, 'PROBCUT_MARGIN': 147}
+2026-08-03 10:11:28,634 INFO     Estimated Elo: 14.3173 +- 10.0274
+2026-08-03 10:11:28,634 INFO     90.0% confidence interval of the Elo value: (-2.1762, 30.8109)
+2026-08-03 10:11:28,733 INFO     90.0% confidence intervals of the parameters:
+Parameter             Lower bound  Upper bound
+----------------------------------------------
+RFP_MARGIN_PER_DEPTH           64          158
+NMP_EVAL_DIV                   85          288
+NMP_EVAL_MAX                    2            7
+FUTILITY_MID_STEP             173          394
+PROBCUT_MARGIN                 50          158
+
+2026-08-03 10:11:28,733 INFO     Testing {'RFP_MARGIN_PER_DEPTH': 61, 'NMP_EVAL_DIV': 293, 'NMP_EVAL_MAX': 2, 'FUTILITY_MID_STEP': 191, 'PROBCUT_MARGIN': 134}
+2026-08-03 10:11:28,733 INFO     Start experiment
+2026-08-03 10:11:59,483 INFO     Experiment finished (30.749078s elapsed).
+2026-08-03 10:11:59,641 INFO     Got Elo: -102.10900204132246 +- 62.50592659760142
+2026-08-03 10:11:59,641 INFO     Estimated draw rate: 36.36%
+2026-08-03 10:11:59,641 INFO     Updating model
+2026-08-03 10:12:01,891 INFO     GP sampling finished (2.249455s)
+2026-08-03 10:12:01,906 INFO     Starting iteration 58
+2026-08-03 10:12:04,903 INFO     Current optimum:
+{'RFP_MARGIN_PER_DEPTH': 75, 'NMP_EVAL_DIV': 270, 'NMP_EVAL_MAX': 4, 'FUTILITY_MID_STEP': 186, 'PROBCUT_MARGIN': 150}
+2026-08-03 10:12:04,903 INFO     Estimated Elo: 12.4997 +- 9.9226
+2026-08-03 10:12:04,903 INFO     90.0% confidence interval of the Elo value: (-3.8215, 28.8208)
+2026-08-03 10:12:04,970 INFO     90.0% confidence intervals of the parameters:
+Parameter             Lower bound  Upper bound
+----------------------------------------------
+RFP_MARGIN_PER_DEPTH           56          156
+NMP_EVAL_DIV                  103          298
+NMP_EVAL_MAX                    3            8
+FUTILITY_MID_STEP             151          377
+PROBCUT_MARGIN                 40          149
+
+2026-08-03 10:12:04,970 INFO     Testing {'RFP_MARGIN_PER_DEPTH': 91, 'NMP_EVAL_DIV': 286, 'NMP_EVAL_MAX': 3, 'FUTILITY_MID_STEP': 183, 'PROBCUT_MARGIN': 141}
+2026-08-03 10:12:04,971 INFO     Start experiment
+2026-08-03 10:12:38,188 INFO     Experiment finished (33.217165s elapsed).
+2026-08-03 10:12:38,353 INFO     Got Elo: -49.97549464331997 +- 71.1837570413958
+2026-08-03 10:12:38,353 INFO     Estimated draw rate: 31.82%
+2026-08-03 10:12:38,353 INFO     Updating model
+2026-08-03 10:12:40,601 INFO     GP sampling finished (2.247471s)
+2026-08-03 10:12:40,615 INFO     Starting iteration 59
+2026-08-03 10:12:43,890 INFO     Current optimum:
+{'RFP_MARGIN_PER_DEPTH': 73, 'NMP_EVAL_DIV': 268, 'NMP_EVAL_MAX': 4, 'FUTILITY_MID_STEP': 186, 'PROBCUT_MARGIN': 150}
+2026-08-03 10:12:43,890 INFO     Estimated Elo: 10.6113 +- 9.3777
+2026-08-03 10:12:43,890 INFO     90.0% confidence interval of the Elo value: (-4.8136, 26.0362)
+2026-08-03 10:12:43,969 INFO     90.0% confidence intervals of the parameters:
+Parameter             Lower bound  Upper bound
+----------------------------------------------
+RFP_MARGIN_PER_DEPTH           54          150
+NMP_EVAL_DIV                  102          297
+NMP_EVAL_MAX                    3            8
+FUTILITY_MID_STEP             152          374
+PROBCUT_MARGIN                 42          150
+
+2026-08-03 10:12:43,969 INFO     Testing {'RFP_MARGIN_PER_DEPTH': 86, 'NMP_EVAL_DIV': 229, 'NMP_EVAL_MAX': 3, 'FUTILITY_MID_STEP': 169, 'PROBCUT_MARGIN': 141}
+2026-08-03 10:12:43,969 INFO     Start experiment
+2026-08-03 10:13:13,663 INFO     Experiment finished (29.693921s elapsed).
+2026-08-03 10:13:13,815 INFO     Got Elo: 66.99643491750547 +- 59.54106719007163
+2026-08-03 10:13:13,815 INFO     Estimated draw rate: 36.36%
+2026-08-03 10:13:13,815 INFO     Updating model
+2026-08-03 10:13:16,091 INFO     GP sampling finished (2.276359s)
+2026-08-03 10:13:16,155 INFO     Starting iteration 60
+2026-08-03 10:13:19,401 INFO     Current optimum:
+{'RFP_MARGIN_PER_DEPTH': 74, 'NMP_EVAL_DIV': 265, 'NMP_EVAL_MAX': 4, 'FUTILITY_MID_STEP': 185, 'PROBCUT_MARGIN': 150}
+2026-08-03 10:13:19,402 INFO     Estimated Elo: 11.2376 +- 9.0057
+2026-08-03 10:13:19,402 INFO     90.0% confidence interval of the Elo value: (-3.5755, 26.0506)
+2026-08-03 10:13:19,468 INFO     90.0% confidence intervals of the parameters:
+Parameter             Lower bound  Upper bound
+----------------------------------------------
+RFP_MARGIN_PER_DEPTH           51          148
+NMP_EVAL_DIV                   88          285
+NMP_EVAL_MAX                    2            7
+FUTILITY_MID_STEP             150          376
+PROBCUT_MARGIN                 54          159
+
+2026-08-03 10:13:19,468 INFO     Testing {'RFP_MARGIN_PER_DEPTH': 96, 'NMP_EVAL_DIV': 222, 'NMP_EVAL_MAX': 3, 'FUTILITY_MID_STEP': 207, 'PROBCUT_MARGIN': 132}
+2026-08-03 10:13:19,469 INFO     Start experiment
+2026-08-03 10:13:51,452 INFO     Experiment finished (31.983172s elapsed).
+2026-08-03 10:13:51,638 INFO     Got Elo: -0.0 +- 55.950433305415345
+2026-08-03 10:13:51,638 INFO     Estimated draw rate: 36.36%
+2026-08-03 10:13:51,638 INFO     Updating model
+2026-08-03 10:13:53,933 INFO     GP sampling finished (2.295265s)
+2026-08-03 10:13:53,948 INFO     Starting iteration 61
+2026-08-03 10:13:56,820 INFO     Current optimum:
+{'RFP_MARGIN_PER_DEPTH': 74, 'NMP_EVAL_DIV': 266, 'NMP_EVAL_MAX': 4, 'FUTILITY_MID_STEP': 185, 'PROBCUT_MARGIN': 150}
+2026-08-03 10:13:56,820 INFO     Estimated Elo: 11.5909 +- 9.268
+2026-08-03 10:13:56,820 INFO     90.0% confidence interval of the Elo value: (-3.6537, 26.8354)
+2026-08-03 10:13:56,915 INFO     90.0% confidence intervals of the parameters:
+Parameter             Lower bound  Upper bound
+----------------------------------------------
+RFP_MARGIN_PER_DEPTH           62          159
+NMP_EVAL_DIV                  100          292
+NMP_EVAL_MAX                    3            8
+FUTILITY_MID_STEP             181          400
+PROBCUT_MARGIN                 40          146
+
+2026-08-03 10:13:56,915 INFO     Testing {'RFP_MARGIN_PER_DEPTH': 83, 'NMP_EVAL_DIV': 285, 'NMP_EVAL_MAX': 5, 'FUTILITY_MID_STEP': 184, 'PROBCUT_MARGIN': 156}
+2026-08-03 10:13:56,916 INFO     Start experiment
+2026-08-03 10:14:31,808 INFO     Experiment finished (34.892503s elapsed).
+2026-08-03 10:14:31,978 INFO     Got Elo: 33.18969402590559 +- 50.233620069739345
+2026-08-03 10:14:31,978 INFO     Estimated draw rate: 45.45%
+2026-08-03 10:14:31,978 INFO     Updating model
+2026-08-03 10:14:34,198 INFO     GP sampling finished (2.219776s)
+2026-08-03 10:14:34,212 INFO     Starting iteration 62
+2026-08-03 10:14:37,403 INFO     Current optimum:
+{'RFP_MARGIN_PER_DEPTH': 75, 'NMP_EVAL_DIV': 267, 'NMP_EVAL_MAX': 4, 'FUTILITY_MID_STEP': 185, 'PROBCUT_MARGIN': 150}
+2026-08-03 10:14:37,403 INFO     Estimated Elo: 12.7174 +- 9.5841
+2026-08-03 10:14:37,403 INFO     90.0% confidence interval of the Elo value: (-3.047, 28.4818)
+2026-08-03 10:14:37,469 INFO     90.0% confidence intervals of the parameters:
+Parameter             Lower bound  Upper bound
+----------------------------------------------
+RFP_MARGIN_PER_DEPTH           52          150
+NMP_EVAL_DIV                  100          297
+NMP_EVAL_MAX                    3            8
+FUTILITY_MID_STEP             164          391
+PROBCUT_MARGIN                 53          159
+
+2026-08-03 10:14:37,470 INFO     Testing {'RFP_MARGIN_PER_DEPTH': 104, 'NMP_EVAL_DIV': 284, 'NMP_EVAL_MAX': 4, 'FUTILITY_MID_STEP': 193, 'PROBCUT_MARGIN': 152}
+2026-08-03 10:14:37,470 INFO     Start experiment
+2026-08-03 10:15:10,487 INFO     Experiment finished (33.016632s elapsed).
+2026-08-03 10:15:10,656 INFO     Got Elo: -84.3413461259573 +- 65.8248882209435
+2026-08-03 10:15:10,657 INFO     Estimated draw rate: 40.91%
+2026-08-03 10:15:10,657 INFO     Updating model
+2026-08-03 10:15:12,913 INFO     GP sampling finished (2.256507s)
+2026-08-03 10:15:12,927 INFO     Starting iteration 63
+2026-08-03 10:15:15,896 INFO     Current optimum:
+{'RFP_MARGIN_PER_DEPTH': 73, 'NMP_EVAL_DIV': 266, 'NMP_EVAL_MAX': 4, 'FUTILITY_MID_STEP': 184, 'PROBCUT_MARGIN': 150}
+2026-08-03 10:15:15,896 INFO     Estimated Elo: 11.4392 +- 9.6778
+2026-08-03 10:15:15,896 INFO     90.0% confidence interval of the Elo value: (-4.4793, 27.3578)
+2026-08-03 10:15:15,980 INFO     90.0% confidence intervals of the parameters:
+Parameter             Lower bound  Upper bound
+----------------------------------------------
+RFP_MARGIN_PER_DEPTH           58          158
+NMP_EVAL_DIV                   95          294
+NMP_EVAL_MAX                    3            8
+FUTILITY_MID_STEP             171          384
+PROBCUT_MARGIN                 47          154
+
+2026-08-03 10:15:15,980 INFO     Testing {'RFP_MARGIN_PER_DEPTH': 71, 'NMP_EVAL_DIV': 264, 'NMP_EVAL_MAX': 5, 'FUTILITY_MID_STEP': 215, 'PROBCUT_MARGIN': 152}
+2026-08-03 10:15:15,981 INFO     Start experiment
+2026-08-03 10:15:56,461 INFO     Experiment finished (40.480483s elapsed).
+2026-08-03 10:15:56,645 INFO     Got Elo: 84.3413461259572 +- 42.54852604964619
+2026-08-03 10:15:56,645 INFO     Estimated draw rate: 50.00%
+2026-08-03 10:15:56,645 INFO     Updating model
+2026-08-03 10:15:59,252 INFO     GP sampling finished (2.607068s)
+2026-08-03 10:15:59,319 INFO     Starting iteration 64
+2026-08-03 10:16:02,197 INFO     Current optimum:
+{'RFP_MARGIN_PER_DEPTH': 73, 'NMP_EVAL_DIV': 267, 'NMP_EVAL_MAX': 4, 'FUTILITY_MID_STEP': 198, 'PROBCUT_MARGIN': 151}
+2026-08-03 10:16:02,198 INFO     Estimated Elo: 14.2693 +- 9.8003
+2026-08-03 10:16:02,198 INFO     90.0% confidence interval of the Elo value: (-1.8506, 30.3893)
+2026-08-03 10:16:02,273 INFO     90.0% confidence intervals of the parameters:
+Parameter             Lower bound  Upper bound
+----------------------------------------------
+RFP_MARGIN_PER_DEPTH           51          152
+NMP_EVAL_DIV                   94          288
+NMP_EVAL_MAX                    2            7
+FUTILITY_MID_STEP             163          391
+PROBCUT_MARGIN                 51          160
+
+2026-08-03 10:16:02,273 INFO     Testing {'RFP_MARGIN_PER_DEPTH': 51, 'NMP_EVAL_DIV': 257, 'NMP_EVAL_MAX': 4, 'FUTILITY_MID_STEP': 248, 'PROBCUT_MARGIN': 145}
+2026-08-03 10:16:02,274 INFO     Start experiment
+2026-08-03 10:16:34,711 INFO     Experiment finished (32.43769s elapsed).
+2026-08-03 10:16:34,886 INFO     Got Elo: 49.97549464331993 +- 56.75742735891913
+2026-08-03 10:16:34,886 INFO     Estimated draw rate: 50.00%
+2026-08-03 10:16:34,886 INFO     Updating model
+2026-08-03 10:16:37,720 INFO     GP sampling finished (2.833659s)
+2026-08-03 10:16:37,788 INFO     Starting iteration 65
+2026-08-03 10:16:41,049 INFO     Current optimum:
+{'RFP_MARGIN_PER_DEPTH': 72, 'NMP_EVAL_DIV': 267, 'NMP_EVAL_MAX': 4, 'FUTILITY_MID_STEP': 200, 'PROBCUT_MARGIN': 151}
+2026-08-03 10:16:41,049 INFO     Estimated Elo: 14.3239 +- 9.4258
+2026-08-03 10:16:41,049 INFO     90.0% confidence interval of the Elo value: (-1.1802, 29.8279)
+2026-08-03 10:16:41,165 INFO     90.0% confidence intervals of the parameters:
+Parameter             Lower bound  Upper bound
+----------------------------------------------
+RFP_MARGIN_PER_DEPTH           55          154
+NMP_EVAL_DIV                  106          294
+NMP_EVAL_MAX                    2            7
+FUTILITY_MID_STEP             151          371
+PROBCUT_MARGIN                 52          160
+
+2026-08-03 10:16:41,165 INFO     Testing {'RFP_MARGIN_PER_DEPTH': 65, 'NMP_EVAL_DIV': 259, 'NMP_EVAL_MAX': 5, 'FUTILITY_MID_STEP': 249, 'PROBCUT_MARGIN': 157}
+2026-08-03 10:16:41,165 INFO     Start experiment
+2026-08-03 10:17:06,178 INFO     Experiment finished (25.012146s elapsed).
+2026-08-03 10:17:06,341 INFO     Got Elo: -0.0 +- 60.648560390573245
+2026-08-03 10:17:06,341 INFO     Estimated draw rate: 45.45%
+2026-08-03 10:17:06,341 INFO     Updating model
+2026-08-03 10:17:10,054 INFO     GP sampling finished (3.713387s)
+2026-08-03 10:17:10,075 INFO     Starting iteration 66
+2026-08-03 10:17:13,491 INFO     Current optimum:
+{'RFP_MARGIN_PER_DEPTH': 72, 'NMP_EVAL_DIV': 267, 'NMP_EVAL_MAX': 4, 'FUTILITY_MID_STEP': 199, 'PROBCUT_MARGIN': 151}
+2026-08-03 10:17:13,491 INFO     Estimated Elo: 13.5828 +- 9.129
+2026-08-03 10:17:13,491 INFO     90.0% confidence interval of the Elo value: (-1.433, 28.5987)
+2026-08-03 10:17:13,660 INFO     90.0% confidence intervals of the parameters:
+Parameter             Lower bound  Upper bound
+----------------------------------------------
+RFP_MARGIN_PER_DEPTH           51          150
+NMP_EVAL_DIV                   97          294
+NMP_EVAL_MAX                    3            8
+FUTILITY_MID_STEP             155          374
+PROBCUT_MARGIN                 50          158
+
+2026-08-03 10:17:13,660 INFO     Testing {'RFP_MARGIN_PER_DEPTH': 66, 'NMP_EVAL_DIV': 252, 'NMP_EVAL_MAX': 4, 'FUTILITY_MID_STEP': 193, 'PROBCUT_MARGIN': 159}
+2026-08-03 10:17:13,661 INFO     Start experiment
+2026-08-03 10:17:45,844 INFO     Experiment finished (32.183147s elapsed).
+2026-08-03 10:17:46,033 INFO     Got Elo: -0.0 +- 65.08172851371754
+2026-08-03 10:17:46,033 INFO     Estimated draw rate: 36.36%
+2026-08-03 10:17:46,033 INFO     Updating model
+2026-08-03 10:17:49,077 INFO     GP sampling finished (3.043721s)
+2026-08-03 10:17:49,104 INFO     Starting iteration 67
+2026-08-03 10:17:52,431 INFO     Current optimum:
+{'RFP_MARGIN_PER_DEPTH': 72, 'NMP_EVAL_DIV': 267, 'NMP_EVAL_MAX': 4, 'FUTILITY_MID_STEP': 198, 'PROBCUT_MARGIN': 151}
+2026-08-03 10:17:52,431 INFO     Estimated Elo: 12.7805 +- 8.7753
+2026-08-03 10:17:52,431 INFO     90.0% confidence interval of the Elo value: (-1.6536, 27.2146)
+2026-08-03 10:17:52,506 INFO     90.0% confidence intervals of the parameters:
+Parameter             Lower bound  Upper bound
+----------------------------------------------
+RFP_MARGIN_PER_DEPTH           58          154
+NMP_EVAL_DIV                  104          299
+NMP_EVAL_MAX                    2            7
+FUTILITY_MID_STEP             150          376
+PROBCUT_MARGIN                 42          147
+
+2026-08-03 10:17:52,506 INFO     Testing {'RFP_MARGIN_PER_DEPTH': 76, 'NMP_EVAL_DIV': 252, 'NMP_EVAL_MAX': 6, 'FUTILITY_MID_STEP': 214, 'PROBCUT_MARGIN': 152}
+2026-08-03 10:17:52,507 INFO     Start experiment
+2026-08-03 10:18:23,378 INFO     Experiment finished (30.871631s elapsed).
+2026-08-03 10:18:23,536 INFO     Got Elo: -16.557074063290028 +- 71.53672481393028
+2026-08-03 10:18:23,536 INFO     Estimated draw rate: 22.73%
+2026-08-03 10:18:23,536 INFO     Updating model
+2026-08-03 10:18:27,600 INFO     GP sampling finished (4.064115s)
+2026-08-03 10:18:27,671 INFO     Starting iteration 68
+2026-08-03 10:18:30,978 INFO     Current optimum:
+{'RFP_MARGIN_PER_DEPTH': 72, 'NMP_EVAL_DIV': 268, 'NMP_EVAL_MAX': 4, 'FUTILITY_MID_STEP': 197, 'PROBCUT_MARGIN': 151}
+2026-08-03 10:18:30,978 INFO     Estimated Elo: 12.3365 +- 8.7198
+2026-08-03 10:18:30,978 INFO     90.0% confidence interval of the Elo value: (-2.0062, 26.6792)
+2026-08-03 10:18:31,081 INFO     90.0% confidence intervals of the parameters:
+Parameter             Lower bound  Upper bound
+----------------------------------------------
+RFP_MARGIN_PER_DEPTH           58          157
+NMP_EVAL_DIV                   96          297
+NMP_EVAL_MAX                    2            7
+FUTILITY_MID_STEP             169          398
+PROBCUT_MARGIN                 40          145
+
+2026-08-03 10:18:31,081 INFO     Testing {'RFP_MARGIN_PER_DEPTH': 53, 'NMP_EVAL_DIV': 246, 'NMP_EVAL_MAX': 3, 'FUTILITY_MID_STEP': 210, 'PROBCUT_MARGIN': 147}
+2026-08-03 10:18:31,081 INFO     Start experiment
+2026-08-03 10:19:04,329 INFO     Experiment finished (33.247317s elapsed).
+2026-08-03 10:19:04,500 INFO     Got Elo: -49.975494643320026 +- 57.265517317655345
+2026-08-03 10:19:04,500 INFO     Estimated draw rate: 50.00%
+2026-08-03 10:19:04,500 INFO     Updating model
+2026-08-03 10:19:07,998 INFO     GP sampling finished (3.497489s)
+2026-08-03 10:19:08,019 INFO     Starting iteration 69
+2026-08-03 10:19:11,346 INFO     Current optimum:
+{'RFP_MARGIN_PER_DEPTH': 73, 'NMP_EVAL_DIV': 268, 'NMP_EVAL_MAX': 4, 'FUTILITY_MID_STEP': 197, 'PROBCUT_MARGIN': 151}
+2026-08-03 10:19:11,346 INFO     Estimated Elo: 11.5561 +- 8.7421
+2026-08-03 10:19:11,347 INFO     90.0% confidence interval of the Elo value: (-2.8234, 25.9357)
+2026-08-03 10:19:11,424 INFO     90.0% confidence intervals of the parameters:
+Parameter             Lower bound  Upper bound
+----------------------------------------------
+RFP_MARGIN_PER_DEPTH           60          159
+NMP_EVAL_DIV                  100          297
+NMP_EVAL_MAX                    3            8
+FUTILITY_MID_STEP             155          371
+PROBCUT_MARGIN                 54          158
+
+2026-08-03 10:19:11,424 INFO     Testing {'RFP_MARGIN_PER_DEPTH': 54, 'NMP_EVAL_DIV': 292, 'NMP_EVAL_MAX': 4, 'FUTILITY_MID_STEP': 196, 'PROBCUT_MARGIN': 145}
+2026-08-03 10:19:11,425 INFO     Start experiment
+2026-08-03 10:19:44,543 INFO     Experiment finished (33.118008s elapsed).
+2026-08-03 10:19:44,712 INFO     Got Elo: 33.18969402590559 +- 60.26841299727504
+2026-08-03 10:19:44,712 INFO     Estimated draw rate: 27.27%
+2026-08-03 10:19:44,712 INFO     Updating model
+2026-08-03 10:19:47,973 INFO     GP sampling finished (3.260753s)
+2026-08-03 10:19:47,993 INFO     Starting iteration 70
+2026-08-03 10:19:51,110 INFO     Current optimum:
+{'RFP_MARGIN_PER_DEPTH': 72, 'NMP_EVAL_DIV': 269, 'NMP_EVAL_MAX': 4, 'FUTILITY_MID_STEP': 197, 'PROBCUT_MARGIN': 151}
+2026-08-03 10:19:51,110 INFO     Estimated Elo: 11.9351 +- 8.6005
+2026-08-03 10:19:51,111 INFO     90.0% confidence interval of the Elo value: (-2.2115, 26.0816)
+2026-08-03 10:19:51,353 INFO     90.0% confidence intervals of the parameters:
+Parameter             Lower bound  Upper bound
+----------------------------------------------
+RFP_MARGIN_PER_DEPTH           58          156
+NMP_EVAL_DIV                   99          291
+NMP_EVAL_MAX                    2            8
+FUTILITY_MID_STEP             152          375
+PROBCUT_MARGIN                 42          148
+
+2026-08-03 10:19:51,353 INFO     Testing {'RFP_MARGIN_PER_DEPTH': 77, 'NMP_EVAL_DIV': 290, 'NMP_EVAL_MAX': 4, 'FUTILITY_MID_STEP': 219, 'PROBCUT_MARGIN': 155}
+2026-08-03 10:19:51,354 INFO     Start experiment
+2026-08-03 10:20:25,246 INFO     Experiment finished (33.891927s elapsed).
+2026-08-03 10:20:25,395 INFO     Got Elo: -49.97549464331997 +- 52.11305487579545
+2026-08-03 10:20:25,395 INFO     Estimated draw rate: 50.00%
+2026-08-03 10:20:25,396 INFO     Updating model
+2026-08-03 10:20:29,105 INFO     GP sampling finished (3.70969s)
+2026-08-03 10:20:29,131 INFO     Starting iteration 71
+2026-08-03 10:20:32,540 INFO     Current optimum:
+{'RFP_MARGIN_PER_DEPTH': 72, 'NMP_EVAL_DIV': 266, 'NMP_EVAL_MAX': 4, 'FUTILITY_MID_STEP': 192, 'PROBCUT_MARGIN': 150}
+2026-08-03 10:20:32,540 INFO     Estimated Elo: 9.9386 +- 8.1566
+2026-08-03 10:20:32,540 INFO     90.0% confidence interval of the Elo value: (-3.4779, 23.3551)
+2026-08-03 10:20:32,690 INFO     90.0% confidence intervals of the parameters:
+Parameter             Lower bound  Upper bound
+----------------------------------------------
+RFP_MARGIN_PER_DEPTH           60          157
+NMP_EVAL_DIV                   86          283
+NMP_EVAL_MAX                    2            7
+FUTILITY_MID_STEP             169          393
+PROBCUT_MARGIN                 42          148
+
+2026-08-03 10:20:32,691 INFO     Testing {'RFP_MARGIN_PER_DEPTH': 72, 'NMP_EVAL_DIV': 255, 'NMP_EVAL_MAX': 6, 'FUTILITY_MID_STEP': 254, 'PROBCUT_MARGIN': 149}
+2026-08-03 10:20:32,691 INFO     Start experiment
+2026-08-03 10:21:01,865 INFO     Experiment finished (29.174014s elapsed).
+2026-08-03 10:21:02,053 INFO     Got Elo: -16.55707406328996 +- 41.51735552999724
+2026-08-03 10:21:02,053 INFO     Estimated draw rate: 59.09%
+2026-08-03 10:21:02,053 INFO     Updating model
+2026-08-03 10:21:06,516 INFO     GP sampling finished (4.462616s)
+2026-08-03 10:21:06,592 INFO     Starting iteration 72
+2026-08-03 10:21:09,734 INFO     Current optimum:
+{'RFP_MARGIN_PER_DEPTH': 72, 'NMP_EVAL_DIV': 266, 'NMP_EVAL_MAX': 4, 'FUTILITY_MID_STEP': 189, 'PROBCUT_MARGIN': 150}
+2026-08-03 10:21:09,734 INFO     Estimated Elo: 9.6546 +- 8.1438
+2026-08-03 10:21:09,734 INFO     90.0% confidence interval of the Elo value: (-3.7408, 23.05)
+2026-08-03 10:21:09,856 INFO     90.0% confidence intervals of the parameters:
+Parameter             Lower bound  Upper bound
+----------------------------------------------
+RFP_MARGIN_PER_DEPTH           50          147
+NMP_EVAL_DIV                  103          299
+NMP_EVAL_MAX                    2            7
+FUTILITY_MID_STEP             150          375
+PROBCUT_MARGIN                 52          159
+
+2026-08-03 10:21:09,856 INFO     Testing {'RFP_MARGIN_PER_DEPTH': 135, 'NMP_EVAL_DIV': 257, 'NMP_EVAL_MAX': 6, 'FUTILITY_MID_STEP': 151, 'PROBCUT_MARGIN': 141}
+2026-08-03 10:21:09,857 INFO     Start experiment
+2026-08-03 10:21:37,644 INFO     Experiment finished (27.787143s elapsed).
+2026-08-03 10:21:37,837 INFO     Got Elo: -33.189694025905595 +- 55.01851455680713
+2026-08-03 10:21:37,837 INFO     Estimated draw rate: 36.36%
+2026-08-03 10:21:37,837 INFO     Updating model
+2026-08-03 10:21:41,927 INFO     GP sampling finished (4.089709s)
+2026-08-03 10:21:41,953 INFO     Starting iteration 73
+2026-08-03 10:21:45,243 INFO     Current optimum:
+{'RFP_MARGIN_PER_DEPTH': 72, 'NMP_EVAL_DIV': 266, 'NMP_EVAL_MAX': 4, 'FUTILITY_MID_STEP': 188, 'PROBCUT_MARGIN': 150}
+2026-08-03 10:21:45,243 INFO     Estimated Elo: 8.7722 +- 7.8128
+2026-08-03 10:21:45,243 INFO     90.0% confidence interval of the Elo value: (-4.0787, 21.6231)
+2026-08-03 10:21:45,349 INFO     90.0% confidence intervals of the parameters:
+Parameter             Lower bound  Upper bound
+----------------------------------------------
+RFP_MARGIN_PER_DEPTH           51          148
+NMP_EVAL_DIV                   80          274
+NMP_EVAL_MAX                    2            8
+FUTILITY_MID_STEP             151          374
+PROBCUT_MARGIN                 42          150
+
+2026-08-03 10:21:45,350 INFO     Testing {'RFP_MARGIN_PER_DEPTH': 57, 'NMP_EVAL_DIV': 243, 'NMP_EVAL_MAX': 5, 'FUTILITY_MID_STEP': 196, 'PROBCUT_MARGIN': 154}
+2026-08-03 10:21:45,350 INFO     Start experiment
+2026-08-03 10:22:16,751 INFO     Experiment finished (31.401118s elapsed).
+2026-08-03 10:22:16,935 INFO     Got Elo: 139.38185823684773 +- 58.99153869166379
+2026-08-03 10:22:16,935 INFO     Estimated draw rate: 45.45%
+2026-08-03 10:22:16,935 INFO     Updating model
+2026-08-03 10:22:20,536 INFO     GP sampling finished (3.600635s)
+2026-08-03 10:22:20,562 INFO     Starting iteration 74
+2026-08-03 10:22:23,583 INFO     Current optimum:
+{'RFP_MARGIN_PER_DEPTH': 68, 'NMP_EVAL_DIV': 260, 'NMP_EVAL_MAX': 5, 'FUTILITY_MID_STEP': 196, 'PROBCUT_MARGIN': 152}
+2026-08-03 10:22:23,583 INFO     Estimated Elo: 11.3383 +- 8.084
+2026-08-03 10:22:23,583 INFO     90.0% confidence interval of the Elo value: (-1.9587, 24.6353)
+2026-08-03 10:22:23,657 INFO     90.0% confidence intervals of the parameters:
+Parameter             Lower bound  Upper bound
+----------------------------------------------
+RFP_MARGIN_PER_DEPTH           53          149
+NMP_EVAL_DIV                   83          282
+NMP_EVAL_MAX                    2            7
+FUTILITY_MID_STEP             151          381
+PROBCUT_MARGIN                 54          159
+
+2026-08-03 10:22:23,657 INFO     Testing {'RFP_MARGIN_PER_DEPTH': 59, 'NMP_EVAL_DIV': 231, 'NMP_EVAL_MAX': 5, 'FUTILITY_MID_STEP': 230, 'PROBCUT_MARGIN': 132}
+2026-08-03 10:22:23,658 INFO     Start experiment
+2026-08-03 10:22:59,794 INFO     Experiment finished (36.135717s elapsed).
+2026-08-03 10:23:00,006 INFO     Got Elo: 16.55707406328996 +- 52.867444072108796
+2026-08-03 10:23:00,006 INFO     Estimated draw rate: 40.91%
+2026-08-03 10:23:00,006 INFO     Updating model
+2026-08-03 10:23:03,645 INFO     GP sampling finished (3.638613s)
+2026-08-03 10:23:03,716 INFO     Starting iteration 75
+2026-08-03 10:23:06,826 INFO     Current optimum:
+{'RFP_MARGIN_PER_DEPTH': 68, 'NMP_EVAL_DIV': 259, 'NMP_EVAL_MAX': 5, 'FUTILITY_MID_STEP': 197, 'PROBCUT_MARGIN': 152}
+2026-08-03 10:23:06,826 INFO     Estimated Elo: 12.2894 +- 8.5705
+2026-08-03 10:23:06,826 INFO     90.0% confidence interval of the Elo value: (-1.8078, 26.3866)
+2026-08-03 10:23:06,919 INFO     90.0% confidence intervals of the parameters:
+Parameter             Lower bound  Upper bound
+----------------------------------------------
+RFP_MARGIN_PER_DEPTH           61          158
+NMP_EVAL_DIV                   98          295
+NMP_EVAL_MAX                    2            7
+FUTILITY_MID_STEP             151          373
+PROBCUT_MARGIN                 42          152
+
+2026-08-03 10:23:06,919 INFO     Testing {'RFP_MARGIN_PER_DEPTH': 80, 'NMP_EVAL_DIV': 235, 'NMP_EVAL_MAX': 6, 'FUTILITY_MID_STEP': 160, 'PROBCUT_MARGIN': 149}
+2026-08-03 10:23:06,920 INFO     Start experiment
+2026-08-03 10:23:35,020 INFO     Experiment finished (28.100166s elapsed).
+2026-08-03 10:23:35,208 INFO     Got Elo: 33.18969402590552 +- 49.80409209254172
+2026-08-03 10:23:35,208 INFO     Estimated draw rate: 45.45%
+2026-08-03 10:23:35,209 INFO     Updating model
+2026-08-03 10:23:38,941 INFO     GP sampling finished (3.732251s)
+2026-08-03 10:23:38,962 INFO     Starting iteration 76
+2026-08-03 10:23:42,025 INFO     Current optimum:
+{'RFP_MARGIN_PER_DEPTH': 68, 'NMP_EVAL_DIV': 259, 'NMP_EVAL_MAX': 5, 'FUTILITY_MID_STEP': 196, 'PROBCUT_MARGIN': 152}
+2026-08-03 10:23:42,025 INFO     Estimated Elo: 12.5659 +- 8.4356
+2026-08-03 10:23:42,025 INFO     90.0% confidence interval of the Elo value: (-1.3094, 26.4412)
+2026-08-03 10:23:42,161 INFO     90.0% confidence intervals of the parameters:
+Parameter             Lower bound  Upper bound
+----------------------------------------------
+RFP_MARGIN_PER_DEPTH           61          156
+NMP_EVAL_DIV                  104          298
+NMP_EVAL_MAX                    2            7
+FUTILITY_MID_STEP             163          389
+PROBCUT_MARGIN                 42          150
+
+2026-08-03 10:23:42,161 INFO     Testing {'RFP_MARGIN_PER_DEPTH': 106, 'NMP_EVAL_DIV': 248, 'NMP_EVAL_MAX': 5, 'FUTILITY_MID_STEP': 199, 'PROBCUT_MARGIN': 149}
+2026-08-03 10:23:42,161 INFO     Start experiment
+2026-08-03 10:24:13,634 INFO     Experiment finished (31.471901s elapsed).
+2026-08-03 10:24:13,808 INFO     Got Elo: -49.97549464331997 +- 39.73184415800669
+2026-08-03 10:24:13,808 INFO     Estimated draw rate: 50.00%
+2026-08-03 10:24:13,808 INFO     Updating model
+2026-08-03 10:24:17,581 INFO     GP sampling finished (3.772253s)
+2026-08-03 10:24:17,656 INFO     Starting iteration 77
+2026-08-03 10:24:20,574 INFO     Current optimum:
+{'RFP_MARGIN_PER_DEPTH': 66, 'NMP_EVAL_DIV': 259, 'NMP_EVAL_MAX': 5, 'FUTILITY_MID_STEP': 196, 'PROBCUT_MARGIN': 152}
+2026-08-03 10:24:20,575 INFO     Estimated Elo: 10.7923 +- 7.8915
+2026-08-03 10:24:20,575 INFO     90.0% confidence interval of the Elo value: (-2.188, 23.7726)
+2026-08-03 10:24:20,653 INFO     90.0% confidence intervals of the parameters:
+Parameter             Lower bound  Upper bound
+----------------------------------------------
+RFP_MARGIN_PER_DEPTH           60          159
+NMP_EVAL_DIV                   98          293
+NMP_EVAL_MAX                    2            7
+FUTILITY_MID_STEP             164          390
+PROBCUT_MARGIN                 40          148
+
+2026-08-03 10:24:20,653 INFO     Testing {'RFP_MARGIN_PER_DEPTH': 69, 'NMP_EVAL_DIV': 246, 'NMP_EVAL_MAX': 5, 'FUTILITY_MID_STEP': 192, 'PROBCUT_MARGIN': 147}
+2026-08-03 10:24:20,653 INFO     Start experiment
+2026-08-03 10:24:54,758 INFO     Experiment finished (34.104545s elapsed).
+2026-08-03 10:24:54,929 INFO     Got Elo: -84.3413461259573 +- 61.17558456448583
+2026-08-03 10:24:54,929 INFO     Estimated draw rate: 40.91%
+2026-08-03 10:24:54,929 INFO     Updating model
+2026-08-03 10:24:58,513 INFO     GP sampling finished (3.583265s)
+2026-08-03 10:24:58,535 INFO     Starting iteration 78
+2026-08-03 10:25:01,485 INFO     Current optimum:
+{'RFP_MARGIN_PER_DEPTH': 67, 'NMP_EVAL_DIV': 266, 'NMP_EVAL_MAX': 4, 'FUTILITY_MID_STEP': 191, 'PROBCUT_MARGIN': 151}
+2026-08-03 10:25:01,485 INFO     Estimated Elo: 8.5851 +- 7.3988
+2026-08-03 10:25:01,485 INFO     90.0% confidence interval of the Elo value: (-3.5848, 20.755)
+2026-08-03 10:25:01,607 INFO     90.0% confidence intervals of the parameters:
+Parameter             Lower bound  Upper bound
+----------------------------------------------
+RFP_MARGIN_PER_DEPTH           50          150
+NMP_EVAL_DIV                  106          300
+NMP_EVAL_MAX                    2            8
+FUTILITY_MID_STEP             166          388
+PROBCUT_MARGIN                 52          158
+
+2026-08-03 10:25:01,607 INFO     Testing {'RFP_MARGIN_PER_DEPTH': 53, 'NMP_EVAL_DIV': 298, 'NMP_EVAL_MAX': 5, 'FUTILITY_MID_STEP': 231, 'PROBCUT_MARGIN': 128}
+2026-08-03 10:25:01,607 INFO     Start experiment
+2026-08-03 10:25:30,934 INFO     Experiment finished (29.326709s elapsed).
+2026-08-03 10:25:31,110 INFO     Got Elo: -16.55707406328996 +- 52.94662202834831
+2026-08-03 10:25:31,110 INFO     Estimated draw rate: 50.00%
+2026-08-03 10:25:31,110 INFO     Updating model
+2026-08-03 10:25:34,817 INFO     GP sampling finished (3.707226s)
+2026-08-03 10:25:34,895 INFO     Starting iteration 79
+2026-08-03 10:25:37,727 INFO     Current optimum:
+{'RFP_MARGIN_PER_DEPTH': 67, 'NMP_EVAL_DIV': 265, 'NMP_EVAL_MAX': 4, 'FUTILITY_MID_STEP': 189, 'PROBCUT_MARGIN': 151}
+2026-08-03 10:25:37,727 INFO     Estimated Elo: 8.212 +- 7.3153
+2026-08-03 10:25:37,728 INFO     90.0% confidence interval of the Elo value: (-3.8206, 20.2446)
+2026-08-03 10:25:37,803 INFO     90.0% confidence intervals of the parameters:
+Parameter             Lower bound  Upper bound
+----------------------------------------------
+RFP_MARGIN_PER_DEPTH           51          149
+NMP_EVAL_DIV                   80          281
+NMP_EVAL_MAX                    2            7
+FUTILITY_MID_STEP             173          399
+PROBCUT_MARGIN                 47          152
+
+2026-08-03 10:25:37,803 INFO     Testing {'RFP_MARGIN_PER_DEPTH': 74, 'NMP_EVAL_DIV': 278, 'NMP_EVAL_MAX': 4, 'FUTILITY_MID_STEP': 176, 'PROBCUT_MARGIN': 138}
+2026-08-03 10:25:37,803 INFO     Start experiment
+2026-08-03 10:26:08,018 INFO     Experiment finished (30.215203s elapsed).
+2026-08-03 10:26:08,185 INFO     Got Elo: -0.0 +- 64.96572304860739
+2026-08-03 10:26:08,185 INFO     Estimated draw rate: 45.45%
+2026-08-03 10:26:08,186 INFO     Updating model
+2026-08-03 10:26:12,226 INFO     GP sampling finished (4.040337s)
+2026-08-03 10:26:12,247 INFO     Starting iteration 80
+2026-08-03 10:26:15,779 INFO     Current optimum:
+{'RFP_MARGIN_PER_DEPTH': 67, 'NMP_EVAL_DIV': 265, 'NMP_EVAL_MAX': 4, 'FUTILITY_MID_STEP': 190, 'PROBCUT_MARGIN': 152}
+2026-08-03 10:26:15,779 INFO     Estimated Elo: 7.5955 +- 6.9074
+2026-08-03 10:26:15,779 INFO     90.0% confidence interval of the Elo value: (-3.7661, 18.9571)
+2026-08-03 10:26:15,855 INFO     90.0% confidence intervals of the parameters:
+Parameter             Lower bound  Upper bound
+----------------------------------------------
+RFP_MARGIN_PER_DEPTH           51          148
+NMP_EVAL_DIV                   87          281
+NMP_EVAL_MAX                    2            7
+FUTILITY_MID_STEP             154          375
+PROBCUT_MARGIN                 50          157
+
+2026-08-03 10:26:15,855 INFO     Testing {'RFP_MARGIN_PER_DEPTH': 81, 'NMP_EVAL_DIV': 264, 'NMP_EVAL_MAX': 4, 'FUTILITY_MID_STEP': 235, 'PROBCUT_MARGIN': 142}
+2026-08-03 10:26:15,855 INFO     Start experiment
+2026-08-03 10:26:44,077 INFO     Experiment finished (28.221749s elapsed).
+2026-08-03 10:26:44,240 INFO     Got Elo: -139.38185823684773 +- 65.8226255034729
+2026-08-03 10:26:44,241 INFO     Estimated draw rate: 45.45%
+2026-08-03 10:26:44,241 INFO     Updating model
+2026-08-03 10:26:48,377 INFO     GP sampling finished (4.136465s)
+2026-08-03 10:26:48,406 INFO     Starting iteration 81
+2026-08-03 10:26:51,294 INFO     Current optimum:
+{'RFP_MARGIN_PER_DEPTH': 67, 'NMP_EVAL_DIV': 266, 'NMP_EVAL_MAX': 4, 'FUTILITY_MID_STEP': 183, 'PROBCUT_MARGIN': 152}
+2026-08-03 10:26:51,294 INFO     Estimated Elo: 6.1421 +- 7.1184
+2026-08-03 10:26:51,294 INFO     90.0% confidence interval of the Elo value: (-5.5667, 17.8508)
+2026-08-03 10:26:51,395 INFO     90.0% confidence intervals of the parameters:
+Parameter             Lower bound  Upper bound
+----------------------------------------------
+RFP_MARGIN_PER_DEPTH           60          158
+NMP_EVAL_DIV                   80          276
+NMP_EVAL_MAX                    2            7
+FUTILITY_MID_STEP             155          372
+PROBCUT_MARGIN                 53          159
+
+2026-08-03 10:26:51,396 INFO     Testing {'RFP_MARGIN_PER_DEPTH': 64, 'NMP_EVAL_DIV': 254, 'NMP_EVAL_MAX': 6, 'FUTILITY_MID_STEP': 195, 'PROBCUT_MARGIN': 119}
+2026-08-03 10:26:51,396 INFO     Start experiment
+2026-08-03 10:27:19,264 INFO     Experiment finished (27.867888s elapsed).
+2026-08-03 10:27:19,427 INFO     Got Elo: 16.557074063289978 +- 62.95077840125407
+2026-08-03 10:27:19,427 INFO     Estimated draw rate: 31.82%
+2026-08-03 10:27:19,427 INFO     Updating model
+2026-08-03 10:27:22,670 INFO     GP sampling finished (3.242644s)
+2026-08-03 10:27:22,700 INFO     Starting iteration 82
+2026-08-03 10:27:25,839 INFO     Current optimum:
+{'RFP_MARGIN_PER_DEPTH': 67, 'NMP_EVAL_DIV': 265, 'NMP_EVAL_MAX': 4, 'FUTILITY_MID_STEP': 184, 'PROBCUT_MARGIN': 152}
+2026-08-03 10:27:25,840 INFO     Estimated Elo: 6.4228 +- 7.1729
+2026-08-03 10:27:25,840 INFO     90.0% confidence interval of the Elo value: (-5.3756, 18.2211)
+2026-08-03 10:27:25,950 INFO     90.0% confidence intervals of the parameters:
+Parameter             Lower bound  Upper bound
+----------------------------------------------
+RFP_MARGIN_PER_DEPTH           51          149
+NMP_EVAL_DIV                   99          297
+NMP_EVAL_MAX                    3            8
+FUTILITY_MID_STEP             157          381
+PROBCUT_MARGIN                 52          158
+
+2026-08-03 10:27:25,951 INFO     Testing {'RFP_MARGIN_PER_DEPTH': 54, 'NMP_EVAL_DIV': 239, 'NMP_EVAL_MAX': 5, 'FUTILITY_MID_STEP': 178, 'PROBCUT_MARGIN': 153}
+2026-08-03 10:27:25,966 INFO     Start experiment
+2026-08-03 10:27:56,562 INFO     Experiment finished (30.596353s elapsed).
+2026-08-03 10:27:56,754 INFO     Got Elo: -33.189694025905595 +- 44.00208665792348
+2026-08-03 10:27:56,754 INFO     Estimated draw rate: 54.55%
+2026-08-03 10:27:56,754 INFO     Updating model
+2026-08-03 10:28:01,615 INFO     GP sampling finished (4.860806s)
+2026-08-03 10:28:01,685 INFO     Starting iteration 83
+2026-08-03 10:28:04,757 INFO     Current optimum:
+{'RFP_MARGIN_PER_DEPTH': 68, 'NMP_EVAL_DIV': 268, 'NMP_EVAL_MAX': 4, 'FUTILITY_MID_STEP': 180, 'PROBCUT_MARGIN': 151}
+2026-08-03 10:28:04,757 INFO     Estimated Elo: 5.6858 +- 7.116
+2026-08-03 10:28:04,757 INFO     90.0% confidence interval of the Elo value: (-6.019, 17.3906)
+2026-08-03 10:28:04,885 INFO     90.0% confidence intervals of the parameters:
+Parameter             Lower bound  Upper bound
+----------------------------------------------
+RFP_MARGIN_PER_DEPTH           54          149
+NMP_EVAL_DIV                   93          284
+NMP_EVAL_MAX                    2            7
+FUTILITY_MID_STEP             154          372
+PROBCUT_MARGIN                 50          158
+
+2026-08-03 10:28:04,885 INFO     Testing {'RFP_MARGIN_PER_DEPTH': 75, 'NMP_EVAL_DIV': 177, 'NMP_EVAL_MAX': 4, 'FUTILITY_MID_STEP': 186, 'PROBCUT_MARGIN': 156}
+2026-08-03 10:28:04,885 INFO     Start experiment
+2026-08-03 10:28:40,093 INFO     Experiment finished (35.20792s elapsed).
+2026-08-03 10:28:40,284 INFO     Got Elo: 16.55707406329004 +- 41.57594291018322
+2026-08-03 10:28:40,284 INFO     Estimated draw rate: 31.82%
+2026-08-03 10:28:40,284 INFO     Updating model
+2026-08-03 10:28:44,354 INFO     GP sampling finished (4.069329s)
+2026-08-03 10:28:44,392 INFO     Starting iteration 84
+2026-08-03 10:28:47,700 INFO     Current optimum:
+{'RFP_MARGIN_PER_DEPTH': 69, 'NMP_EVAL_DIV': 267, 'NMP_EVAL_MAX': 4, 'FUTILITY_MID_STEP': 180, 'PROBCUT_MARGIN': 151}
+2026-08-03 10:28:47,700 INFO     Estimated Elo: 5.5969 +- 6.9048
+2026-08-03 10:28:47,700 INFO     90.0% confidence interval of the Elo value: (-5.7606, 16.9543)
+2026-08-03 10:28:47,782 INFO     90.0% confidence intervals of the parameters:
+Parameter             Lower bound  Upper bound
+----------------------------------------------
+RFP_MARGIN_PER_DEPTH           61          159
+NMP_EVAL_DIV                   83          282
+NMP_EVAL_MAX                    2            7
+FUTILITY_MID_STEP             167          391
+PROBCUT_MARGIN                 50          157
+
+2026-08-03 10:28:47,783 INFO     Testing {'RFP_MARGIN_PER_DEPTH': 83, 'NMP_EVAL_DIV': 248, 'NMP_EVAL_MAX': 3, 'FUTILITY_MID_STEP': 158, 'PROBCUT_MARGIN': 119}
+2026-08-03 10:28:47,783 INFO     Start experiment
+2026-08-03 10:29:20,166 INFO     Experiment finished (32.383452s elapsed).
+2026-08-03 10:29:20,359 INFO     Got Elo: -33.189694025905595 +- 49.72862248703297
+2026-08-03 10:29:20,359 INFO     Estimated draw rate: 36.36%
+2026-08-03 10:29:20,359 INFO     Updating model
+2026-08-03 10:29:23,174 INFO     GP sampling finished (2.814944s)
+2026-08-03 10:29:23,244 INFO     Starting iteration 85
+2026-08-03 10:29:26,143 INFO     Current optimum:
+{'RFP_MARGIN_PER_DEPTH': 68, 'NMP_EVAL_DIV': 268, 'NMP_EVAL_MAX': 4, 'FUTILITY_MID_STEP': 182, 'PROBCUT_MARGIN': 152}
+2026-08-03 10:29:26,143 INFO     Estimated Elo: 5.4369 +- 7.0852
+2026-08-03 10:29:26,143 INFO     90.0% confidence interval of the Elo value: (-6.2172, 17.0911)
+2026-08-03 10:29:26,236 INFO     90.0% confidence intervals of the parameters:
+Parameter             Lower bound  Upper bound
+----------------------------------------------
+RFP_MARGIN_PER_DEPTH           63          160
+NMP_EVAL_DIV                   96          293
+NMP_EVAL_MAX                    3            8
+FUTILITY_MID_STEP             151          374
+PROBCUT_MARGIN                 51          156
+
+2026-08-03 10:29:26,236 INFO     Testing {'RFP_MARGIN_PER_DEPTH': 52, 'NMP_EVAL_DIV': 295, 'NMP_EVAL_MAX': 5, 'FUTILITY_MID_STEP': 216, 'PROBCUT_MARGIN': 151}
+2026-08-03 10:29:26,236 INFO     Start experiment
+2026-08-03 10:30:06,185 INFO     Experiment finished (39.948031s elapsed).
+2026-08-03 10:30:06,354 INFO     Got Elo: -66.99643491750545 +- 59.69394346851856
+2026-08-03 10:30:06,354 INFO     Estimated draw rate: 45.45%
+2026-08-03 10:30:06,354 INFO     Updating model
+2026-08-03 10:30:09,339 INFO     GP sampling finished (2.984818s)
+2026-08-03 10:30:09,362 INFO     Starting iteration 86
+2026-08-03 10:30:12,822 INFO     Current optimum:
+{'RFP_MARGIN_PER_DEPTH': 69, 'NMP_EVAL_DIV': 265, 'NMP_EVAL_MAX': 4, 'FUTILITY_MID_STEP': 180, 'PROBCUT_MARGIN': 152}
+2026-08-03 10:30:12,822 INFO     Estimated Elo: 5.0025 +- 7.3309
+2026-08-03 10:30:12,822 INFO     90.0% confidence interval of the Elo value: (-7.0558, 17.0608)
+2026-08-03 10:30:12,898 INFO     90.0% confidence intervals of the parameters:
+Parameter             Lower bound  Upper bound
+----------------------------------------------
+RFP_MARGIN_PER_DEPTH           50          149
+NMP_EVAL_DIV                  106          293
+NMP_EVAL_MAX                    2            7
+FUTILITY_MID_STEP             169          392
+PROBCUT_MARGIN                 50          156
+
+2026-08-03 10:30:12,898 INFO     Testing {'RFP_MARGIN_PER_DEPTH': 51, 'NMP_EVAL_DIV': 234, 'NMP_EVAL_MAX': 3, 'FUTILITY_MID_STEP': 237, 'PROBCUT_MARGIN': 125}
+2026-08-03 10:30:12,898 INFO     Start experiment
+2026-08-03 10:30:46,969 INFO     Experiment finished (34.070446s elapsed).
+2026-08-03 10:30:47,163 INFO     Got Elo: 16.557074063289978 +- 58.06703885763781
+2026-08-03 10:30:47,163 INFO     Estimated draw rate: 50.00%
+2026-08-03 10:30:47,163 INFO     Updating model
+2026-08-03 10:30:50,505 INFO     GP sampling finished (3.341819s)
+2026-08-03 10:30:50,587 INFO     Starting iteration 87
+2026-08-03 10:30:53,909 INFO     Current optimum:
+{'RFP_MARGIN_PER_DEPTH': 69, 'NMP_EVAL_DIV': 265, 'NMP_EVAL_MAX': 4, 'FUTILITY_MID_STEP': 180, 'PROBCUT_MARGIN': 152}
+2026-08-03 10:30:53,909 INFO     Estimated Elo: 4.871 +- 7.1005
+2026-08-03 10:30:53,909 INFO     90.0% confidence interval of the Elo value: (-6.8083, 16.5503)
+2026-08-03 10:30:53,988 INFO     90.0% confidence intervals of the parameters:
+Parameter             Lower bound  Upper bound
+----------------------------------------------
+RFP_MARGIN_PER_DEPTH           56          155
+NMP_EVAL_DIV                   80          279
+NMP_EVAL_MAX                    2            7
+FUTILITY_MID_STEP             150          367
+PROBCUT_MARGIN                 47          153
+
+2026-08-03 10:30:53,988 INFO     Testing {'RFP_MARGIN_PER_DEPTH': 80, 'NMP_EVAL_DIV': 258, 'NMP_EVAL_MAX': 4, 'FUTILITY_MID_STEP': 192, 'PROBCUT_MARGIN': 158}
+2026-08-03 10:30:53,988 INFO     Start experiment
+2026-08-03 10:31:26,971 INFO     Experiment finished (32.982261s elapsed).
+2026-08-03 10:31:27,162 INFO     Got Elo: 33.18969402590559 +- 44.09993643873645
+2026-08-03 10:31:27,162 INFO     Estimated draw rate: 63.64%
+2026-08-03 10:31:27,162 INFO     Updating model
+2026-08-03 10:31:31,021 INFO     GP sampling finished (3.859272s)
+2026-08-03 10:31:31,046 INFO     Starting iteration 88
+2026-08-03 10:31:33,993 INFO     Current optimum:
+{'RFP_MARGIN_PER_DEPTH': 71, 'NMP_EVAL_DIV': 264, 'NMP_EVAL_MAX': 4, 'FUTILITY_MID_STEP': 181, 'PROBCUT_MARGIN': 153}
+2026-08-03 10:31:33,993 INFO     Estimated Elo: 5.4858 +- 6.918
+2026-08-03 10:31:33,993 INFO     90.0% confidence interval of the Elo value: (-5.8934, 16.865)
+2026-08-03 10:31:34,062 INFO     90.0% confidence intervals of the parameters:
+Parameter             Lower bound  Upper bound
+----------------------------------------------
+RFP_MARGIN_PER_DEPTH           50          150
+NMP_EVAL_DIV                   96          290
+NMP_EVAL_MAX                    2            7
+FUTILITY_MID_STEP             151          373
+PROBCUT_MARGIN                 41          149
+
+2026-08-03 10:31:34,062 INFO     Testing {'RFP_MARGIN_PER_DEPTH': 71, 'NMP_EVAL_DIV': 252, 'NMP_EVAL_MAX': 4, 'FUTILITY_MID_STEP': 185, 'PROBCUT_MARGIN': 149}
+2026-08-03 10:31:34,062 INFO     Start experiment
+2026-08-03 10:32:07,300 INFO     Experiment finished (33.237307s elapsed).
+2026-08-03 10:32:07,454 INFO     Got Elo: 16.55707406329004 +- 41.60643803766621
+2026-08-03 10:32:07,454 INFO     Estimated draw rate: 50.00%
+2026-08-03 10:32:07,454 INFO     Updating model
+2026-08-03 10:32:10,370 INFO     GP sampling finished (2.915875s)
+2026-08-03 10:32:10,389 INFO     Starting iteration 89
+2026-08-03 10:32:13,595 INFO     Current optimum:
+{'RFP_MARGIN_PER_DEPTH': 71, 'NMP_EVAL_DIV': 263, 'NMP_EVAL_MAX': 4, 'FUTILITY_MID_STEP': 182, 'PROBCUT_MARGIN': 153}
+2026-08-03 10:32:13,595 INFO     Estimated Elo: 5.3187 +- 6.4454
+2026-08-03 10:32:13,595 INFO     90.0% confidence interval of the Elo value: (-5.2831, 15.9205)
+2026-08-03 10:32:13,701 INFO     90.0% confidence intervals of the parameters:
+Parameter             Lower bound  Upper bound
+----------------------------------------------
+RFP_MARGIN_PER_DEPTH           50          149
+NMP_EVAL_DIV                   97          296
+NMP_EVAL_MAX                    3            8
+FUTILITY_MID_STEP             172          397
+PROBCUT_MARGIN                 46          154
+
+2026-08-03 10:32:13,701 INFO     Testing {'RFP_MARGIN_PER_DEPTH': 103, 'NMP_EVAL_DIV': 265, 'NMP_EVAL_MAX': 3, 'FUTILITY_MID_STEP': 163, 'PROBCUT_MARGIN': 159}
+2026-08-03 10:32:13,701 INFO     Start experiment
+2026-08-03 10:32:46,869 INFO     Experiment finished (33.167851s elapsed).
+2026-08-03 10:32:47,052 INFO     Got Elo: -0.0 +- 38.50150951404694
+2026-08-03 10:32:47,052 INFO     Estimated draw rate: 54.55%
+2026-08-03 10:32:47,052 INFO     Updating model
+2026-08-03 10:32:50,631 INFO     GP sampling finished (3.578496s)
+2026-08-03 10:32:50,654 INFO     Starting iteration 90
+2026-08-03 10:32:54,040 INFO     Current optimum:
+{'RFP_MARGIN_PER_DEPTH': 71, 'NMP_EVAL_DIV': 263, 'NMP_EVAL_MAX': 4, 'FUTILITY_MID_STEP': 182, 'PROBCUT_MARGIN': 153}
+2026-08-03 10:32:54,040 INFO     Estimated Elo: 5.6452 +- 6.6982
+2026-08-03 10:32:54,041 INFO     90.0% confidence interval of the Elo value: (-5.3723, 16.6627)
+2026-08-03 10:32:54,118 INFO     90.0% confidence intervals of the parameters:
+Parameter             Lower bound  Upper bound
+----------------------------------------------
+RFP_MARGIN_PER_DEPTH           52          150
+NMP_EVAL_DIV                   83          280
+NMP_EVAL_MAX                    2            7
+FUTILITY_MID_STEP             160          379
+PROBCUT_MARGIN                 46          153
+
+2026-08-03 10:32:54,118 INFO     Testing {'RFP_MARGIN_PER_DEPTH': 69, 'NMP_EVAL_DIV': 260, 'NMP_EVAL_MAX': 4, 'FUTILITY_MID_STEP': 167, 'PROBCUT_MARGIN': 139}
+2026-08-03 10:32:54,118 INFO     Start experiment
+2026-08-03 10:33:24,868 INFO     Experiment finished (30.749723s elapsed).
+2026-08-03 10:33:25,025 INFO     Got Elo: 33.18969402590559 +- 50.2122537630477
+2026-08-03 10:33:25,025 INFO     Estimated draw rate: 45.45%
+2026-08-03 10:33:25,025 INFO     Updating model
+2026-08-03 10:33:28,889 INFO     GP sampling finished (3.863711s)
+2026-08-03 10:33:28,913 INFO     Starting iteration 91
+2026-08-03 10:33:31,834 INFO     Current optimum:
+{'RFP_MARGIN_PER_DEPTH': 71, 'NMP_EVAL_DIV': 263, 'NMP_EVAL_MAX': 4, 'FUTILITY_MID_STEP': 180, 'PROBCUT_MARGIN': 152}
+2026-08-03 10:33:31,834 INFO     Estimated Elo: 6.4972 +- 6.816
+2026-08-03 10:33:31,834 INFO     90.0% confidence interval of the Elo value: (-4.7141, 17.7086)
+2026-08-03 10:33:31,920 INFO     90.0% confidence intervals of the parameters:
+Parameter             Lower bound  Upper bound
+----------------------------------------------
+RFP_MARGIN_PER_DEPTH           50          146
+NMP_EVAL_DIV                   91          285
+NMP_EVAL_MAX                    2            7
+FUTILITY_MID_STEP             151          373
+PROBCUT_MARGIN                 54          158
+
+2026-08-03 10:33:31,920 INFO     Testing {'RFP_MARGIN_PER_DEPTH': 75, 'NMP_EVAL_DIV': 253, 'NMP_EVAL_MAX': 3, 'FUTILITY_MID_STEP': 186, 'PROBCUT_MARGIN': 146}
+2026-08-03 10:33:31,921 INFO     Start experiment
+2026-08-03 10:34:05,241 INFO     Experiment finished (33.320159s elapsed).
+2026-08-03 10:34:05,437 INFO     Got Elo: 84.3413461259572 +- 42.56919586880619
+2026-08-03 10:34:05,437 INFO     Estimated draw rate: 50.00%
+2026-08-03 10:34:05,437 INFO     Updating model
+2026-08-03 10:34:09,699 INFO     GP sampling finished (4.262475s)
+2026-08-03 10:34:09,721 INFO     Starting iteration 92
+2026-08-03 10:34:12,715 INFO     Current optimum:
+{'RFP_MARGIN_PER_DEPTH': 72, 'NMP_EVAL_DIV': 258, 'NMP_EVAL_MAX': 3, 'FUTILITY_MID_STEP': 180, 'PROBCUT_MARGIN': 150}
+2026-08-03 10:34:12,715 INFO     Estimated Elo: 9.3535 +- 7.5375
+2026-08-03 10:34:12,716 INFO     90.0% confidence interval of the Elo value: (-3.0446, 21.7516)
+2026-08-03 10:34:12,839 INFO     90.0% confidence intervals of the parameters:
+Parameter             Lower bound  Upper bound
+----------------------------------------------
+RFP_MARGIN_PER_DEPTH           61          157
+NMP_EVAL_DIV                  100          299
+NMP_EVAL_MAX                    3            8
+FUTILITY_MID_STEP             176          395
+PROBCUT_MARGIN                 43          150
+
+2026-08-03 10:34:12,840 INFO     Testing {'RFP_MARGIN_PER_DEPTH': 83, 'NMP_EVAL_DIV': 257, 'NMP_EVAL_MAX': 3, 'FUTILITY_MID_STEP': 158, 'PROBCUT_MARGIN': 143}
+2026-08-03 10:34:12,840 INFO     Start experiment
+2026-08-03 10:34:52,551 INFO     Experiment finished (39.711149s elapsed).
+2026-08-03 10:34:52,722 INFO     Got Elo: -16.55707406328996 +- 62.761252533305154
+2026-08-03 10:34:52,722 INFO     Estimated draw rate: 22.73%
+2026-08-03 10:34:52,722 INFO     Updating model
+2026-08-03 10:34:55,772 INFO     GP sampling finished (3.049439s)
+2026-08-03 10:34:55,840 INFO     Starting iteration 93
+2026-08-03 10:34:58,887 INFO     Current optimum:
+{'RFP_MARGIN_PER_DEPTH': 71, 'NMP_EVAL_DIV': 259, 'NMP_EVAL_MAX': 4, 'FUTILITY_MID_STEP': 181, 'PROBCUT_MARGIN': 150}
+2026-08-03 10:34:58,887 INFO     Estimated Elo: 8.3089 +- 6.815
+2026-08-03 10:34:58,887 INFO     90.0% confidence interval of the Elo value: (-2.9009, 19.5186)
+2026-08-03 10:34:58,974 INFO     90.0% confidence intervals of the parameters:
+Parameter             Lower bound  Upper bound
+----------------------------------------------
+RFP_MARGIN_PER_DEPTH           52          146
+NMP_EVAL_DIV                  104          292
+NMP_EVAL_MAX                    2            7
+FUTILITY_MID_STEP             156          381
+PROBCUT_MARGIN                 41          145
+
+2026-08-03 10:34:58,974 INFO     Testing {'RFP_MARGIN_PER_DEPTH': 82, 'NMP_EVAL_DIV': 258, 'NMP_EVAL_MAX': 3, 'FUTILITY_MID_STEP': 212, 'PROBCUT_MARGIN': 154}
+2026-08-03 10:34:58,974 INFO     Start experiment
+2026-08-03 10:35:28,350 INFO     Experiment finished (29.375282s elapsed).
+2026-08-03 10:35:28,517 INFO     Got Elo: -49.97549464331997 +- 66.41512278775986
+2026-08-03 10:35:28,517 INFO     Estimated draw rate: 40.91%
+2026-08-03 10:35:28,517 INFO     Updating model
+2026-08-03 10:35:32,649 INFO     GP sampling finished (4.1316s)
+2026-08-03 10:35:32,686 INFO     Starting iteration 94
+2026-08-03 10:35:35,602 INFO     Current optimum:
+{'RFP_MARGIN_PER_DEPTH': 71, 'NMP_EVAL_DIV': 259, 'NMP_EVAL_MAX': 4, 'FUTILITY_MID_STEP': 179, 'PROBCUT_MARGIN': 150}
+2026-08-03 10:35:35,602 INFO     Estimated Elo: 7.5179 +- 6.7774
+2026-08-03 10:35:35,602 INFO     90.0% confidence interval of the Elo value: (-3.6299, 18.6658)
+2026-08-03 10:35:35,683 INFO     90.0% confidence intervals of the parameters:
+Parameter             Lower bound  Upper bound
+----------------------------------------------
+RFP_MARGIN_PER_DEPTH           50          148
+NMP_EVAL_DIV                  101          299
+NMP_EVAL_MAX                    3            8
+FUTILITY_MID_STEP             154          369
+PROBCUT_MARGIN                 40          147
+
+2026-08-03 10:35:35,683 INFO     Testing {'RFP_MARGIN_PER_DEPTH': 68, 'NMP_EVAL_DIV': 229, 'NMP_EVAL_MAX': 4, 'FUTILITY_MID_STEP': 165, 'PROBCUT_MARGIN': 121}
+2026-08-03 10:35:35,683 INFO     Start experiment
+2026-08-03 10:36:11,543 INFO     Experiment finished (35.859403s elapsed).
+2026-08-03 10:36:11,711 INFO     Got Elo: 16.55707406329004 +- 53.23169519467377
+2026-08-03 10:36:11,711 INFO     Estimated draw rate: 50.00%
+2026-08-03 10:36:11,711 INFO     Updating model
+2026-08-03 10:36:15,103 INFO     GP sampling finished (3.391421s)
+2026-08-03 10:36:15,179 INFO     Starting iteration 95
+2026-08-03 10:36:18,474 INFO     Current optimum:
+{'RFP_MARGIN_PER_DEPTH': 71, 'NMP_EVAL_DIV': 259, 'NMP_EVAL_MAX': 4, 'FUTILITY_MID_STEP': 179, 'PROBCUT_MARGIN': 150}
+2026-08-03 10:36:18,475 INFO     Estimated Elo: 7.6707 +- 6.7727
+2026-08-03 10:36:18,475 INFO     90.0% confidence interval of the Elo value: (-3.4695, 18.8108)
+2026-08-03 10:36:18,567 INFO     90.0% confidence intervals of the parameters:
+Parameter             Lower bound  Upper bound
+----------------------------------------------
+RFP_MARGIN_PER_DEPTH           58          156
+NMP_EVAL_DIV                   97          294
+NMP_EVAL_MAX                    3            8
+FUTILITY_MID_STEP             155          375
+PROBCUT_MARGIN                 49          156
+
+2026-08-03 10:36:18,567 INFO     Testing {'RFP_MARGIN_PER_DEPTH': 66, 'NMP_EVAL_DIV': 287, 'NMP_EVAL_MAX': 6, 'FUTILITY_MID_STEP': 189, 'PROBCUT_MARGIN': 155}
+2026-08-03 10:36:18,567 INFO     Start experiment
+2026-08-03 10:36:48,664 INFO     Experiment finished (30.096545s elapsed).
+2026-08-03 10:36:48,839 INFO     Got Elo: -0.0 +- 69.21278261740777
+2026-08-03 10:36:48,840 INFO     Estimated draw rate: 36.36%
+2026-08-03 10:36:48,840 INFO     Updating model
+2026-08-03 10:36:53,312 INFO     GP sampling finished (4.472032s)
+2026-08-03 10:36:53,337 INFO     Starting iteration 96
+2026-08-03 10:36:56,251 INFO     Current optimum:
+{'RFP_MARGIN_PER_DEPTH': 71, 'NMP_EVAL_DIV': 259, 'NMP_EVAL_MAX': 4, 'FUTILITY_MID_STEP': 179, 'PROBCUT_MARGIN': 150}
+2026-08-03 10:36:56,251 INFO     Estimated Elo: 7.344 +- 6.6397
+2026-08-03 10:36:56,251 INFO     90.0% confidence interval of the Elo value: (-3.5773, 18.2653)
+2026-08-03 10:36:56,378 INFO     90.0% confidence intervals of the parameters:
+Parameter             Lower bound  Upper bound
+----------------------------------------------
+RFP_MARGIN_PER_DEPTH           56          152
+NMP_EVAL_DIV                   99          292
+NMP_EVAL_MAX                    2            8
+FUTILITY_MID_STEP             153          370
+PROBCUT_MARGIN                 42          149
+
+2026-08-03 10:36:56,378 INFO     Testing {'RFP_MARGIN_PER_DEPTH': 69, 'NMP_EVAL_DIV': 250, 'NMP_EVAL_MAX': 5, 'FUTILITY_MID_STEP': 195, 'PROBCUT_MARGIN': 153}
+2026-08-03 10:36:56,378 INFO     Start experiment
+2026-08-03 10:37:39,447 INFO     Experiment finished (43.068461s elapsed).
+2026-08-03 10:37:39,627 INFO     Got Elo: 33.18969402590559 +- 44.03575040956794
+2026-08-03 10:37:39,627 INFO     Estimated draw rate: 54.55%
+2026-08-03 10:37:39,627 INFO     Updating model
+2026-08-03 10:37:42,671 INFO     GP sampling finished (3.044109s)
+2026-08-03 10:37:42,695 INFO     Starting iteration 97
+2026-08-03 10:37:45,712 INFO     Current optimum:
+{'RFP_MARGIN_PER_DEPTH': 71, 'NMP_EVAL_DIV': 259, 'NMP_EVAL_MAX': 4, 'FUTILITY_MID_STEP': 180, 'PROBCUT_MARGIN': 150}
+2026-08-03 10:37:45,712 INFO     Estimated Elo: 7.7237 +- 6.601
+2026-08-03 10:37:45,712 INFO     90.0% confidence interval of the Elo value: (-3.134, 18.5815)
+2026-08-03 10:37:45,794 INFO     90.0% confidence intervals of the parameters:
+Parameter             Lower bound  Upper bound
+----------------------------------------------
+RFP_MARGIN_PER_DEPTH           51          149
+NMP_EVAL_DIV                   96          294
+NMP_EVAL_MAX                    3            8
+FUTILITY_MID_STEP             163          375
+PROBCUT_MARGIN                 41          150
+
+2026-08-03 10:37:45,794 INFO     Testing {'RFP_MARGIN_PER_DEPTH': 69, 'NMP_EVAL_DIV': 280, 'NMP_EVAL_MAX': 3, 'FUTILITY_MID_STEP': 183, 'PROBCUT_MARGIN': 101}
+2026-08-03 10:37:45,794 INFO     Start experiment
+2026-08-03 10:38:22,793 INFO     Experiment finished (36.998472s elapsed).
+2026-08-03 10:38:22,947 INFO     Got Elo: 33.18969402590559 +- 55.37141472029644
+2026-08-03 10:38:22,947 INFO     Estimated draw rate: 45.45%
+2026-08-03 10:38:22,947 INFO     Updating model
+2026-08-03 10:38:27,366 INFO     GP sampling finished (4.419416s)
+2026-08-03 10:38:27,399 INFO     Starting iteration 98
+2026-08-03 10:38:30,293 INFO     Current optimum:
+{'RFP_MARGIN_PER_DEPTH': 71, 'NMP_EVAL_DIV': 259, 'NMP_EVAL_MAX': 4, 'FUTILITY_MID_STEP': 180, 'PROBCUT_MARGIN': 150}
+2026-08-03 10:38:30,293 INFO     Estimated Elo: 8.4859 +- 6.8334
+2026-08-03 10:38:30,293 INFO     90.0% confidence interval of the Elo value: (-2.754, 19.7258)
+2026-08-03 10:38:30,377 INFO     90.0% confidence intervals of the parameters:
+Parameter             Lower bound  Upper bound
+----------------------------------------------
+RFP_MARGIN_PER_DEPTH           51          148
+NMP_EVAL_DIV                  104          298
+NMP_EVAL_MAX                    3            8
+FUTILITY_MID_STEP             150          373
+PROBCUT_MARGIN                 50          156
+
+2026-08-03 10:38:30,377 INFO     Testing {'RFP_MARGIN_PER_DEPTH': 55, 'NMP_EVAL_DIV': 263, 'NMP_EVAL_MAX': 3, 'FUTILITY_MID_STEP': 336, 'PROBCUT_MARGIN': 147}
+2026-08-03 10:38:30,378 INFO     Start experiment
+2026-08-03 10:39:01,577 INFO     Experiment finished (31.199383s elapsed).
+2026-08-03 10:39:01,757 INFO     Got Elo: 49.975494643319955 +- 52.248040452433806
+2026-08-03 10:39:01,757 INFO     Estimated draw rate: 50.00%
+2026-08-03 10:39:01,757 INFO     Updating model
+2026-08-03 10:39:06,139 INFO     GP sampling finished (4.381338s)
+2026-08-03 10:39:06,172 INFO     Starting iteration 99
+2026-08-03 10:39:09,404 INFO     Current optimum:
+{'RFP_MARGIN_PER_DEPTH': 71, 'NMP_EVAL_DIV': 259, 'NMP_EVAL_MAX': 4, 'FUTILITY_MID_STEP': 180, 'PROBCUT_MARGIN': 150}
+2026-08-03 10:39:09,404 INFO     Estimated Elo: 8.9163 +- 6.88
+2026-08-03 10:39:09,404 INFO     90.0% confidence interval of the Elo value: (-2.4002, 20.2328)
+2026-08-03 10:39:09,488 INFO     90.0% confidence intervals of the parameters:
+Parameter             Lower bound  Upper bound
+----------------------------------------------
+RFP_MARGIN_PER_DEPTH           52          150
+NMP_EVAL_DIV                   80          279
+NMP_EVAL_MAX                    2            7
+FUTILITY_MID_STEP             151          373
+PROBCUT_MARGIN                 50          154
+
+2026-08-03 10:39:09,488 INFO     Testing {'RFP_MARGIN_PER_DEPTH': 66, 'NMP_EVAL_DIV': 261, 'NMP_EVAL_MAX': 3, 'FUTILITY_MID_STEP': 347, 'PROBCUT_MARGIN': 139}
+2026-08-03 10:39:09,488 INFO     Start experiment
+2026-08-03 10:39:38,687 INFO     Experiment finished (29.199023s elapsed).
+2026-08-03 10:39:38,874 INFO     Got Elo: -16.557074063290028 +- 47.57607168537913
+2026-08-03 10:39:38,874 INFO     Estimated draw rate: 50.00%
+2026-08-03 10:39:38,874 INFO     Updating model
+2026-08-03 10:39:42,628 INFO     GP sampling finished (3.753979s)
+2026-08-03 10:39:42,660 INFO     Starting iteration 100
+2026-08-03 10:39:45,587 INFO     Current optimum:
+{'RFP_MARGIN_PER_DEPTH': 71, 'NMP_EVAL_DIV': 259, 'NMP_EVAL_MAX': 4, 'FUTILITY_MID_STEP': 180, 'PROBCUT_MARGIN': 150}
+2026-08-03 10:39:45,587 INFO     Estimated Elo: 8.2806 +- 6.6122
+2026-08-03 10:39:45,587 INFO     90.0% confidence interval of the Elo value: (-2.5956, 19.1567)
+2026-08-03 10:39:45,732 INFO     90.0% confidence intervals of the parameters:
+Parameter             Lower bound  Upper bound
+----------------------------------------------
+RFP_MARGIN_PER_DEPTH           50          150
+NMP_EVAL_DIV                   85          280
+NMP_EVAL_MAX                    3            8
+FUTILITY_MID_STEP             157          384
+PROBCUT_MARGIN                 51          157
+
+2026-08-03 10:39:45,732 INFO     Testing {'RFP_MARGIN_PER_DEPTH': 65, 'NMP_EVAL_DIV': 287, 'NMP_EVAL_MAX': 5, 'FUTILITY_MID_STEP': 193, 'PROBCUT_MARGIN': 156}
+2026-08-03 10:39:45,732 INFO     Start experiment
+2026-08-03 10:40:13,209 INFO     Experiment finished (27.476144s elapsed).
+2026-08-03 10:40:13,394 INFO     Got Elo: 16.55707406329004 +- 52.969452523714956
+2026-08-03 10:40:13,394 INFO     Estimated draw rate: 59.09%
+2026-08-03 10:40:13,394 INFO     Updating model
+2026-08-03 10:40:17,485 INFO     GP sampling finished (4.090919s)
+2026-08-03 10:40:17,527 INFO     Starting iteration 101
+2026-08-03 10:40:20,587 INFO     Current optimum:
+{'RFP_MARGIN_PER_DEPTH': 70, 'NMP_EVAL_DIV': 260, 'NMP_EVAL_MAX': 4, 'FUTILITY_MID_STEP': 180, 'PROBCUT_MARGIN': 150}
+2026-08-03 10:40:20,587 INFO     Estimated Elo: 8.1198 +- 6.4658
+2026-08-03 10:40:20,587 INFO     90.0% confidence interval of the Elo value: (-2.5154, 18.755)
+2026-08-03 10:40:20,659 INFO     90.0% confidence intervals of the parameters:
+Parameter             Lower bound  Upper bound
+----------------------------------------------
+RFP_MARGIN_PER_DEPTH           51          147
+NMP_EVAL_DIV                   82          277
+NMP_EVAL_MAX                    2            7
+FUTILITY_MID_STEP             159          380
+PROBCUT_MARGIN                 43          150
+
+2026-08-03 10:40:20,659 INFO     Testing {'RFP_MARGIN_PER_DEPTH': 71, 'NMP_EVAL_DIV': 253, 'NMP_EVAL_MAX': 3, 'FUTILITY_MID_STEP': 163, 'PROBCUT_MARGIN': 158}
+2026-08-03 10:40:20,660 INFO     Start experiment
+2026-08-03 10:40:53,234 INFO     Experiment finished (32.574426s elapsed).
+2026-08-03 10:40:53,400 INFO     Got Elo: 84.3413461259573 +- 61.23700221563334
+2026-08-03 10:40:53,401 INFO     Estimated draw rate: 22.73%
+2026-08-03 10:40:53,401 INFO     Updating model
+2026-08-03 10:40:56,866 INFO     GP sampling finished (3.464896s)
+2026-08-03 10:40:56,892 INFO     Starting iteration 102
+2026-08-03 10:41:00,200 INFO     Current optimum:
+{'RFP_MARGIN_PER_DEPTH': 71, 'NMP_EVAL_DIV': 258, 'NMP_EVAL_MAX': 3, 'FUTILITY_MID_STEP': 177, 'PROBCUT_MARGIN': 151}
+2026-08-03 10:41:00,200 INFO     Estimated Elo: 9.7425 +- 6.9612
+2026-08-03 10:41:00,200 INFO     90.0% confidence interval of the Elo value: (-1.7077, 21.1927)
+2026-08-03 10:41:00,263 INFO     90.0% confidence intervals of the parameters:
+Parameter             Lower bound  Upper bound
+----------------------------------------------
+RFP_MARGIN_PER_DEPTH           58          156
+NMP_EVAL_DIV                  101          298
+NMP_EVAL_MAX                    3            8
+FUTILITY_MID_STEP             150          373
+PROBCUT_MARGIN                 50          156
+
+2026-08-03 10:41:00,263 INFO     Testing {'RFP_MARGIN_PER_DEPTH': 70, 'NMP_EVAL_DIV': 293, 'NMP_EVAL_MAX': 3, 'FUTILITY_MID_STEP': 203, 'PROBCUT_MARGIN': 151}
+2026-08-03 10:41:00,263 INFO     Start experiment
+2026-08-03 10:41:28,283 INFO     Experiment finished (28.019005s elapsed).
+2026-08-03 10:41:28,486 INFO     Got Elo: 66.99643491750547 +- 41.3891385508745
+2026-08-03 10:41:28,486 INFO     Estimated draw rate: 63.64%
+2026-08-03 10:41:28,486 INFO     Updating model
+2026-08-03 10:41:31,920 INFO     GP sampling finished (3.433956s)
+2026-08-03 10:41:31,943 INFO     Starting iteration 103
+2026-08-03 10:41:34,828 INFO     Current optimum:
+{'RFP_MARGIN_PER_DEPTH': 70, 'NMP_EVAL_DIV': 263, 'NMP_EVAL_MAX': 3, 'FUTILITY_MID_STEP': 179, 'PROBCUT_MARGIN': 151}
+2026-08-03 10:41:34,828 INFO     Estimated Elo: 11.0648 +- 7.0222
+2026-08-03 10:41:34,829 INFO     90.0% confidence interval of the Elo value: (-0.4856, 22.6153)
+2026-08-03 10:41:34,914 INFO     90.0% confidence intervals of the parameters:
+Parameter             Lower bound  Upper bound
+----------------------------------------------
+RFP_MARGIN_PER_DEPTH           50          146
+NMP_EVAL_DIV                   92          287
+NMP_EVAL_MAX                    2            7
+FUTILITY_MID_STEP             158          376
+PROBCUT_MARGIN                 41          152
+
+2026-08-03 10:41:34,914 INFO     Testing {'RFP_MARGIN_PER_DEPTH': 73, 'NMP_EVAL_DIV': 263, 'NMP_EVAL_MAX': 3, 'FUTILITY_MID_STEP': 198, 'PROBCUT_MARGIN': 149}
+2026-08-03 10:41:34,915 INFO     Start experiment
+2026-08-03 10:42:02,798 INFO     Experiment finished (27.883627s elapsed).
+2026-08-03 10:42:02,965 INFO     Got Elo: -33.189694025905595 +- 44.008522168520706
+2026-08-03 10:42:02,965 INFO     Estimated draw rate: 36.36%
+2026-08-03 10:42:02,965 INFO     Updating model
+2026-08-03 10:42:06,496 INFO     GP sampling finished (3.531155s)
+2026-08-03 10:42:06,574 INFO     Starting iteration 104
+2026-08-03 10:42:09,772 INFO     Current optimum:
+{'RFP_MARGIN_PER_DEPTH': 70, 'NMP_EVAL_DIV': 263, 'NMP_EVAL_MAX': 4, 'FUTILITY_MID_STEP': 177, 'PROBCUT_MARGIN': 152}
+2026-08-03 10:42:09,772 INFO     Estimated Elo: 10.2462 +- 6.8858
+2026-08-03 10:42:09,772 INFO     90.0% confidence interval of the Elo value: (-1.0799, 21.5723)
+2026-08-03 10:42:09,876 INFO     90.0% confidence intervals of the parameters:
+Parameter             Lower bound  Upper bound
+----------------------------------------------
+RFP_MARGIN_PER_DEPTH           51          150
+NMP_EVAL_DIV                   96          291
+NMP_EVAL_MAX                    3            8
+FUTILITY_MID_STEP             156          386
+PROBCUT_MARGIN                 42          149
+
+2026-08-03 10:42:09,877 INFO     Testing {'RFP_MARGIN_PER_DEPTH': 75, 'NMP_EVAL_DIV': 279, 'NMP_EVAL_MAX': 4, 'FUTILITY_MID_STEP': 221, 'PROBCUT_MARGIN': 159}
+2026-08-03 10:42:09,877 INFO     Start experiment
+2026-08-03 10:42:43,925 INFO     Experiment finished (34.047895s elapsed).
+2026-08-03 10:42:44,115 INFO     Got Elo: -66.99643491750545 +- 69.32814344535029
+2026-08-03 10:42:44,115 INFO     Estimated draw rate: 45.45%
+2026-08-03 10:42:44,115 INFO     Updating model
+2026-08-03 10:42:46,921 INFO     GP sampling finished (2.805241s)
+2026-08-03 10:42:46,940 INFO     Starting iteration 105
+2026-08-03 10:42:49,870 INFO     Current optimum:
+{'RFP_MARGIN_PER_DEPTH': 70, 'NMP_EVAL_DIV': 262, 'NMP_EVAL_MAX': 3, 'FUTILITY_MID_STEP': 176, 'PROBCUT_MARGIN': 151}
+2026-08-03 10:42:49,870 INFO     Estimated Elo: 9.6647 +- 7.1295
+2026-08-03 10:42:49,870 INFO     90.0% confidence interval of the Elo value: (-2.0622, 21.3916)
+2026-08-03 10:42:50,022 INFO     90.0% confidence intervals of the parameters:
+Parameter             Lower bound  Upper bound
+----------------------------------------------
+RFP_MARGIN_PER_DEPTH           58          157
+NMP_EVAL_DIV                   81          278
+NMP_EVAL_MAX                    3            8
+FUTILITY_MID_STEP             159          386
+PROBCUT_MARGIN                 52          158
+
+2026-08-03 10:42:50,022 INFO     Testing {'RFP_MARGIN_PER_DEPTH': 77, 'NMP_EVAL_DIV': 261, 'NMP_EVAL_MAX': 3, 'FUTILITY_MID_STEP': 190, 'PROBCUT_MARGIN': 146}
+2026-08-03 10:42:50,023 INFO     Start experiment
+2026-08-03 10:43:21,130 INFO     Experiment finished (31.107033s elapsed).
+2026-08-03 10:43:21,320 INFO     Got Elo: 84.3413461259573 +- 56.073263987759034
+2026-08-03 10:43:21,320 INFO     Estimated draw rate: 50.00%
+2026-08-03 10:43:21,320 INFO     Updating model
+2026-08-03 10:43:24,451 INFO     GP sampling finished (3.130847s)
+2026-08-03 10:43:24,525 INFO     Starting iteration 106
+2026-08-03 10:43:27,382 INFO     Current optimum:
+{'RFP_MARGIN_PER_DEPTH': 71, 'NMP_EVAL_DIV': 261, 'NMP_EVAL_MAX': 3, 'FUTILITY_MID_STEP': 177, 'PROBCUT_MARGIN': 150}
+2026-08-03 10:43:27,382 INFO     Estimated Elo: 11.0031 +- 7.0993
+2026-08-03 10:43:27,382 INFO     90.0% confidence interval of the Elo value: (-0.6742, 22.6804)
+2026-08-03 10:43:27,454 INFO     90.0% confidence intervals of the parameters:
+Parameter             Lower bound  Upper bound
+----------------------------------------------
+RFP_MARGIN_PER_DEPTH           51          148
+NMP_EVAL_DIV                   91          290
+NMP_EVAL_MAX                    3            8
+FUTILITY_MID_STEP             172          396
+PROBCUT_MARGIN                 46          153
+
+2026-08-03 10:43:27,454 INFO     Testing {'RFP_MARGIN_PER_DEPTH': 74, 'NMP_EVAL_DIV': 269, 'NMP_EVAL_MAX': 3, 'FUTILITY_MID_STEP': 184, 'PROBCUT_MARGIN': 122}
+2026-08-03 10:43:27,454 INFO     Start experiment
+2026-08-03 10:43:53,990 INFO     Experiment finished (26.535797s elapsed).
+2026-08-03 10:43:54,142 INFO     Got Elo: 120.41199826559243 +- 63.657310633973886
+2026-08-03 10:43:54,142 INFO     Estimated draw rate: 40.91%
+2026-08-03 10:43:54,142 INFO     Updating model
+2026-08-03 10:43:57,781 INFO     GP sampling finished (3.638553s)
+2026-08-03 10:43:57,857 INFO     Starting iteration 107
+2026-08-03 10:44:00,502 INFO     Current optimum:
+{'RFP_MARGIN_PER_DEPTH': 71, 'NMP_EVAL_DIV': 262, 'NMP_EVAL_MAX': 3, 'FUTILITY_MID_STEP': 177, 'PROBCUT_MARGIN': 147}
+2026-08-03 10:44:00,502 INFO     Estimated Elo: 12.2437 +- 7.0424
+2026-08-03 10:44:00,502 INFO     90.0% confidence interval of the Elo value: (0.66, 23.8274)
+2026-08-03 10:44:00,579 INFO     90.0% confidence intervals of the parameters:
+Parameter             Lower bound  Upper bound
+----------------------------------------------
+RFP_MARGIN_PER_DEPTH           50          149
+NMP_EVAL_DIV                  105          297
+NMP_EVAL_MAX                    2            7
+FUTILITY_MID_STEP             152          375
+PROBCUT_MARGIN                 40          146
+
+2026-08-03 10:44:00,579 INFO     Testing {'RFP_MARGIN_PER_DEPTH': 67, 'NMP_EVAL_DIV': 288, 'NMP_EVAL_MAX': 3, 'FUTILITY_MID_STEP': 169, 'PROBCUT_MARGIN': 119}
+2026-08-03 10:44:00,579 INFO     Start experiment
+2026-08-03 10:44:28,520 INFO     Experiment finished (27.940838s elapsed).
+2026-08-03 10:44:28,690 INFO     Got Elo: 33.18969402590559 +- 60.242565786597446
+2026-08-03 10:44:28,690 INFO     Estimated draw rate: 45.45%
+2026-08-03 10:44:28,690 INFO     Updating model
+2026-08-03 10:44:32,045 INFO     GP sampling finished (3.354733s)
+2026-08-03 10:44:32,119 INFO     Starting iteration 108
+2026-08-03 10:44:34,820 INFO     Current optimum:
+{'RFP_MARGIN_PER_DEPTH': 71, 'NMP_EVAL_DIV': 263, 'NMP_EVAL_MAX': 3, 'FUTILITY_MID_STEP': 177, 'PROBCUT_MARGIN': 146}
+2026-08-03 10:44:34,821 INFO     Estimated Elo: 11.8025 +- 6.6804
+2026-08-03 10:44:34,821 INFO     90.0% confidence interval of the Elo value: (0.8142, 22.7908)
+2026-08-03 10:44:34,896 INFO     90.0% confidence intervals of the parameters:
+Parameter             Lower bound  Upper bound
+----------------------------------------------
+RFP_MARGIN_PER_DEPTH           52          146
+NMP_EVAL_DIV                  103          299
+NMP_EVAL_MAX                    3            8
+FUTILITY_MID_STEP             152          375
+PROBCUT_MARGIN                 43          148
+
+2026-08-03 10:44:34,897 INFO     Testing {'RFP_MARGIN_PER_DEPTH': 77, 'NMP_EVAL_DIV': 248, 'NMP_EVAL_MAX': 4, 'FUTILITY_MID_STEP': 187, 'PROBCUT_MARGIN': 132}
+2026-08-03 10:44:34,897 INFO     Start experiment
+2026-08-03 10:45:03,536 INFO     Experiment finished (28.638623s elapsed).
+2026-08-03 10:45:03,703 INFO     Got Elo: -0.0 +- 55.81155986024493
+2026-08-03 10:45:03,703 INFO     Estimated draw rate: 36.36%
+2026-08-03 10:45:03,703 INFO     Updating model
+2026-08-03 10:45:07,198 INFO     GP sampling finished (3.495228s)
+2026-08-03 10:45:07,222 INFO     Starting iteration 109
+2026-08-03 10:45:09,655 INFO     Current optimum:
+{'RFP_MARGIN_PER_DEPTH': 71, 'NMP_EVAL_DIV': 263, 'NMP_EVAL_MAX': 3, 'FUTILITY_MID_STEP': 177, 'PROBCUT_MARGIN': 147}
+2026-08-03 10:45:09,656 INFO     Estimated Elo: 11.4014 +- 6.5198
+2026-08-03 10:45:09,656 INFO     90.0% confidence interval of the Elo value: (0.6772, 22.1255)
+2026-08-03 10:45:09,802 INFO     90.0% confidence intervals of the parameters:
+Parameter             Lower bound  Upper bound
+----------------------------------------------
+RFP_MARGIN_PER_DEPTH           58          156
+NMP_EVAL_DIV                  102          298
+NMP_EVAL_MAX                    2            7
+FUTILITY_MID_STEP             152          374
+PROBCUT_MARGIN                 44          149
+
+2026-08-03 10:45:09,802 INFO     Testing {'RFP_MARGIN_PER_DEPTH': 52, 'NMP_EVAL_DIV': 248, 'NMP_EVAL_MAX': 3, 'FUTILITY_MID_STEP': 168, 'PROBCUT_MARGIN': 148}
+2026-08-03 10:45:09,802 INFO     Start experiment
+2026-08-03 10:45:42,559 INFO     Experiment finished (32.756963s elapsed).
+2026-08-03 10:45:42,719 INFO     Got Elo: -66.99643491750545 +- 48.38175578905942
+2026-08-03 10:45:42,720 INFO     Estimated draw rate: 54.55%
+2026-08-03 10:45:42,720 INFO     Updating model
+2026-08-03 10:45:45,651 INFO     GP sampling finished (2.93151s)
+2026-08-03 10:45:45,675 INFO     Starting iteration 110
+2026-08-03 10:45:48,278 INFO     Current optimum:
+{'RFP_MARGIN_PER_DEPTH': 73, 'NMP_EVAL_DIV': 264, 'NMP_EVAL_MAX': 3, 'FUTILITY_MID_STEP': 178, 'PROBCUT_MARGIN': 147}
+2026-08-03 10:45:48,278 INFO     Estimated Elo: 10.1732 +- 6.3867
+2026-08-03 10:45:48,278 INFO     90.0% confidence interval of the Elo value: (-0.3321, 20.6784)
+2026-08-03 10:45:48,354 INFO     90.0% confidence intervals of the parameters:
+Parameter             Lower bound  Upper bound
+----------------------------------------------
+RFP_MARGIN_PER_DEPTH           59          152
+NMP_EVAL_DIV                  103          297
+NMP_EVAL_MAX                    2            8
+FUTILITY_MID_STEP             182          399
+PROBCUT_MARGIN                 53          159
+
+2026-08-03 10:45:48,354 INFO     Testing {'RFP_MARGIN_PER_DEPTH': 80, 'NMP_EVAL_DIV': 258, 'NMP_EVAL_MAX': 5, 'FUTILITY_MID_STEP': 178, 'PROBCUT_MARGIN': 157}
+2026-08-03 10:45:48,354 INFO     Start experiment
+2026-08-03 10:46:24,133 INFO     Experiment finished (35.778246s elapsed).
+2026-08-03 10:46:24,334 INFO     Got Elo: -33.189694025905595 +- 49.72452844758066
+2026-08-03 10:46:24,334 INFO     Estimated draw rate: 54.55%
+2026-08-03 10:46:24,334 INFO     Updating model
+2026-08-03 10:46:27,291 INFO     GP sampling finished (2.957534s)
+2026-08-03 10:46:27,362 INFO     Starting iteration 111
+2026-08-03 10:46:30,133 INFO     Current optimum:
+{'RFP_MARGIN_PER_DEPTH': 73, 'NMP_EVAL_DIV': 264, 'NMP_EVAL_MAX': 3, 'FUTILITY_MID_STEP': 179, 'PROBCUT_MARGIN': 146}
+2026-08-03 10:46:30,133 INFO     Estimated Elo: 9.6953 +- 6.3241
+2026-08-03 10:46:30,133 INFO     90.0% confidence interval of the Elo value: (-0.707, 20.0975)
+2026-08-03 10:46:30,206 INFO     90.0% confidence intervals of the parameters:
+Parameter             Lower bound  Upper bound
+----------------------------------------------
+RFP_MARGIN_PER_DEPTH           62          159
+NMP_EVAL_DIV                  107          300
+NMP_EVAL_MAX                    3            8
+FUTILITY_MID_STEP             152          376
+PROBCUT_MARGIN                 50          159
+
+2026-08-03 10:46:30,206 INFO     Testing {'RFP_MARGIN_PER_DEPTH': 77, 'NMP_EVAL_DIV': 288, 'NMP_EVAL_MAX': 3, 'FUTILITY_MID_STEP': 208, 'PROBCUT_MARGIN': 130}
+2026-08-03 10:46:30,207 INFO     Start experiment
+2026-08-03 10:47:00,378 INFO     Experiment finished (30.171262s elapsed).
+2026-08-03 10:47:00,548 INFO     Got Elo: 33.18969402590559 +- 55.45219398234069
+2026-08-03 10:47:00,548 INFO     Estimated draw rate: 54.55%
+2026-08-03 10:47:00,548 INFO     Updating model
+2026-08-03 10:47:03,882 INFO     GP sampling finished (3.333726s)
+2026-08-03 10:47:03,906 INFO     Starting iteration 112
+2026-08-03 10:47:06,915 INFO     Current optimum:
+{'RFP_MARGIN_PER_DEPTH': 73, 'NMP_EVAL_DIV': 265, 'NMP_EVAL_MAX': 3, 'FUTILITY_MID_STEP': 180, 'PROBCUT_MARGIN': 145}
+2026-08-03 10:47:06,915 INFO     Estimated Elo: 9.7835 +- 6.1882
+2026-08-03 10:47:06,915 INFO     90.0% confidence interval of the Elo value: (-0.3951, 19.9622)
+2026-08-03 10:47:06,988 INFO     90.0% confidence intervals of the parameters:
+Parameter             Lower bound  Upper bound
+----------------------------------------------
+RFP_MARGIN_PER_DEPTH           51          148
+NMP_EVAL_DIV                  101          299
+NMP_EVAL_MAX                    2            7
+FUTILITY_MID_STEP             155          377
+PROBCUT_MARGIN                 42          148
+
+2026-08-03 10:47:06,989 INFO     Testing {'RFP_MARGIN_PER_DEPTH': 65, 'NMP_EVAL_DIV': 275, 'NMP_EVAL_MAX': 2, 'FUTILITY_MID_STEP': 302, 'PROBCUT_MARGIN': 94}
+2026-08-03 10:47:06,989 INFO     Start experiment
+2026-08-03 10:47:39,091 INFO     Experiment finished (32.10223s elapsed).
+2026-08-03 10:47:39,253 INFO     Got Elo: -0.0 +- 84.8909872637465
+2026-08-03 10:47:39,253 INFO     Estimated draw rate: 18.18%
+2026-08-03 10:47:39,254 INFO     Updating model
+2026-08-03 10:47:42,120 INFO     GP sampling finished (2.86625s)
+2026-08-03 10:47:42,144 INFO     Starting iteration 113
+2026-08-03 10:47:45,025 INFO     Current optimum:
+{'RFP_MARGIN_PER_DEPTH': 73, 'NMP_EVAL_DIV': 266, 'NMP_EVAL_MAX': 3, 'FUTILITY_MID_STEP': 180, 'PROBCUT_MARGIN': 145}
+2026-08-03 10:47:45,025 INFO     Estimated Elo: 9.9489 +- 6.3614
+2026-08-03 10:47:45,025 INFO     90.0% confidence interval of the Elo value: (-0.5146, 20.4124)
+2026-08-03 10:47:45,093 INFO     90.0% confidence intervals of the parameters:
+Parameter             Lower bound  Upper bound
+----------------------------------------------
+RFP_MARGIN_PER_DEPTH           62          158
+NMP_EVAL_DIV                   83          279
+NMP_EVAL_MAX                    3            8
+FUTILITY_MID_STEP             173          397
+PROBCUT_MARGIN                 46          150
+
+2026-08-03 10:47:45,093 INFO     Testing {'RFP_MARGIN_PER_DEPTH': 62, 'NMP_EVAL_DIV': 290, 'NMP_EVAL_MAX': 3, 'FUTILITY_MID_STEP': 203, 'PROBCUT_MARGIN': 96}
+2026-08-03 10:47:45,093 INFO     Start experiment
+2026-08-03 10:48:15,625 INFO     Experiment finished (30.531833s elapsed).
+2026-08-03 10:48:15,820 INFO     Got Elo: -49.97549464331997 +- 39.75761640650203
+2026-08-03 10:48:15,820 INFO     Estimated draw rate: 40.91%
+2026-08-03 10:48:15,820 INFO     Updating model
+2026-08-03 10:48:19,535 INFO     GP sampling finished (3.714403s)
+2026-08-03 10:48:19,609 INFO     Starting iteration 114
+2026-08-03 10:48:22,371 INFO     Current optimum:
+{'RFP_MARGIN_PER_DEPTH': 73, 'NMP_EVAL_DIV': 265, 'NMP_EVAL_MAX': 3, 'FUTILITY_MID_STEP': 179, 'PROBCUT_MARGIN': 146}
+2026-08-03 10:48:22,371 INFO     Estimated Elo: 9.2631 +- 6.2085
+2026-08-03 10:48:22,371 INFO     90.0% confidence interval of the Elo value: (-0.949, 19.4753)
+2026-08-03 10:48:22,439 INFO     90.0% confidence intervals of the parameters:
+Parameter             Lower bound  Upper bound
+----------------------------------------------
+RFP_MARGIN_PER_DEPTH           50          152
+NMP_EVAL_DIV                   81          283
+NMP_EVAL_MAX                    2            7
+FUTILITY_MID_STEP             172          400
+PROBCUT_MARGIN                 42          148
+
+2026-08-03 10:48:22,440 INFO     Testing {'RFP_MARGIN_PER_DEPTH': 53, 'NMP_EVAL_DIV': 279, 'NMP_EVAL_MAX': 3, 'FUTILITY_MID_STEP': 175, 'PROBCUT_MARGIN': 147}
+2026-08-03 10:48:22,440 INFO     Start experiment
+2026-08-03 10:48:51,711 INFO     Experiment finished (29.271146s elapsed).
+2026-08-03 10:48:51,898 INFO     Got Elo: -0.0 +- 44.776359408663204
+2026-08-03 10:48:51,898 INFO     Estimated draw rate: 54.55%
+2026-08-03 10:48:51,898 INFO     Updating model
+2026-08-03 10:48:55,191 INFO     GP sampling finished (3.293106s)
+2026-08-03 10:48:55,266 INFO     Starting iteration 115
+2026-08-03 10:48:58,127 INFO     Current optimum:
+{'RFP_MARGIN_PER_DEPTH': 73, 'NMP_EVAL_DIV': 264, 'NMP_EVAL_MAX': 3, 'FUTILITY_MID_STEP': 179, 'PROBCUT_MARGIN': 146}
+2026-08-03 10:48:58,127 INFO     Estimated Elo: 8.63 +- 5.8593
+2026-08-03 10:48:58,128 INFO     90.0% confidence interval of the Elo value: (-1.0077, 18.2677)
+2026-08-03 10:48:58,204 INFO     90.0% confidence intervals of the parameters:
+Parameter             Lower bound  Upper bound
+----------------------------------------------
+RFP_MARGIN_PER_DEPTH           56          155
+NMP_EVAL_DIV                  100          297
+NMP_EVAL_MAX                    2            7
+FUTILITY_MID_STEP             155          380
+PROBCUT_MARGIN                 42          149
+
+2026-08-03 10:48:58,204 INFO     Testing {'RFP_MARGIN_PER_DEPTH': 84, 'NMP_EVAL_DIV': 232, 'NMP_EVAL_MAX': 2, 'FUTILITY_MID_STEP': 188, 'PROBCUT_MARGIN': 144}
+2026-08-03 10:48:58,205 INFO     Start experiment
+2026-08-03 10:49:32,491 INFO     Experiment finished (34.286223s elapsed).
+2026-08-03 10:49:32,666 INFO     Got Elo: -33.189694025905595 +- 44.100041914255186
+2026-08-03 10:49:32,666 INFO     Estimated draw rate: 45.45%
+2026-08-03 10:49:32,666 INFO     Updating model
+2026-08-03 10:49:36,744 INFO     GP sampling finished (4.077684s)
+2026-08-03 10:49:36,771 INFO     Starting iteration 116
+2026-08-03 10:49:39,732 INFO     Current optimum:
+{'RFP_MARGIN_PER_DEPTH': 72, 'NMP_EVAL_DIV': 265, 'NMP_EVAL_MAX': 3, 'FUTILITY_MID_STEP': 179, 'PROBCUT_MARGIN': 147}
+2026-08-03 10:49:39,732 INFO     Estimated Elo: 8.3031 +- 5.8832
+2026-08-03 10:49:39,732 INFO     90.0% confidence interval of the Elo value: (-1.3739, 17.9802)
+2026-08-03 10:49:39,787 INFO     90.0% confidence intervals of the parameters:
+Parameter             Lower bound  Upper bound
+----------------------------------------------
+RFP_MARGIN_PER_DEPTH           62          159
+NMP_EVAL_DIV                  100          300
+NMP_EVAL_MAX                    2            7
+FUTILITY_MID_STEP             151          371
+PROBCUT_MARGIN                 44          149
+
+2026-08-03 10:49:39,787 INFO     Testing {'RFP_MARGIN_PER_DEPTH': 110, 'NMP_EVAL_DIV': 273, 'NMP_EVAL_MAX': 3, 'FUTILITY_MID_STEP': 197, 'PROBCUT_MARGIN': 104}
+2026-08-03 10:49:39,787 INFO     Start experiment
+2026-08-03 10:50:15,382 INFO     Experiment finished (35.594509s elapsed).
+2026-08-03 10:50:15,561 INFO     Got Elo: -16.557074063290028 +- 58.07301599563877
+2026-08-03 10:50:15,562 INFO     Estimated draw rate: 50.00%
+2026-08-03 10:50:15,562 INFO     Updating model
+2026-08-03 10:50:18,574 INFO     GP sampling finished (3.012346s)
+2026-08-03 10:50:18,645 INFO     Starting iteration 117
+2026-08-03 10:50:22,029 INFO     Current optimum:
+{'RFP_MARGIN_PER_DEPTH': 72, 'NMP_EVAL_DIV': 265, 'NMP_EVAL_MAX': 3, 'FUTILITY_MID_STEP': 179, 'PROBCUT_MARGIN': 147}
+2026-08-03 10:50:22,030 INFO     Estimated Elo: 8.1899 +- 5.8509
+2026-08-03 10:50:22,030 INFO     90.0% confidence interval of the Elo value: (-1.434, 17.8138)
+2026-08-03 10:50:22,082 INFO     90.0% confidence intervals of the parameters:
+Parameter             Lower bound  Upper bound
+----------------------------------------------
+RFP_MARGIN_PER_DEPTH           58          154
+NMP_EVAL_DIV                   93          291
+NMP_EVAL_MAX                    3            8
+FUTILITY_MID_STEP             152          374
+PROBCUT_MARGIN                 47          153
+
+2026-08-03 10:50:22,082 INFO     Testing {'RFP_MARGIN_PER_DEPTH': 68, 'NMP_EVAL_DIV': 254, 'NMP_EVAL_MAX': 5, 'FUTILITY_MID_STEP': 158, 'PROBCUT_MARGIN': 108}
+2026-08-03 10:50:22,083 INFO     Start experiment
+2026-08-03 10:50:52,447 INFO     Experiment finished (30.363877s elapsed).
+2026-08-03 10:50:52,636 INFO     Got Elo: 66.99643491750547 +- 47.556874822962484
+2026-08-03 10:50:52,636 INFO     Estimated draw rate: 54.55%
+2026-08-03 10:50:52,636 INFO     Updating model
+2026-08-03 10:50:55,801 INFO     GP sampling finished (3.165138s)
+2026-08-03 10:50:55,826 INFO     Starting iteration 118
+2026-08-03 10:50:58,646 INFO     Current optimum:
+{'RFP_MARGIN_PER_DEPTH': 72, 'NMP_EVAL_DIV': 266, 'NMP_EVAL_MAX': 3, 'FUTILITY_MID_STEP': 179, 'PROBCUT_MARGIN': 146}
+2026-08-03 10:50:58,646 INFO     Estimated Elo: 8.3743 +- 5.7017
+2026-08-03 10:50:58,646 INFO     90.0% confidence interval of the Elo value: (-1.0042, 17.7528)
+2026-08-03 10:50:58,700 INFO     90.0% confidence intervals of the parameters:
+Parameter             Lower bound  Upper bound
+----------------------------------------------
+RFP_MARGIN_PER_DEPTH           50          146
+NMP_EVAL_DIV                  100          299
+NMP_EVAL_MAX                    3            8
+FUTILITY_MID_STEP             155          379
+PROBCUT_MARGIN                 50          158
+
+2026-08-03 10:50:58,700 INFO     Testing {'RFP_MARGIN_PER_DEPTH': 65, 'NMP_EVAL_DIV': 252, 'NMP_EVAL_MAX': 3, 'FUTILITY_MID_STEP': 181, 'PROBCUT_MARGIN': 140}
+2026-08-03 10:50:58,700 INFO     Start experiment
+2026-08-03 10:51:29,507 INFO     Experiment finished (30.806954s elapsed).
+2026-08-03 10:51:29,667 INFO     Got Elo: -16.557074063290028 +- 47.58641442886216
+2026-08-03 10:51:29,667 INFO     Estimated draw rate: 31.82%
+2026-08-03 10:51:29,667 INFO     Updating model
+2026-08-03 10:51:32,505 INFO     GP sampling finished (2.837682s)
+2026-08-03 10:51:32,526 INFO     Starting iteration 119
+2026-08-03 10:51:35,476 INFO     Current optimum:
+{'RFP_MARGIN_PER_DEPTH': 73, 'NMP_EVAL_DIV': 266, 'NMP_EVAL_MAX': 3, 'FUTILITY_MID_STEP': 179, 'PROBCUT_MARGIN': 147}
+2026-08-03 10:51:35,476 INFO     Estimated Elo: 8.0767 +- 5.7491
+2026-08-03 10:51:35,476 INFO     90.0% confidence interval of the Elo value: (-1.3797, 17.533)
+2026-08-03 10:51:35,561 INFO     90.0% confidence intervals of the parameters:
+Parameter             Lower bound  Upper bound
+----------------------------------------------
+RFP_MARGIN_PER_DEPTH           62          160
+NMP_EVAL_DIV                  100          295
+NMP_EVAL_MAX                    2            8
+FUTILITY_MID_STEP             151          374
+PROBCUT_MARGIN                 40          148
+
+2026-08-03 10:51:35,561 INFO     Testing {'RFP_MARGIN_PER_DEPTH': 90, 'NMP_EVAL_DIV': 243, 'NMP_EVAL_MAX': 3, 'FUTILITY_MID_STEP': 189, 'PROBCUT_MARGIN': 158}
+2026-08-03 10:51:35,561 INFO     Start experiment
+2026-08-03 10:52:03,491 INFO     Experiment finished (27.929884s elapsed).
+2026-08-03 10:52:03,678 INFO     Got Elo: -84.3413461259573 +- 49.65807533132499
+2026-08-03 10:52:03,681 INFO     Estimated draw rate: 40.91%
+2026-08-03 10:52:03,681 INFO     Updating model
+2026-08-03 10:52:06,950 INFO     GP sampling finished (3.26897s)
+2026-08-03 10:52:07,026 INFO     Starting iteration 120
+2026-08-03 10:52:10,441 INFO     Current optimum:
+{'RFP_MARGIN_PER_DEPTH': 71, 'NMP_EVAL_DIV': 270, 'NMP_EVAL_MAX': 3, 'FUTILITY_MID_STEP': 179, 'PROBCUT_MARGIN': 145}
+2026-08-03 10:52:10,441 INFO     Estimated Elo: 7.1735 +- 5.7863
+2026-08-03 10:52:10,441 INFO     90.0% confidence interval of the Elo value: (-2.3442, 16.6912)
+2026-08-03 10:52:10,514 INFO     90.0% confidence intervals of the parameters:
+Parameter             Lower bound  Upper bound
+----------------------------------------------
+RFP_MARGIN_PER_DEPTH           62          159
+NMP_EVAL_DIV                  104          298
+NMP_EVAL_MAX                    2            7
+FUTILITY_MID_STEP             176          395
+PROBCUT_MARGIN                 45          154
+
+2026-08-03 10:52:10,514 INFO     Testing {'RFP_MARGIN_PER_DEPTH': 61, 'NMP_EVAL_DIV': 271, 'NMP_EVAL_MAX': 3, 'FUTILITY_MID_STEP': 242, 'PROBCUT_MARGIN': 147}
+2026-08-03 10:52:10,515 INFO     Start experiment
+2026-08-03 10:52:41,766 INFO     Experiment finished (31.251558s elapsed).
+2026-08-03 10:52:41,943 INFO     Got Elo: 66.99643491750547 +- 53.80673613790709
+2026-08-03 10:52:41,943 INFO     Estimated draw rate: 36.36%
+2026-08-03 10:52:41,943 INFO     Updating model
+2026-08-03 10:52:44,698 INFO     GP sampling finished (2.754043s)
+2026-08-03 10:52:44,767 INFO     Starting iteration 121
+2026-08-03 10:52:47,743 INFO     Current optimum:
+{'RFP_MARGIN_PER_DEPTH': 70, 'NMP_EVAL_DIV': 270, 'NMP_EVAL_MAX': 3, 'FUTILITY_MID_STEP': 181, 'PROBCUT_MARGIN': 145}
+2026-08-03 10:52:47,743 INFO     Estimated Elo: 7.5524 +- 5.6365
+2026-08-03 10:52:47,743 INFO     90.0% confidence interval of the Elo value: (-1.7188, 16.8235)
+2026-08-03 10:52:47,817 INFO     90.0% confidence intervals of the parameters:
+Parameter             Lower bound  Upper bound
+----------------------------------------------
+RFP_MARGIN_PER_DEPTH           60          157
+NMP_EVAL_DIV                   98          293
+NMP_EVAL_MAX                    2            7
+FUTILITY_MID_STEP             150          378
+PROBCUT_MARGIN                 53          159
+
+2026-08-03 10:52:47,817 INFO     Testing {'RFP_MARGIN_PER_DEPTH': 66, 'NMP_EVAL_DIV': 245, 'NMP_EVAL_MAX': 4, 'FUTILITY_MID_STEP': 154, 'PROBCUT_MARGIN': 154}
+2026-08-03 10:52:47,817 INFO     Start experiment
+2026-08-03 10:53:23,275 INFO     Experiment finished (35.458169s elapsed).
+2026-08-03 10:53:23,448 INFO     Got Elo: 66.99643491750547 +- 68.70240060857783
+2026-08-03 10:53:23,448 INFO     Estimated draw rate: 18.18%
+2026-08-03 10:53:23,448 INFO     Updating model
+2026-08-03 10:53:26,357 INFO     GP sampling finished (2.90833s)
+2026-08-03 10:53:26,379 INFO     Starting iteration 122
+2026-08-03 10:53:29,647 INFO     Current optimum:
+{'RFP_MARGIN_PER_DEPTH': 70, 'NMP_EVAL_DIV': 269, 'NMP_EVAL_MAX': 4, 'FUTILITY_MID_STEP': 179, 'PROBCUT_MARGIN': 146}
+2026-08-03 10:53:29,647 INFO     Estimated Elo: 7.9466 +- 5.4795
+2026-08-03 10:53:29,647 INFO     90.0% confidence interval of the Elo value: (-1.0664, 16.9597)
+2026-08-03 10:53:29,699 INFO     90.0% confidence intervals of the parameters:
+Parameter             Lower bound  Upper bound
+----------------------------------------------
+RFP_MARGIN_PER_DEPTH           51          146
+NMP_EVAL_DIV                   80          276
+NMP_EVAL_MAX                    3            8
+FUTILITY_MID_STEP             160          388
+PROBCUT_MARGIN                 50          160
+
+2026-08-03 10:53:29,700 INFO     Testing {'RFP_MARGIN_PER_DEPTH': 76, 'NMP_EVAL_DIV': 290, 'NMP_EVAL_MAX': 3, 'FUTILITY_MID_STEP': 226, 'PROBCUT_MARGIN': 120}
+2026-08-03 10:53:29,700 INFO     Start experiment
+2026-08-03 10:54:03,301 INFO     Experiment finished (33.601201s elapsed).
+2026-08-03 10:54:03,523 INFO     Got Elo: -49.975494643320026 +- 57.22458692126343
+2026-08-03 10:54:03,523 INFO     Estimated draw rate: 50.00%
+2026-08-03 10:54:03,523 INFO     Updating model
+2026-08-03 10:54:06,286 INFO     GP sampling finished (2.763119s)
+2026-08-03 10:54:06,357 INFO     Starting iteration 123
+2026-08-03 10:54:09,292 INFO     Current optimum:
+{'RFP_MARGIN_PER_DEPTH': 70, 'NMP_EVAL_DIV': 268, 'NMP_EVAL_MAX': 4, 'FUTILITY_MID_STEP': 178, 'PROBCUT_MARGIN': 147}
+2026-08-03 10:54:09,292 INFO     Estimated Elo: 7.8767 +- 5.7255
+2026-08-03 10:54:09,292 INFO     90.0% confidence interval of the Elo value: (-1.5409, 17.2944)
+2026-08-03 10:54:09,360 INFO     90.0% confidence intervals of the parameters:
+Parameter             Lower bound  Upper bound
+----------------------------------------------
+RFP_MARGIN_PER_DEPTH           51          148
+NMP_EVAL_DIV                   97          294
+NMP_EVAL_MAX                    2            7
+FUTILITY_MID_STEP             164          386
+PROBCUT_MARGIN                 50          158
+
+2026-08-03 10:54:09,361 INFO     Testing {'RFP_MARGIN_PER_DEPTH': 58, 'NMP_EVAL_DIV': 278, 'NMP_EVAL_MAX': 8, 'FUTILITY_MID_STEP': 179, 'PROBCUT_MARGIN': 143}
+2026-08-03 10:54:09,361 INFO     Start experiment
+2026-08-03 10:54:50,003 INFO     Experiment finished (40.641448s elapsed).
+2026-08-03 10:54:50,178 INFO     Got Elo: -49.97549464331997 +- 66.95631927966075
+2026-08-03 10:54:50,178 INFO     Estimated draw rate: 31.82%
+2026-08-03 10:54:50,178 INFO     Updating model
+2026-08-03 10:54:53,112 INFO     GP sampling finished (2.934364s)
+2026-08-03 10:54:53,138 INFO     Starting iteration 124
+2026-08-03 10:54:56,220 INFO     Current optimum:
+{'RFP_MARGIN_PER_DEPTH': 70, 'NMP_EVAL_DIV': 268, 'NMP_EVAL_MAX': 4, 'FUTILITY_MID_STEP': 179, 'PROBCUT_MARGIN': 147}
+2026-08-03 10:54:56,221 INFO     Estimated Elo: 6.9247 +- 5.2777
+2026-08-03 10:54:56,221 INFO     90.0% confidence interval of the Elo value: (-1.7564, 15.6057)
+2026-08-03 10:54:56,340 INFO     90.0% confidence intervals of the parameters:
+Parameter             Lower bound  Upper bound
+----------------------------------------------
+RFP_MARGIN_PER_DEPTH           54          154
+NMP_EVAL_DIV                   96          298
+NMP_EVAL_MAX                    3            8
+FUTILITY_MID_STEP             156          378
+PROBCUT_MARGIN                 50          157
+
+2026-08-03 10:54:56,340 INFO     Testing {'RFP_MARGIN_PER_DEPTH': 70, 'NMP_EVAL_DIV': 299, 'NMP_EVAL_MAX': 3, 'FUTILITY_MID_STEP': 181, 'PROBCUT_MARGIN': 125}
+2026-08-03 10:54:56,341 INFO     Start experiment
+2026-08-03 10:55:24,025 INFO     Experiment finished (27.684018s elapsed).
+2026-08-03 10:55:24,187 INFO     Got Elo: -16.557074063290028 +- 47.56414823760519
+2026-08-03 10:55:24,187 INFO     Estimated draw rate: 50.00%
+2026-08-03 10:55:24,187 INFO     Updating model
+2026-08-03 10:55:28,086 INFO     GP sampling finished (3.899069s)
+2026-08-03 10:55:28,163 INFO     Starting iteration 125
+2026-08-03 10:55:31,230 INFO     Current optimum:
+{'RFP_MARGIN_PER_DEPTH': 70, 'NMP_EVAL_DIV': 267, 'NMP_EVAL_MAX': 4, 'FUTILITY_MID_STEP': 178, 'PROBCUT_MARGIN': 147}
+2026-08-03 10:55:31,230 INFO     Estimated Elo: 7.2253 +- 5.6125
+2026-08-03 10:55:31,230 INFO     90.0% confidence interval of the Elo value: (-2.0065, 16.4571)
+2026-08-03 10:55:31,298 INFO     90.0% confidence intervals of the parameters:
+Parameter             Lower bound  Upper bound
+----------------------------------------------
+RFP_MARGIN_PER_DEPTH           57          157
+NMP_EVAL_DIV                   85          283
+NMP_EVAL_MAX                    3            8
+FUTILITY_MID_STEP             170          387
+PROBCUT_MARGIN                 49          154
+
+2026-08-03 10:55:31,298 INFO     Testing {'RFP_MARGIN_PER_DEPTH': 96, 'NMP_EVAL_DIV': 239, 'NMP_EVAL_MAX': 5, 'FUTILITY_MID_STEP': 153, 'PROBCUT_MARGIN': 100}
+2026-08-03 10:55:31,299 INFO     Start experiment
+2026-08-03 10:56:04,389 INFO     Experiment finished (33.09057s elapsed).
+2026-08-03 10:56:04,554 INFO     Got Elo: 66.99643491750547 +- 53.89306222846625
+2026-08-03 10:56:04,555 INFO     Estimated draw rate: 45.45%
+2026-08-03 10:56:04,555 INFO     Updating model
+2026-08-03 10:56:08,049 INFO     GP sampling finished (3.494751s)
+2026-08-03 10:56:08,076 INFO     Starting iteration 126
+2026-08-03 10:56:11,610 INFO     Current optimum:
+{'RFP_MARGIN_PER_DEPTH': 70, 'NMP_EVAL_DIV': 267, 'NMP_EVAL_MAX': 4, 'FUTILITY_MID_STEP': 178, 'PROBCUT_MARGIN': 147}
+2026-08-03 10:56:11,610 INFO     Estimated Elo: 7.3321 +- 5.4587
+2026-08-03 10:56:11,610 INFO     90.0% confidence interval of the Elo value: (-1.6466, 16.3109)
+2026-08-03 10:56:11,680 INFO     90.0% confidence intervals of the parameters:
+Parameter             Lower bound  Upper bound
+----------------------------------------------
+RFP_MARGIN_PER_DEPTH           52          151
+NMP_EVAL_DIV                   81          279
+NMP_EVAL_MAX                    2            7
+FUTILITY_MID_STEP             160          383
+PROBCUT_MARGIN                 48          155
+
+2026-08-03 10:56:11,680 INFO     Testing {'RFP_MARGIN_PER_DEPTH': 61, 'NMP_EVAL_DIV': 255, 'NMP_EVAL_MAX': 4, 'FUTILITY_MID_STEP': 176, 'PROBCUT_MARGIN': 114}
+2026-08-03 10:56:11,680 INFO     Start experiment
+2026-08-03 10:56:43,534 INFO     Experiment finished (31.853048s elapsed).
+2026-08-03 10:56:43,721 INFO     Got Elo: 33.18969402590559 +- 43.99712044740859
+2026-08-03 10:56:43,721 INFO     Estimated draw rate: 45.45%
+2026-08-03 10:56:43,722 INFO     Updating model
+2026-08-03 10:56:47,706 INFO     GP sampling finished (3.984116s)
+2026-08-03 10:56:47,780 INFO     Starting iteration 127
+2026-08-03 10:56:51,342 INFO     Current optimum:
+{'RFP_MARGIN_PER_DEPTH': 70, 'NMP_EVAL_DIV': 267, 'NMP_EVAL_MAX': 4, 'FUTILITY_MID_STEP': 178, 'PROBCUT_MARGIN': 147}
+2026-08-03 10:56:51,342 INFO     Estimated Elo: 7.5821 +- 5.4624
+2026-08-03 10:56:51,343 INFO     90.0% confidence interval of the Elo value: (-1.4027, 16.5669)
+2026-08-03 10:56:51,481 INFO     90.0% confidence intervals of the parameters:
+Parameter             Lower bound  Upper bound
+----------------------------------------------
+RFP_MARGIN_PER_DEPTH           50          148
+NMP_EVAL_DIV                  107          296
+NMP_EVAL_MAX                    2            7
+FUTILITY_MID_STEP             173          399
+PROBCUT_MARGIN                 45          150
+
+2026-08-03 10:56:51,481 INFO     Testing {'RFP_MARGIN_PER_DEPTH': 71, 'NMP_EVAL_DIV': 292, 'NMP_EVAL_MAX': 3, 'FUTILITY_MID_STEP': 205, 'PROBCUT_MARGIN': 155}
+2026-08-03 10:56:51,482 INFO     Start experiment
+2026-08-03 10:57:22,130 INFO     Experiment finished (30.647689s elapsed).
+2026-08-03 10:57:22,305 INFO     Got Elo: -33.189694025905595 +- 44.0482857201645
+2026-08-03 10:57:22,305 INFO     Estimated draw rate: 63.64%
+2026-08-03 10:57:22,305 INFO     Updating model
+2026-08-03 10:57:25,332 INFO     GP sampling finished (3.027056s)
+2026-08-03 10:57:25,370 INFO     Starting iteration 128
+2026-08-03 10:57:28,643 INFO     Current optimum:
+{'RFP_MARGIN_PER_DEPTH': 70, 'NMP_EVAL_DIV': 264, 'NMP_EVAL_MAX': 4, 'FUTILITY_MID_STEP': 176, 'PROBCUT_MARGIN': 146}
+2026-08-03 10:57:28,643 INFO     Estimated Elo: 7.1884 +- 5.4752
+2026-08-03 10:57:28,643 INFO     90.0% confidence interval of the Elo value: (-1.8175, 16.1942)
+2026-08-03 10:57:28,743 INFO     90.0% confidence intervals of the parameters:
+Parameter             Lower bound  Upper bound
+----------------------------------------------
+RFP_MARGIN_PER_DEPTH           54          152
+NMP_EVAL_DIV                   96          296
+NMP_EVAL_MAX                    2            7
+FUTILITY_MID_STEP             165          383
+PROBCUT_MARGIN                 41          150
+
+2026-08-03 10:57:28,744 INFO     Testing {'RFP_MARGIN_PER_DEPTH': 82, 'NMP_EVAL_DIV': 270, 'NMP_EVAL_MAX': 5, 'FUTILITY_MID_STEP': 162, 'PROBCUT_MARGIN': 102}
+2026-08-03 10:57:28,744 INFO     Start experiment
+2026-08-03 10:57:58,543 INFO     Experiment finished (29.798688s elapsed).
+2026-08-03 10:57:58,710 INFO     Got Elo: -49.97549464331997 +- 39.69569024248711
+2026-08-03 10:57:58,710 INFO     Estimated draw rate: 50.00%
+2026-08-03 10:57:58,711 INFO     Updating model
+2026-08-03 10:58:01,627 INFO     GP sampling finished (2.915947s)
+2026-08-03 10:58:01,697 INFO     Starting iteration 129
+2026-08-03 10:58:04,936 INFO     Current optimum:
+{'RFP_MARGIN_PER_DEPTH': 70, 'NMP_EVAL_DIV': 264, 'NMP_EVAL_MAX': 4, 'FUTILITY_MID_STEP': 177, 'PROBCUT_MARGIN': 146}
+2026-08-03 10:58:04,937 INFO     Estimated Elo: 6.9049 +- 5.4613
+2026-08-03 10:58:04,937 INFO     90.0% confidence interval of the Elo value: (-2.0782, 15.888)
+2026-08-03 10:58:05,006 INFO     90.0% confidence intervals of the parameters:
+Parameter             Lower bound  Upper bound
+----------------------------------------------
+RFP_MARGIN_PER_DEPTH           56          152
+NMP_EVAL_DIV                  102          300
+NMP_EVAL_MAX                    2            7
+FUTILITY_MID_STEP             151          379
+PROBCUT_MARGIN                 45          150
+
+2026-08-03 10:58:05,006 INFO     Testing {'RFP_MARGIN_PER_DEPTH': 60, 'NMP_EVAL_DIV': 236, 'NMP_EVAL_MAX': 4, 'FUTILITY_MID_STEP': 198, 'PROBCUT_MARGIN': 143}
+2026-08-03 10:58:05,006 INFO     Start experiment
+2026-08-03 10:58:35,328 INFO     Experiment finished (30.321703s elapsed).
+2026-08-03 10:58:35,502 INFO     Got Elo: -66.99643491750545 +- 48.334905331579144
+2026-08-03 10:58:35,502 INFO     Estimated draw rate: 36.36%
+2026-08-03 10:58:35,502 INFO     Updating model
+2026-08-03 10:58:39,568 INFO     GP sampling finished (4.066193s)
+2026-08-03 10:58:39,596 INFO     Starting iteration 130
+2026-08-03 10:58:42,848 INFO     Current optimum:
+{'RFP_MARGIN_PER_DEPTH': 71, 'NMP_EVAL_DIV': 267, 'NMP_EVAL_MAX': 4, 'FUTILITY_MID_STEP': 175, 'PROBCUT_MARGIN': 147}
+2026-08-03 10:58:42,849 INFO     Estimated Elo: 5.7616 +- 5.1926
+2026-08-03 10:58:42,849 INFO     90.0% confidence interval of the Elo value: (-2.7795, 14.3026)
+2026-08-03 10:58:42,926 INFO     90.0% confidence intervals of the parameters:
+Parameter             Lower bound  Upper bound
+----------------------------------------------
+RFP_MARGIN_PER_DEPTH           53          148
+NMP_EVAL_DIV                   84          283
+NMP_EVAL_MAX                    3            8
+FUTILITY_MID_STEP             156          383
+PROBCUT_MARGIN                 50          155
+
+2026-08-03 10:58:42,926 INFO     Testing {'RFP_MARGIN_PER_DEPTH': 59, 'NMP_EVAL_DIV': 275, 'NMP_EVAL_MAX': 5, 'FUTILITY_MID_STEP': 184, 'PROBCUT_MARGIN': 151}
+2026-08-03 10:58:42,927 INFO     Start experiment
+2026-08-03 10:59:14,753 INFO     Experiment finished (31.825934s elapsed).
+2026-08-03 10:59:14,900 INFO     Got Elo: 66.99643491750547 +- 53.790834114900846
+2026-08-03 10:59:14,901 INFO     Estimated draw rate: 36.36%
+2026-08-03 10:59:14,901 INFO     Updating model
+2026-08-03 10:59:18,204 INFO     GP sampling finished (3.303703s)
+2026-08-03 10:59:18,230 INFO     Starting iteration 131
+2026-08-03 10:59:21,619 INFO     Current optimum:
+{'RFP_MARGIN_PER_DEPTH': 70, 'NMP_EVAL_DIV': 268, 'NMP_EVAL_MAX': 4, 'FUTILITY_MID_STEP': 175, 'PROBCUT_MARGIN': 147}
+2026-08-03 10:59:21,619 INFO     Estimated Elo: 6.002 +- 4.9895
+2026-08-03 10:59:21,619 INFO     90.0% confidence interval of the Elo value: (-2.2051, 14.209)
+2026-08-03 10:59:21,751 INFO     90.0% confidence intervals of the parameters:
+Parameter             Lower bound  Upper bound
+----------------------------------------------
+RFP_MARGIN_PER_DEPTH           50          149
+NMP_EVAL_DIV                  103          292
+NMP_EVAL_MAX                    2            7
+FUTILITY_MID_STEP             180          399
+PROBCUT_MARGIN                 53          158
+
+2026-08-03 10:59:21,751 INFO     Testing {'RFP_MARGIN_PER_DEPTH': 73, 'NMP_EVAL_DIV': 214, 'NMP_EVAL_MAX': 4, 'FUTILITY_MID_STEP': 178, 'PROBCUT_MARGIN': 153}
+2026-08-03 10:59:21,752 INFO     Start experiment
+2026-08-03 10:59:48,438 INFO     Experiment finished (26.686303s elapsed).
+2026-08-03 10:59:48,617 INFO     Got Elo: 16.55707406329004 +- 53.014346226624355
+2026-08-03 10:59:48,617 INFO     Estimated draw rate: 50.00%
+2026-08-03 10:59:48,618 INFO     Updating model
+2026-08-03 10:59:52,860 INFO     GP sampling finished (4.242755s)
+2026-08-03 10:59:52,888 INFO     Starting iteration 132
+2026-08-03 10:59:56,362 INFO     Current optimum:
+{'RFP_MARGIN_PER_DEPTH': 70, 'NMP_EVAL_DIV': 267, 'NMP_EVAL_MAX': 4, 'FUTILITY_MID_STEP': 175, 'PROBCUT_MARGIN': 148}
+2026-08-03 10:59:56,362 INFO     Estimated Elo: 5.8407 +- 4.7749
+2026-08-03 10:59:56,362 INFO     90.0% confidence interval of the Elo value: (-2.0133, 13.6947)
+2026-08-03 10:59:56,501 INFO     90.0% confidence intervals of the parameters:
+Parameter             Lower bound  Upper bound
+----------------------------------------------
+RFP_MARGIN_PER_DEPTH           57          154
+NMP_EVAL_DIV                   80          275
+NMP_EVAL_MAX                    2            7
+FUTILITY_MID_STEP             161          374
+PROBCUT_MARGIN                 42          149
+
+2026-08-03 10:59:56,502 INFO     Testing {'RFP_MARGIN_PER_DEPTH': 58, 'NMP_EVAL_DIV': 283, 'NMP_EVAL_MAX': 5, 'FUTILITY_MID_STEP': 200, 'PROBCUT_MARGIN': 149}
+2026-08-03 10:59:56,502 INFO     Start experiment
+2026-08-03 11:00:26,656 INFO     Experiment finished (30.153726s elapsed).
+2026-08-03 11:00:26,816 INFO     Got Elo: 49.97549464331993 +- 61.98361461446606
+2026-08-03 11:00:26,816 INFO     Estimated draw rate: 40.91%
+2026-08-03 11:00:26,816 INFO     Updating model
+2026-08-03 11:00:31,814 INFO     GP sampling finished (4.997745s)
+2026-08-03 11:00:31,889 INFO     Starting iteration 133
+2026-08-03 11:00:35,268 INFO     Current optimum:
+{'RFP_MARGIN_PER_DEPTH': 70, 'NMP_EVAL_DIV': 268, 'NMP_EVAL_MAX': 4, 'FUTILITY_MID_STEP': 175, 'PROBCUT_MARGIN': 148}
+2026-08-03 11:00:35,268 INFO     Estimated Elo: 6.0832 +- 4.6863
+2026-08-03 11:00:35,268 INFO     90.0% confidence interval of the Elo value: (-1.6251, 13.7914)
+2026-08-03 11:00:35,413 INFO     90.0% confidence intervals of the parameters:
+Parameter             Lower bound  Upper bound
+----------------------------------------------
+RFP_MARGIN_PER_DEPTH           60          157
+NMP_EVAL_DIV                   81          271
+NMP_EVAL_MAX                    2            7
+FUTILITY_MID_STEP             168          389
+PROBCUT_MARGIN                 48          155
+
+2026-08-03 11:00:35,413 INFO     Testing {'RFP_MARGIN_PER_DEPTH': 83, 'NMP_EVAL_DIV': 254, 'NMP_EVAL_MAX': 4, 'FUTILITY_MID_STEP': 156, 'PROBCUT_MARGIN': 152}
+2026-08-03 11:00:35,414 INFO     Start experiment
+2026-08-03 11:01:06,720 INFO     Experiment finished (31.305979s elapsed).
+2026-08-03 11:01:06,910 INFO     Got Elo: 16.55707406329004 +- 47.47526164896966
+2026-08-03 11:01:06,910 INFO     Estimated draw rate: 50.00%
+2026-08-03 11:01:06,910 INFO     Updating model
+2026-08-03 11:01:11,362 INFO     GP sampling finished (4.452041s)
+2026-08-03 11:01:11,388 INFO     Starting iteration 134
+2026-08-03 11:01:14,484 INFO     Current optimum:
+{'RFP_MARGIN_PER_DEPTH': 70, 'NMP_EVAL_DIV': 268, 'NMP_EVAL_MAX': 4, 'FUTILITY_MID_STEP': 175, 'PROBCUT_MARGIN': 148}
+2026-08-03 11:01:14,484 INFO     Estimated Elo: 6.2419 +- 4.7171
+2026-08-03 11:01:14,484 INFO     90.0% confidence interval of the Elo value: (-1.517, 14.0007)
+2026-08-03 11:01:14,601 INFO     90.0% confidence intervals of the parameters:
+Parameter             Lower bound  Upper bound
+----------------------------------------------
+RFP_MARGIN_PER_DEPTH           53          152
+NMP_EVAL_DIV                   89          279
+NMP_EVAL_MAX                    2            7
+FUTILITY_MID_STEP             163          385
+PROBCUT_MARGIN                 55          157
+
+2026-08-03 11:01:14,601 INFO     Testing {'RFP_MARGIN_PER_DEPTH': 63, 'NMP_EVAL_DIV': 280, 'NMP_EVAL_MAX': 3, 'FUTILITY_MID_STEP': 155, 'PROBCUT_MARGIN': 111}
+2026-08-03 11:01:14,602 INFO     Start experiment
+2026-08-03 11:01:49,879 INFO     Experiment finished (35.277584s elapsed).
+2026-08-03 11:01:50,067 INFO     Got Elo: -16.557074063290028 +- 47.47169564135385
+2026-08-03 11:01:50,067 INFO     Estimated draw rate: 50.00%
+2026-08-03 11:01:50,067 INFO     Updating model
+2026-08-03 11:01:53,288 INFO     GP sampling finished (3.221237s)
+2026-08-03 11:01:53,313 INFO     Starting iteration 135
+2026-08-03 11:01:56,457 INFO     Current optimum:
+{'RFP_MARGIN_PER_DEPTH': 70, 'NMP_EVAL_DIV': 268, 'NMP_EVAL_MAX': 4, 'FUTILITY_MID_STEP': 175, 'PROBCUT_MARGIN': 149}
+2026-08-03 11:01:56,457 INFO     Estimated Elo: 6.1648 +- 4.7818
+2026-08-03 11:01:56,457 INFO     90.0% confidence interval of the Elo value: (-1.7005, 14.0302)
+2026-08-03 11:01:56,535 INFO     90.0% confidence intervals of the parameters:
+Parameter             Lower bound  Upper bound
+----------------------------------------------
+RFP_MARGIN_PER_DEPTH           50          150
+NMP_EVAL_DIV                   84          285
+NMP_EVAL_MAX                    3            8
+FUTILITY_MID_STEP             173          400
+PROBCUT_MARGIN                 50          156
+
+2026-08-03 11:01:56,535 INFO     Testing {'RFP_MARGIN_PER_DEPTH': 66, 'NMP_EVAL_DIV': 218, 'NMP_EVAL_MAX': 5, 'FUTILITY_MID_STEP': 193, 'PROBCUT_MARGIN': 145}
+2026-08-03 11:01:56,535 INFO     Start experiment
+2026-08-03 11:02:28,443 INFO     Experiment finished (31.908282s elapsed).
+2026-08-03 11:02:28,855 INFO     Got Elo: 84.3413461259573 +- 49.73324777985306
+2026-08-03 11:02:28,855 INFO     Estimated draw rate: 40.91%
+2026-08-03 11:02:28,856 INFO     Updating model
+2026-08-03 11:02:51,128 INFO     GP sampling finished (22.272231s)
+2026-08-03 11:02:51,205 INFO     Starting iteration 136
+2026-08-03 11:02:54,364 INFO     Current optimum:
+{'RFP_MARGIN_PER_DEPTH': 69, 'NMP_EVAL_DIV': 265, 'NMP_EVAL_MAX': 4, 'FUTILITY_MID_STEP': 176, 'PROBCUT_MARGIN': 149}
+2026-08-03 11:02:54,365 INFO     Estimated Elo: 7.074 +- 5.0362
+2026-08-03 11:02:54,365 INFO     90.0% confidence interval of the Elo value: (-1.2099, 15.3579)
+2026-08-03 11:02:54,443 INFO     90.0% confidence intervals of the parameters:
+Parameter             Lower bound  Upper bound
+----------------------------------------------
+RFP_MARGIN_PER_DEPTH           51          150
+NMP_EVAL_DIV                  103          296
+NMP_EVAL_MAX                    2            7
+FUTILITY_MID_STEP             164          386
+PROBCUT_MARGIN                 41          147
+
+2026-08-03 11:02:54,443 INFO     Testing {'RFP_MARGIN_PER_DEPTH': 79, 'NMP_EVAL_DIV': 216, 'NMP_EVAL_MAX': 5, 'FUTILITY_MID_STEP': 155, 'PROBCUT_MARGIN': 160}
+2026-08-03 11:02:54,443 INFO     Start experiment
+2026-08-03 11:03:22,801 INFO     Experiment finished (28.357306s elapsed).
+2026-08-03 11:03:22,969 INFO     Got Elo: -0.0 +- 69.35958317752089
+2026-08-03 11:03:22,969 INFO     Estimated draw rate: 27.27%
+2026-08-03 11:03:22,969 INFO     Updating model
+2026-08-03 11:03:27,275 INFO     GP sampling finished (4.305783s)
+2026-08-03 11:03:27,352 INFO     Starting iteration 137
+2026-08-03 11:03:30,288 INFO     Current optimum:
+{'RFP_MARGIN_PER_DEPTH': 70, 'NMP_EVAL_DIV': 265, 'NMP_EVAL_MAX': 4, 'FUTILITY_MID_STEP': 176, 'PROBCUT_MARGIN': 149}
+2026-08-03 11:03:30,288 INFO     Estimated Elo: 7.2551 +- 5.1594
+2026-08-03 11:03:30,288 INFO     90.0% confidence interval of the Elo value: (-1.2315, 15.7416)
+2026-08-03 11:03:30,358 INFO     90.0% confidence intervals of the parameters:
+Parameter             Lower bound  Upper bound
+----------------------------------------------
+RFP_MARGIN_PER_DEPTH           60          156
+NMP_EVAL_DIV                   94          291
+NMP_EVAL_MAX                    2            7
+FUTILITY_MID_STEP             156          382
+PROBCUT_MARGIN                 50          155
+
+2026-08-03 11:03:30,358 INFO     Testing {'RFP_MARGIN_PER_DEPTH': 72, 'NMP_EVAL_DIV': 263, 'NMP_EVAL_MAX': 4, 'FUTILITY_MID_STEP': 190, 'PROBCUT_MARGIN': 108}
+2026-08-03 11:03:30,358 INFO     Start experiment
+2026-08-03 11:04:04,045 INFO     Experiment finished (33.686914s elapsed).
+2026-08-03 11:04:04,228 INFO     Got Elo: -16.557074063290028 +- 52.94864320763938
+2026-08-03 11:04:04,229 INFO     Estimated draw rate: 50.00%
+2026-08-03 11:04:04,229 INFO     Updating model
+2026-08-03 11:04:07,502 INFO     GP sampling finished (3.273801s)
+2026-08-03 11:04:07,584 INFO     Starting iteration 138
+2026-08-03 11:04:10,813 INFO     Current optimum:
+{'RFP_MARGIN_PER_DEPTH': 70, 'NMP_EVAL_DIV': 265, 'NMP_EVAL_MAX': 4, 'FUTILITY_MID_STEP': 176, 'PROBCUT_MARGIN': 149}
+2026-08-03 11:04:10,814 INFO     Estimated Elo: 7.3789 +- 5.3024
+2026-08-03 11:04:10,814 INFO     90.0% confidence interval of the Elo value: (-1.3427, 16.1006)
+2026-08-03 11:04:10,915 INFO     90.0% confidence intervals of the parameters:
+Parameter             Lower bound  Upper bound
+----------------------------------------------
+RFP_MARGIN_PER_DEPTH           50          148
+NMP_EVAL_DIV                  108          299
+NMP_EVAL_MAX                    2            7
+FUTILITY_MID_STEP             174          397
+PROBCUT_MARGIN                 51          158
+
+2026-08-03 11:04:10,915 INFO     Testing {'RFP_MARGIN_PER_DEPTH': 52, 'NMP_EVAL_DIV': 276, 'NMP_EVAL_MAX': 6, 'FUTILITY_MID_STEP': 197, 'PROBCUT_MARGIN': 147}
+2026-08-03 11:04:10,915 INFO     Start experiment
+2026-08-03 11:04:42,289 INFO     Experiment finished (31.373666s elapsed).
+2026-08-03 11:04:42,460 INFO     Got Elo: -16.557074063290102 +- 71.24147281326789
+2026-08-03 11:04:42,460 INFO     Estimated draw rate: 31.82%
+2026-08-03 11:04:42,460 INFO     Updating model
+2026-08-03 11:04:46,307 INFO     GP sampling finished (3.84719s)
+2026-08-03 11:04:46,343 INFO     Starting iteration 139
+2026-08-03 11:04:49,725 INFO     Current optimum:
+{'RFP_MARGIN_PER_DEPTH': 70, 'NMP_EVAL_DIV': 265, 'NMP_EVAL_MAX': 4, 'FUTILITY_MID_STEP': 175, 'PROBCUT_MARGIN': 149}
+2026-08-03 11:04:49,725 INFO     Estimated Elo: 7.4383 +- 5.4183
+2026-08-03 11:04:49,725 INFO     90.0% confidence interval of the Elo value: (-1.474, 16.3507)
+2026-08-03 11:04:49,777 INFO     90.0% confidence intervals of the parameters:
+Parameter             Lower bound  Upper bound
+----------------------------------------------
+RFP_MARGIN_PER_DEPTH           62          160
+NMP_EVAL_DIV                  104          295
+NMP_EVAL_MAX                    2            8
+FUTILITY_MID_STEP             150          369
+PROBCUT_MARGIN                 49          155
+
+2026-08-03 11:04:49,777 INFO     Testing {'RFP_MARGIN_PER_DEPTH': 79, 'NMP_EVAL_DIV': 263, 'NMP_EVAL_MAX': 4, 'FUTILITY_MID_STEP': 173, 'PROBCUT_MARGIN': 127}
+2026-08-03 11:04:49,778 INFO     Start experiment
+2026-08-03 11:05:22,595 INFO     Experiment finished (32.81688s elapsed).
+2026-08-03 11:05:22,744 INFO     Got Elo: 49.975494643319955 +- 52.175266543999356
+2026-08-03 11:05:22,744 INFO     Estimated draw rate: 40.91%
+2026-08-03 11:05:22,744 INFO     Updating model
+2026-08-03 11:05:25,825 INFO     GP sampling finished (3.080507s)
+2026-08-03 11:05:25,851 INFO     Starting iteration 140
+2026-08-03 11:05:28,966 INFO     Current optimum:
+{'RFP_MARGIN_PER_DEPTH': 71, 'NMP_EVAL_DIV': 265, 'NMP_EVAL_MAX': 4, 'FUTILITY_MID_STEP': 174, 'PROBCUT_MARGIN': 147}
+2026-08-03 11:05:28,966 INFO     Estimated Elo: 7.9644 +- 5.4513
+2026-08-03 11:05:28,966 INFO     90.0% confidence interval of the Elo value: (-1.0023, 16.931)
+2026-08-03 11:05:29,020 INFO     90.0% confidence intervals of the parameters:
+Parameter             Lower bound  Upper bound
+----------------------------------------------
+RFP_MARGIN_PER_DEPTH           50          149
+NMP_EVAL_DIV                   97          283
+NMP_EVAL_MAX                    2            7
+FUTILITY_MID_STEP             165          396
+PROBCUT_MARGIN                 51          158
+
+2026-08-03 11:05:29,020 INFO     Testing {'RFP_MARGIN_PER_DEPTH': 72, 'NMP_EVAL_DIV': 225, 'NMP_EVAL_MAX': 4, 'FUTILITY_MID_STEP': 217, 'PROBCUT_MARGIN': 154}
+2026-08-03 11:05:29,021 INFO     Start experiment

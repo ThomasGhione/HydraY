@@ -6,12 +6,14 @@
 
 #include "coords.hpp"
 
-// Sliding-piece attacks use PEXT (BMI2). Every shipped build (-march=native,
-// -march=x86-64-v3) provides it; fail loudly on anything that does not.
-#if !defined(__BMI2__)
-#error "HydraY requires BMI2 (PEXT) for sliding-piece attacks; build with -march=native or -march=x86-64-v3."
-#endif
+// Sliding-piece attacks use PEXT via magic bitboards.
+// On x86-64 with BMI2, use hardware PEXT; otherwise fallback to bit-manipulation.
+#if defined(__BMI2__)
 #include <immintrin.h>
+#define HAS_PEXT 1
+#else
+#define HAS_PEXT 0
+#endif
 
 namespace pieces {
 
@@ -68,17 +70,34 @@ inline constexpr std::array<uint64_t, 64> BISHOP_MASKS = squareTable(bishopRelev
 static_assert(ROOK_MASKS[0] == 0x000101010101017EULL && ROOK_MASKS[63] == 0x7E80808080808000ULL, "rook mask");
 static_assert(BISHOP_MASKS[0] == 0x0040201008040200ULL && BISHOP_MASKS[27] == 0x0040221400142200ULL, "bishop mask");
 
-// Table index via PEXT: with these fancy masks the index range equals
-// 2^popcount(mask), exactly the range the attack tables are built against.
+// Table index via PEXT (hardware or fallback).
 struct MagicParams { 
     uint64_t mask; 
     uint32_t offset; 
 };
 
+// Hardware PEXT on BMI2-capable CPUs.
+#if HAS_PEXT
 __attribute__((always_inline))
 inline uint32_t sliderIndex(uint64_t occ, const MagicParams& p) noexcept {
     return static_cast<uint32_t>(_pext_u64(occ, p.mask));
 }
+#else
+// Fallback: portable bit-manipulation PEXT for ARM and other platforms.
+// Extracts bits of `occ` selected by `mask`, compacting them to the right.
+__attribute__((always_inline))
+inline uint32_t sliderIndex(uint64_t occ, const MagicParams& p) noexcept {
+    uint64_t result = 0ULL;
+    uint64_t mask = p.mask;
+    uint64_t x = occ & p.mask;
+    for (int i = 0; mask; ++i) {
+        const int sq = std::countr_zero(mask);
+        mask &= mask - 1;
+        if (x & (ONE << sq)) result |= ONE << i;
+    }
+    return static_cast<uint32_t>(result);
+}
+#endif
 
 template<typename MaskArray>
 constexpr std::array<MagicParams, 64> buildMagicParams(const MaskArray& masks) noexcept {
