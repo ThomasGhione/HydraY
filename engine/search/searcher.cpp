@@ -674,10 +674,10 @@ int32_t Searcher::searchPosition(
     if (enterNode(b, runtime, ply, counter, earlyScore)) return earlyScore;
 
     const bool isPVNode = (static_cast<int64_t>(beta) - static_cast<int64_t>(alpha) > 1);
-
+    // Narrowing here can never demote a PV node to a null-window one.
     if (ply > 0) {
-        alpha = std::max(alpha, NEG_INF + ply);
-        beta  = std::min(beta,  POS_INF - ply);
+        alpha = std::max(alpha, -MATE_VALUE + ply);
+        beta  = std::min(beta,   MATE_VALUE - ply - 1);
         if (alpha >= beta) return alpha;
     }
 
