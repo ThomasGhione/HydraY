@@ -32,8 +32,14 @@ public:
         // payload packing:
         //   bits  0..15  -> packed(depth/age/flag)
         //   bits 16..31  -> bestMove
-        //   bits 32..63  -> score (int32_t)
+        //   bits 32..47  -> score (int16_t)
+        //   bits 48..63  -> staticEval (int16_t)
         // 4 entries = 64 bytes (1 cache line).
+        //
+        // Both score fields are int16_t, which the caller must respect: every
+        // search score fits by construction (see the static_assert on
+        // MATE_VALUE + MAX_PLY in search_constants.hpp). A score outside that
+        // range would wrap silently here.
         uint64_t key = 0ULL;
         uint64_t payload = 0ULL;
 
@@ -43,6 +49,10 @@ public:
             LOWERBOUND,
             UPPERBOUND
         };
+
+        // "No static eval recorded". Outside the reachable eval range, so it can
+        // never collide with a real one.
+        static constexpr int32_t NO_EVAL = -32768;
 
         static constexpr uint8_t DEPTH_BITS = 6;      // 0..63 plies
         static constexpr uint8_t FLAG_BITS = 2;       // 0..3
@@ -81,17 +91,24 @@ public:
             return static_cast<uint16_t>((payloadValue >> 16) & 0xFFFFULL);
         }
 
+        // Both narrow to int16_t, whose conversion back to int32_t sign-extends.
         static constexpr int32_t scoreFromPayload(uint64_t payloadValue) noexcept {
-            return static_cast<int32_t>(static_cast<uint32_t>(payloadValue >> 32));
+            return static_cast<int16_t>(static_cast<uint16_t>(payloadValue >> 32));
+        }
+
+        static constexpr int32_t staticEvalFromPayload(uint64_t payloadValue) noexcept {
+            return static_cast<int16_t>(static_cast<uint16_t>(payloadValue >> 48));
         }
 
         static constexpr uint64_t encodePayload(
             int32_t scoreValue,
+            int32_t staticEvalValue,
             uint16_t bestMoveValue,
             uint8_t depthValue,
             uint8_t ageValue,
             uint8_t flagValue) noexcept {
-            return (static_cast<uint64_t>(static_cast<uint32_t>(scoreValue)) << 32)
+            return (static_cast<uint64_t>(static_cast<uint16_t>(static_cast<int16_t>(staticEvalValue))) << 48)
+                 | (static_cast<uint64_t>(static_cast<uint16_t>(static_cast<int16_t>(scoreValue))) << 32)
                  | (static_cast<uint64_t>(bestMoveValue) << 16)
                  | static_cast<uint64_t>(packedMeta(depthValue, ageValue, flagValue));
         }
@@ -145,13 +162,14 @@ public:
     }
 
     // Decoded snapshot of a probed entry. `hit == false` leaves the other
-    // fields at their zero defaults (flag INVALID, move 0).
+    // fields at their defaults (flag INVALID, move 0, no static eval).
     struct ProbeResult {
-        int32_t  score = 0;
-        uint16_t move  = 0;
-        uint8_t  depth = 0;
-        uint8_t  flag  = Entry::INVALID;
-        bool     hit   = false;
+        int32_t  score      = 0;
+        int32_t  staticEval = Entry::NO_EVAL;
+        uint16_t move       = 0;
+        uint8_t  depth      = 0;
+        uint8_t  flag       = Entry::INVALID;
+        bool     hit        = false;
     };
 
     inline void prefetch(uint64_t key) noexcept;
@@ -166,8 +184,12 @@ public:
     // ordering. Bound/depth gating is the caller's job.
     [[nodiscard]] inline ProbeResult probeEntry(uint64_t key) const noexcept;
     // bestMove == 0 means "no move to store" (a bound-only write): the existing
-    // move in a matching entry is preserved rather than clobbered.
-    inline void store(uint64_t key, uint8_t depth, int32_t score, uint8_t flag, uint16_t bestMove = 0) noexcept;
+    // move in a matching entry is preserved rather than clobbered. staticEval ==
+    // Entry::NO_EVAL is preserved the same way — the static eval is a property
+    // of the position alone, so an older one stays valid regardless of the
+    // depth or window this write came from.
+    inline void store(uint64_t key, uint8_t depth, int32_t score, uint8_t flag,
+                      uint16_t bestMove = 0, int32_t staticEval = Entry::NO_EVAL) noexcept;
 
     // Resize to approximately `megabytes` MiB (rounded down to a power-of-two
     // bucket count) and clear all entries. NOT safe to call during a live
@@ -469,11 +491,12 @@ inline TT::ProbeResult TT::probeEntry(uint64_t key) const noexcept {
     EntrySnapshot entry;
     ProbeResult result;
     if (!findEntrySnapshot(key, entry)) return result;
-    result.score = Entry::scoreFromPayload(entry.payload);
-    result.move  = Entry::bestMoveFromPayload(entry.payload);
-    result.depth = Entry::depthFromPayload(entry.payload);
-    result.flag  = Entry::flagFromPayload(entry.payload);
-    result.hit   = true;
+    result.score      = Entry::scoreFromPayload(entry.payload);
+    result.staticEval = Entry::staticEvalFromPayload(entry.payload);
+    result.move       = Entry::bestMoveFromPayload(entry.payload);
+    result.depth      = Entry::depthFromPayload(entry.payload);
+    result.flag       = Entry::flagFromPayload(entry.payload);
+    result.hit        = true;
     return result;
 }
 
@@ -482,7 +505,8 @@ inline void TT::store(
     uint8_t depth,
     int32_t score,
     uint8_t flag,
-    uint16_t bestMove) noexcept {
+    uint16_t bestMove,
+    int32_t staticEval) noexcept {
     const uint8_t storedDepth = clampDepth(depth);
     const size_t bucketIndex = static_cast<size_t>(key) & bucketMask_;
     Entry* bucket = data() + (bucketIndex * ENTRIES_PER_BUCKET);
@@ -507,9 +531,13 @@ inline void TT::store(
 
         if (entryKey == key) {
             if (storedDepth >= Entry::depthFromPayload(entryPayload) || flag == Entry::EXACT) {
-                // Preserve the stored move on a bound-only write (bestMove == 0).
+                // Preserve the stored move on a bound-only write (bestMove == 0)
+                // and the stored eval when this write carries none.
                 const uint16_t moveToStore = (bestMove != 0) ? bestMove : Entry::bestMoveFromPayload(entryPayload);
-                const uint64_t newPayload = Entry::encodePayload(score, moveToStore, storedDepth, generation_, flag);
+                const int32_t evalToStore = (staticEval != Entry::NO_EVAL)
+                    ? staticEval
+                    : Entry::staticEvalFromPayload(entryPayload);
+                const uint64_t newPayload = Entry::encodePayload(score, evalToStore, moveToStore, storedDepth, generation_, flag);
                 atomicWord(entry.payload).store(newPayload, std::memory_order_relaxed);
             }
             unlockBucket(bucketSeq, lockBase);
@@ -525,7 +553,7 @@ inline void TT::store(
     }
 
     Entry* const target = (emptyEntry != nullptr) ? emptyEntry : replaceEntry;
-    const uint64_t newPayload = Entry::encodePayload(score, bestMove, storedDepth, generation_, flag);
+    const uint64_t newPayload = Entry::encodePayload(score, staticEval, bestMove, storedDepth, generation_, flag);
     atomicWord(target->payload).store(newPayload, std::memory_order_relaxed);
     atomicWord(target->key).store(key, std::memory_order_relaxed);
     unlockBucket(bucketSeq, lockBase);

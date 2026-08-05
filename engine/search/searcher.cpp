@@ -757,8 +757,16 @@ int32_t Searcher::searchPosition(
     // `improving` heuristic can compare evalStack[ply-2] vs current eval
     // starting from ply >= 2. Previously the root left evalStack[0] at its
     // zero-initialised value, biasing `improving` to (staticEval > 0) at ply 2.
+    // The raw eval of this position, before the TT-bound tightening and the
+    // corrHist nudge below. That is what goes back into the TT: a later visit
+    // then skips the NNUE forward pass entirely. NO_EVAL while in check, where
+    // there is no meaningful static eval to record.
+    int32_t rawStaticEval = TT::Entry::NO_EVAL;
     if (!node.inCheck) {
-        node.staticEval = Evaluator::evaluate(b);
+        rawStaticEval = (tte.hit && tte.staticEval != TT::Entry::NO_EVAL)
+            ? tte.staticEval
+            : Evaluator::evaluate(b);
+        node.staticEval = rawStaticEval;
         if (tte.hit) {
             const int32_t ttStaticScore = scoreFromTT(tte.score, ply); // re-base mate scores
             // Negamax (STM-relative): a LOWERBOUND tightens upward, an
@@ -935,7 +943,8 @@ int32_t Searcher::searchPosition(
             hashKey, static_cast<uint8_t>(ctx.depth),
             scoreToTT(best, ctx.ply),
             static_cast<uint8_t>(determineFlag(best, alpha, beta)),
-            TT::Entry::encodeMove(result.move));
+            TT::Entry::encodeMove(result.move),
+            rawStaticEval);
     }
 
     return best;
@@ -958,8 +967,9 @@ int32_t Searcher::quiescenceSearch(
     }
 
     const bool canUseTT = (runtime.transpositionTable != nullptr);
+    TT::ProbeResult tte{};
     if (canUseTT) {
-        const auto tte = runtime.transpositionTable->probeEntry(b.getHash());
+        tte = runtime.transpositionTable->probeEntry(b.getHash());
         // Any depth qualifies at a quiescence node (stored qsearch depth is 0).
         if (tte.hit && ttBoundCutoff(tte.flag, tte.score, alpha, beta)) {
             return scoreFromTT(tte.score, ply);
@@ -983,6 +993,7 @@ int32_t Searcher::quiescenceSearch(
     MovePicker movePicker;
     int32_t best;
     const int32_t alphaOrig = alpha;
+    int32_t rawStaticEval = TT::Entry::NO_EVAL;
 
     if (inCheck) {
         movePicker = engine::MoveGenerator::generateQSearchEvasions(b, checkers);
@@ -991,13 +1002,19 @@ int32_t Searcher::quiescenceSearch(
         }
         best = NEG_INF;
     } else {
-        const int32_t standPat = Evaluator::evaluate(b) + runtime.corrHist.correction(b);
+        // The probe above already pulled this bucket into cache, so a recorded
+        // static eval is free here and this is where 50-80% of all nodes are.
+        rawStaticEval = (tte.hit && tte.staticEval != TT::Entry::NO_EVAL)
+            ? tte.staticEval
+            : Evaluator::evaluate(b);
+        const int32_t standPat = rawStaticEval + runtime.corrHist.correction(b);
         if (isBetaCutoff(standPat, beta)) {
             // Bound-only store (bestMove 0 preserves any stored move): sibling
             // qsearch nodes can then cut on this stand-pat without re-evaluating.
             if (canUseTT) {
                 runtime.transpositionTable->store(
-                    b.getHash(), 0, scoreToTT(standPat, ply), TT::Entry::LOWERBOUND);
+                    b.getHash(), 0, scoreToTT(standPat, ply), TT::Entry::LOWERBOUND,
+                    /*bestMove=*/0, rawStaticEval);
             }
             return standPat; // fail-soft: tighter bound than a flat beta
         }
@@ -1046,7 +1063,7 @@ int32_t Searcher::quiescenceSearch(
     if (!inCheck && canUseTT) {
         runtime.transpositionTable->store(
             b.getHash(), 0, scoreToTT(best, ply),
-            static_cast<uint8_t>(determineFlag(best, alphaOrig, beta)));
+            static_cast<uint8_t>(determineFlag(best, alphaOrig, beta)), /*bestMove=*/0, rawStaticEval);
     }
 
     return best;
