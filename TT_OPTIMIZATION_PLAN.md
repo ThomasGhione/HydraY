@@ -1,8 +1,36 @@
 # Transposition Table — analisi e piano di ottimizzazione
 
 Analisi di `tt/tt.hpp` fatta il 2026-08-04 su profilo `perf` a **cicli** (non a
-istruzioni: la differenza è decisiva, vedi §0). Nessuna modifica eseguita:
-questo documento è il piano per quando ci si tornerà.
+istruzioni: la differenza è decisiva, vedi §0).
+
+## STATO 2026-08-05 — §1, §3, §4 FATTI
+
+| § | esito | misura |
+|---|---|---|
+| §3 static eval nel payload | ✅ `986b93d` | **+2,3%** a d14, albero identico |
+| §1+§4 XOR-lockless | ✅ `7b289ef` | **+1,5%** medio / +2,2% sul minimo, −121 righe |
+| §7 huge page | ⏳ serve `sudo sysctl -w vm.nr_hugepages=64` | non eseguibile senza sudo |
+| §2 chiave a 16 bit | ⏳ non fatto | l'unico rimasto che cambia la geometria |
+
+Totale misurato: **~+3,8%** di velocità, contro la stima di §6 di +5/8% per
+l'insieme §1-§4. La stima era ottimistica ma dell'ordine giusto.
+
+⚠️ **Due lezioni di misura, pagate sul campo:**
+
+1. §3 richiedeva prima di ribasare i punteggi di matto da `INT32_MAX` a
+   `MATE_VALUE = 32000` (`ccf7612`), perché il payload era pieno: i 16 bit per la
+   static eval vengono dal campo score. Il piano dava per scontato che i
+   punteggi stessero già in int16 — **era falso in questo engine.**
+2. §1+§4 e §3 lasciano l'albero **bit-identico**, quindi non servono SPRT: il
+   tempo è una misura pulita. Ma il beneficio multi-thread dell'XOR — la sua
+   giustificazione teorica principale — **non è stato dimostrabile**: a 4 thread
+   la dispersione run-to-run è ~2x e sommerge l'effetto. Resta non verificato.
+
+⚠️ Ribasare i matti ha anche rivelato che la **mate-distance pruning era codice
+morto** (bound a ~2,1 miliardi dai punteggi reali): riattivata in `96337ef`,
+−74% di nodi sulla suite di matti.
+
+---
 
 ⚠️ `tt/tt.hpp` è marcato in `CLAUDE.md` fra i file da non toccare senza capirli:
 concorrenza seqlock, sicurezza Lazy SMP, contratto di formato. Ogni intervento
