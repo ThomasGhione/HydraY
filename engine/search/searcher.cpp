@@ -171,12 +171,7 @@ bool Searcher::checkDrawTerminalConditions(
         }
     }
 
-    if (b.isFiftyMoveRule()) [[unlikely]] {
-        outScore = 0;
-        return true;
-    }
-
-    if (b.hasInsufficientMaterialDraw()) [[unlikely]] {
+    if (b.isFiftyMoveRule() || b.hasInsufficientMaterialDraw()) [[unlikely]] {
         outScore = 0;
         return true;
     }
