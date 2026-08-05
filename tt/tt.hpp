@@ -27,8 +27,18 @@ public:
     };
 
     struct Entry {
-        // 16-byte layout:
-        // key(8) + payload(8)
+        // 16-byte layout: key(8) + payload(8), 4 entries per 64-byte cache line.
+        //
+        // `key` holds zobristKey ^ payload, not the key itself ("lockless
+        // hashing", Hyatt). A reader recovers the identity as key ^ payload and
+        // compares. That makes the pair self-verifying: if two threads interleave
+        // their writes to the same slot, a reader sees one thread's key against
+        // the other's payload, the XOR does not reproduce the probed key, and the
+        // entry is skipped as a miss. Losing an entry costs search efficiency
+        // only, never correctness — which is why no lock is needed here at all.
+        // Each 64-bit word is still read and written atomically (atomic_ref) so
+        // neither can tear on its own.
+        //
         // payload packing:
         //   bits  0..15  -> packed(depth/age/flag)
         //   bits 16..31  -> bestMove
@@ -142,10 +152,9 @@ public:
     static_assert((sizeof(Entry) * ENTRIES_PER_BUCKET) == 64, "Each bucket should be exactly one cache line");
     static_assert((DEFAULT_BUCKET_COUNT & (DEFAULT_BUCKET_COUNT - 1)) == 0, "DEFAULT_BUCKET_COUNT must be power of 2");
 
-    // Map a requested Hash size in MiB to a power-of-two bucket count. The MiB
-    // figure sizes the entry array (the 64-byte-per-bucket cache lines); the
-    // per-bucket seqlock word is a small (~6%) overhead on top. Rounding down to
-    // a power of two keeps the index mask (`& (bucketCount - 1)`) valid.
+    // Map a requested Hash size in MiB to a power-of-two bucket count. The entry
+    // array is now the whole allocation, so the MiB figure is exact. Rounding
+    // down to a power of two keeps the index mask (`& (bucketCount - 1)`) valid.
     [[nodiscard]] static constexpr size_t bucketCountForMB(size_t megabytes) noexcept {
         const size_t clampedMB = std::clamp(megabytes, MIN_HASH_MB, MAX_HASH_MB);
         const size_t targetBytes = clampedMB * 1024u * 1024u;
@@ -210,24 +219,17 @@ public:
     TT& operator=(TT&&) = default;
 
 private:
-    struct BucketSeq {
-        std::atomic<uint32_t> value{0U};
-    };
-
     enum class AllocationKind : uint8_t {
         Heap = 0,
         MMap
     };
 
-    // Total bytes for one contiguous block holding the entry array followed by
-    // the per-bucket seqlock words. The entry array's size is a multiple of 64,
-    // so the seqlock sub-array starts cache-line aligned.
     [[nodiscard]] static constexpr size_t allocBytesFor(size_t buckets) noexcept {
-        return buckets * ENTRIES_PER_BUCKET * sizeof(Entry) + buckets * sizeof(BucketSeq);
+        return buckets * ENTRIES_PER_BUCKET * sizeof(Entry);
     }
 
-    // Owns one raw contiguous block: [Entry[]][BucketSeq[]]. Both sub-arrays are
-    // trivially destructible, so the deleter only releases storage.
+    // Owns the raw Entry[] block. Entry is trivially destructible, so the
+    // deleter only releases storage.
     struct BlockDeleter {
         AllocationKind kind = AllocationKind::Heap;
         size_t mappedBytes = 0;
@@ -251,87 +253,32 @@ private:
     HugePageMode hugePageMode_;
     bool hugePagesBacked_ = false;
     Entry* entries_ = nullptr;
-    BucketSeq* bucketSeq_ = nullptr;
     size_t bucketCount_ = 0;
     size_t bucketMask_ = 0;
 
     inline Entry* data() noexcept { return entries_; }
     inline const Entry* data() const noexcept { return entries_; }
-    inline BucketSeq* seqData() noexcept { return bucketSeq_; }
-    inline const BucketSeq* seqData() const noexcept { return bucketSeq_; }
-
-    struct EntrySnapshot {
-        uint64_t key = 0ULL;
-        uint64_t payload = 0ULL;
-    };
 
     [[nodiscard]] static inline std::atomic_ref<uint64_t> atomicWord(const uint64_t& word) noexcept {
         return std::atomic_ref<uint64_t>(const_cast<uint64_t&>(word));
     }
 
-    [[nodiscard]] static inline uint32_t lockBucket(BucketSeq& bucketSeq) noexcept {
-        uint32_t expected = bucketSeq.value.load(std::memory_order_relaxed);
-        for (;;) {
-            while ((expected & 1U) != 0U) {
-                expected = bucketSeq.value.load(std::memory_order_acquire);
-            }
-
-            const uint32_t desired = expected + 1U; // odd => writer owns lock
-            if (bucketSeq.value.compare_exchange_weak(
-                    expected,
-                    desired,
-                    std::memory_order_acq_rel,
-                    std::memory_order_relaxed)) {
-                return expected;
-            }
-        }
-    }
-
-    static inline void unlockBucket(BucketSeq& bucketSeq, uint32_t lockBase) noexcept {
-        bucketSeq.value.store(lockBase + 2U, std::memory_order_release);
-    }
-
-    [[nodiscard]] static inline bool readBucketSnapshot(
-        const Entry* bucket,
-        const BucketSeq& bucketSeq,
-        EntrySnapshot (&snapshot)[ENTRIES_PER_BUCKET]) noexcept {
-        constexpr int MAX_RETRIES = 8;
-        for (int attempt = 0; attempt < MAX_RETRIES; ++attempt) {
-            const uint32_t seqStart = bucketSeq.value.load(std::memory_order_acquire);
-            if ((seqStart & 1U) != 0U) {
-                continue;
-            }
-
-            for (size_t i = 0; i < ENTRIES_PER_BUCKET; ++i) {
-                snapshot[i].key = atomicWord(bucket[i].key).load(std::memory_order_relaxed);
-                snapshot[i].payload = atomicWord(bucket[i].payload).load(std::memory_order_relaxed);
-            }
-
-            const uint32_t seqEnd = bucketSeq.value.load(std::memory_order_acquire);
-            if (seqStart == seqEnd && (seqEnd & 1U) == 0U) {
-                return true;
-            }
-        }
-        return false;
-    }
-
-    // Shared probe scaffolding: snapshot the bucket and return the first valid
-    // entry whose key matches (the only entry any probe ever inspects, since
-    // they all stop at the first key match). Returns false if the lock-free
-    // snapshot read failed or no matching valid entry exists.
-    [[nodiscard]] __attribute__((always_inline)) inline bool findEntrySnapshot(
-        uint64_t key, EntrySnapshot& out) const noexcept {
+    // Find the first valid entry in the bucket matching `key` and hand back its
+    // payload (the only field any probe reads past the match). Returns false if
+    // there is none.
+    [[nodiscard]] __attribute__((always_inline)) inline bool findPayload(
+        uint64_t key, uint64_t& outPayload) const noexcept {
         const size_t bucketIndex = static_cast<size_t>(key) & bucketMask_;
         const Entry* bucket = data() + (bucketIndex * ENTRIES_PER_BUCKET);
 
-        const BucketSeq& bucketSeq = seqData()[bucketIndex];
-        EntrySnapshot snapshot[ENTRIES_PER_BUCKET];
-        if (!readBucketSnapshot(bucket, bucketSeq, snapshot)) return false;
         for (size_t i = 0; i < ENTRIES_PER_BUCKET; ++i) {
-            const EntrySnapshot& entry = snapshot[i];
-            if (entry.key != key) continue;
-            if (Entry::flagFromPayload(entry.payload) == Entry::INVALID) continue;
-            out = entry;
+            const uint64_t storedKey = atomicWord(bucket[i].key).load(std::memory_order_relaxed);
+            const uint64_t payload   = atomicWord(bucket[i].payload).load(std::memory_order_relaxed);
+            // The XOR check doubles as the torn-read check: see the Entry
+            // comment. A half-updated entry fails it and is skipped.
+            if ((storedKey ^ payload) != key) continue;
+            if (Entry::flagFromPayload(payload) == Entry::INVALID) continue;
+            outPayload = payload;
             return true;
         }
         return false;
@@ -421,23 +368,16 @@ private:
         return allocateHeapBlock(bytes);
     }
 
-    // Begin the lifetimes of the Entry[] and BucketSeq[] sub-arrays inside the
-    // raw block and hand back typed pointers. Value-initialization zeroes every
-    // field, leaving all entries INVALID and all seqlocks unlocked.
-    static inline void constructArrays(void* base, size_t buckets, Entry*& outEntries, BucketSeq*& outSeq) noexcept {
+    // Begin the lifetimes of the Entry objects inside the raw block.
+    // Value-initialization zeroes every field, leaving all entries INVALID.
+    [[nodiscard]] static inline Entry* constructEntries(void* base, size_t buckets) noexcept {
         const size_t entryCount = buckets * ENTRIES_PER_BUCKET;
         Entry* entries = reinterpret_cast<Entry*>(base);
         for (size_t i = 0; i < entryCount; ++i) ::new (static_cast<void*>(&entries[i])) Entry{};
-
-        void* seqRaw = reinterpret_cast<std::byte*>(base) + entryCount * sizeof(Entry);
-        BucketSeq* seq = reinterpret_cast<BucketSeq*>(seqRaw);
-        for (size_t i = 0; i < buckets; ++i) ::new (static_cast<void*>(&seq[i])) BucketSeq{};
-
-        outEntries = entries;
-        outSeq = seq;
+        return entries;
     }
 
-    // Allocate a block for `buckets` buckets, construct its sub-arrays, and swap
+    // Allocate a block for `buckets` buckets, construct its entries, and swap
     // it in as the live table (freeing any previous block). Returns false and
     // leaves the current table untouched on allocation failure.
     [[nodiscard]] inline bool allocateInPlace(size_t buckets) noexcept {
@@ -445,13 +385,10 @@ private:
         BlockPtr block = allocateBlock(hugePageMode_, buckets, huge);
         if (!block) return false;
 
-        Entry* newEntries = nullptr;
-        BucketSeq* newSeq = nullptr;
-        constructArrays(block.get(), buckets, newEntries, newSeq);
+        Entry* newEntries = constructEntries(block.get(), buckets);
 
         table_ = std::move(block); // releases the previous block via its deleter
         entries_ = newEntries;
-        bucketSeq_ = newSeq;
         bucketCount_ = buckets;
         bucketMask_ = buckets - 1;
         hugePagesBacked_ = huge;
@@ -467,7 +404,6 @@ private:
 inline void TT::prefetch(uint64_t key) noexcept {
     const size_t bucketIndex = static_cast<size_t>(key) & bucketMask_;
     __builtin_prefetch(data() + (bucketIndex * ENTRIES_PER_BUCKET), 0, 3);
-    __builtin_prefetch(seqData() + bucketIndex, 0, 3);
 }
 
 static_assert(TT::Entry::encodeMove(chess::Move{12, 28, 'q'}) == TT::Entry::encodeMove(chess::Move{12, 28, 'Q'}), "promotion encoding should be case-insensitive");
@@ -478,24 +414,24 @@ static_assert(TT::Entry::decodeMove(TT::Entry::encodeMove(
     "move decode promotion mismatch");
 
 inline bool TT::probeMove(uint64_t key, uint16_t& outBestMove) const noexcept {
-    EntrySnapshot entry;
-    if (!findEntrySnapshot(key, entry)) {
+    uint64_t payload = 0ULL;
+    if (!findPayload(key, payload)) {
         outBestMove = 0;
         return false;
     }
-    outBestMove = Entry::bestMoveFromPayload(entry.payload);
+    outBestMove = Entry::bestMoveFromPayload(payload);
     return outBestMove != 0;
 }
 
 inline TT::ProbeResult TT::probeEntry(uint64_t key) const noexcept {
-    EntrySnapshot entry;
+    uint64_t payload = 0ULL;
     ProbeResult result;
-    if (!findEntrySnapshot(key, entry)) return result;
-    result.score      = Entry::scoreFromPayload(entry.payload);
-    result.staticEval = Entry::staticEvalFromPayload(entry.payload);
-    result.move       = Entry::bestMoveFromPayload(entry.payload);
-    result.depth      = Entry::depthFromPayload(entry.payload);
-    result.flag       = Entry::flagFromPayload(entry.payload);
+    if (!findPayload(key, payload)) return result;
+    result.score      = Entry::scoreFromPayload(payload);
+    result.staticEval = Entry::staticEvalFromPayload(payload);
+    result.move       = Entry::bestMoveFromPayload(payload);
+    result.depth      = Entry::depthFromPayload(payload);
+    result.flag       = Entry::flagFromPayload(payload);
     result.hit        = true;
     return result;
 }
@@ -511,9 +447,6 @@ inline void TT::store(
     const size_t bucketIndex = static_cast<size_t>(key) & bucketMask_;
     Entry* bucket = data() + (bucketIndex * ENTRIES_PER_BUCKET);
 
-    BucketSeq& bucketSeq = seqData()[bucketIndex];
-    const uint32_t lockBase = lockBucket(bucketSeq);
-
     Entry* replaceEntry = &bucket[0];
     Entry* emptyEntry = nullptr;
     int bestReplaceScore = INT32_MIN;
@@ -523,13 +456,17 @@ inline void TT::store(
         const uint64_t entryKey = atomicWord(entry.key).load(std::memory_order_relaxed);
         const uint64_t entryPayload = atomicWord(entry.payload).load(std::memory_order_relaxed);
         const uint8_t entryFlag = Entry::flagFromPayload(entryPayload);
+        // Stored key is zobrist ^ payload; recover the identity to compare. A
+        // torn entry simply fails to match and is treated as a replacement
+        // candidate, which is exactly what it is.
+        const uint64_t entryIdentity = entryKey ^ entryPayload;
 
         if (entryFlag == Entry::INVALID) {
             if (emptyEntry == nullptr) emptyEntry = &entry;
             continue;
         }
 
-        if (entryKey == key) {
+        if (entryIdentity == key) {
             if (storedDepth >= Entry::depthFromPayload(entryPayload) || flag == Entry::EXACT) {
                 // Preserve the stored move on a bound-only write (bestMove == 0)
                 // and the stored eval when this write carries none.
@@ -539,8 +476,8 @@ inline void TT::store(
                     : Entry::staticEvalFromPayload(entryPayload);
                 const uint64_t newPayload = Entry::encodePayload(score, evalToStore, moveToStore, storedDepth, generation_, flag);
                 atomicWord(entry.payload).store(newPayload, std::memory_order_relaxed);
+                atomicWord(entry.key).store(key ^ newPayload, std::memory_order_relaxed);
             }
-            unlockBucket(bucketSeq, lockBase);
             return;
         }
 
@@ -555,16 +492,11 @@ inline void TT::store(
     Entry* const target = (emptyEntry != nullptr) ? emptyEntry : replaceEntry;
     const uint64_t newPayload = Entry::encodePayload(score, staticEval, bestMove, storedDepth, generation_, flag);
     atomicWord(target->payload).store(newPayload, std::memory_order_relaxed);
-    atomicWord(target->key).store(key, std::memory_order_relaxed);
-    unlockBucket(bucketSeq, lockBase);
+    atomicWord(target->key).store(key ^ newPayload, std::memory_order_relaxed);
 }
 
 inline void TT::clear() noexcept {
     std::fill_n(data(), bucketCount_ * ENTRIES_PER_BUCKET, Entry{});
-    BucketSeq* bucketSeq = seqData();
-    for (size_t i = 0; i < bucketCount_; ++i) {
-        bucketSeq[i].value.store(0U, std::memory_order_relaxed);
-    }
 }
 
 inline bool TT::resize(size_t megabytes) noexcept {
