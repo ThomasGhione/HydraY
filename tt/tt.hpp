@@ -266,8 +266,8 @@ private:
     // Find the first valid entry in the bucket matching `key` and hand back its
     // payload (the only field any probe reads past the match). Returns false if
     // there is none.
-    [[nodiscard]] __attribute__((always_inline)) inline bool findPayload(
-        uint64_t key, uint64_t& outPayload) const noexcept {
+    [[nodiscard]] __attribute__((always_inline))
+    inline bool findPayload(uint64_t key, uint64_t& outPayload) const noexcept {
         const size_t bucketIndex = static_cast<size_t>(key) & bucketMask_;
         const Entry* bucket = data() + (bucketIndex * ENTRIES_PER_BUCKET);
 
