@@ -10,7 +10,7 @@ istruzioni: la differenza è decisiva, vedi §0).
 | §3 static eval nel payload | ✅ `986b93d` | **+2,3%** a d14, albero identico |
 | §1+§4 XOR-lockless | ✅ `7b289ef` | **+1,5%** medio / +2,2% sul minimo, −121 righe |
 | §7 huge page | ✅ 2026-08-06, zero codice | **+2,2%** a d16 |
-| §2 chiave a 16 bit | ⏳ non fatto | l'unico rimasto — e **cambia l'albero** |
+| §2 chiave a 16 bit | ⛔ **SCONSIGLIATO** 2026-08-06 | premessa smentita, vedi §2 |
 
 Totale misurato: **~+6%** di velocità composta (§3 +2,3%, §1/§4 +1,5%, §7 +2,2%),
 contro la stima di §6 di +5/8% per l'insieme §1-§4 più +1/3% per §7.
@@ -106,7 +106,41 @@ non ha lock affatto.
 
 ---
 
-## 2. Metà di ogni entry è chiave
+## 2. Metà di ogni entry è chiave — ⛔ SCONSIGLIATO (2026-08-06)
+
+**Due motivi, il secondo decisivo.**
+
+**(a) Gli 8 byte non sono più raggiungibili.** Questo paragrafo fu scritto quando
+il payload era `score(32)|move(16)|meta(16)`. §3 ha riempito quei 32 bit con
+`score(16)|staticEval(16)`: oggi il payload è pieno a 64 bit, quindi una chiave
+a 16 bit dà **10 byte, non 8** → 6 entry per linea, non 8. Per averne 8 bisogna
+buttare la staticEval, cioè un +2,3% misurato per uno speculativo.
+
+**(b) La premessa "più entry ⇒ meno nodi" è falsa qui.** La TT è già satura a
+64 MiB. Sonda di capacità (Threads=1, `CHESS_TT_HUGEPAGE=off`, nodi
+deterministici):
+
+| Hash | nodi @ d16 | nodi @ d18 |
+|---|---|---|
+| 16 MiB | 31.839.001 | — |
+| 32 MiB | 31.081.358 | — |
+| **64 MiB** | **25.441.846** | **89.964.030** |
+| 128 MiB | 24.916.602 (−2,1%) | 99.440.242 (**+10,5%**) |
+| 256 MiB | 25.837.051 (+1,6%) | — |
+
+Da 16 a 64 MiB si guadagna il 20%, ma **oltre i 64 l'effetto non è monotono**:
+a d16 raddoppiare vale −2,1%, a d18 vale +10,5% di nodi in più. Più capacità
+sposta l'albero in modo imprevedibile invece di migliorarlo.
+
+§2 offrirebbe 1,5x di entry — meno di un raddoppio, che già non rende — pagando
+in cambio: loop di probe da 4 a 6 iterazioni, collisioni a 16 bit come rischio
+nuovo, perdita dell'atomicità a parola singola su cui poggia lo XOR di §1
+(servirebbe un bucket SoA: `uint64 payloads[6]; uint16 keys[6]; pad[4]`), e un
+SPRT perché l'albero cambia. **Rapporto rischio/rendimento negativo.**
+
+Il testo originale dell'analisi resta sotto, per capire da dove veniva l'idea.
+
+### (analisi originale)
 
 ```cpp
 struct Entry { uint64_t key; uint64_t payload; };   // 8 + 8
