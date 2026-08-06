@@ -9,11 +9,22 @@ istruzioni: la differenza è decisiva, vedi §0).
 |---|---|---|
 | §3 static eval nel payload | ✅ `986b93d` | **+2,3%** a d14, albero identico |
 | §1+§4 XOR-lockless | ✅ `7b289ef` | **+1,5%** medio / +2,2% sul minimo, −121 righe |
-| §7 huge page | ⏳ serve `sudo sysctl -w vm.nr_hugepages=64` | non eseguibile senza sudo |
-| §2 chiave a 16 bit | ⏳ non fatto | l'unico rimasto che cambia la geometria |
+| §7 huge page | ✅ 2026-08-06, zero codice | **+2,2%** a d16 |
+| §2 chiave a 16 bit | ⏳ non fatto | l'unico rimasto — e **cambia l'albero** |
 
-Totale misurato: **~+3,8%** di velocità, contro la stima di §6 di +5/8% per
-l'insieme §1-§4. La stima era ottimistica ma dell'ordine giusto.
+Totale misurato: **~+6%** di velocità composta (§3 +2,3%, §1/§4 +1,5%, §7 +2,2%),
+contro la stima di §6 di +5/8% per l'insieme §1-§4 più +1/3% per §7.
+
+⚠️ **§7 non è persistente**: `sudo sysctl -w vm.nr_hugepages=64` si perde al
+reboot. Per renderlo stabile serve `/etc/sysctl.d/`, e il pool va dimensionato
+sull'Hash: 64 pagine = 128 MiB, quindi `Hash` oltre 128 ricade su THP e poi su
+heap senza dire nulla. Verifica che sia attivo guardando `HugePages_Rsvd` in
+`/proc/meminfo` **mentre** il motore cerca (a riposo torna a 0).
+
+⚠️ **§2 è di natura diversa da tutto il resto fatto finora.** §1, §3, §4 e §7
+lasciano l'albero bit-identico: sono pura velocità, verificabili con bench6 e
+senza SPRT. §2 raddoppia le entry per linea di cache, quindi cambia hit rate,
+rimpiazzo e albero — **richiede SPRT**, con il costo in ore che comporta.
 
 ⚠️ **Due lezioni di misura, pagate sul campo:**
 
