@@ -22,7 +22,7 @@
 //
 // Usage: cargo run -r --bin sanity -- <quantised.bin> [fen]...
 
-const HIDDEN: usize = 512;
+const HIDDEN: usize = 1024;
 const INPUT_BUCKETS: usize = 4;
 const OUTPUT_BUCKETS: usize = 8;
 const QA: i32 = 255;

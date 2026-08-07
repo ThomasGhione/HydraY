@@ -1,6 +1,6 @@
 // HydraY NNUE v4 trainer (HALFKA_PLAN.md: HalfKA + king bucket).
 //
-// Architecture: (768x4kb_hm -> 512)x2 -> 8ob — 4 mirrored king buckets on the
+// Architecture: (768x4kb_hm -> 1024)x2 -> 8ob — 4 mirrored king buckets on the
 // inputs (bullet ChessBucketsMirrored: feature = 768*bucket[ksq] + (feat768 ^
 // flip), flip = 7 iff file(ksq) > d), material-count output buckets as in the
 // ob cycle, SCReLU, QA=255/QB=64. Input-layer factoriser l0f (shared 768xH
@@ -64,7 +64,7 @@ use bullet_lib::{
     value::{loader, ValueTrainerBuilder},
 };
 
-const HIDDEN_SIZE: usize = 512;
+const HIDDEN_SIZE: usize = 1024;
 const OUTPUT_BUCKETS: usize = 8;
 const SCALE: i32 = 400;
 const QA: i16 = 255;
