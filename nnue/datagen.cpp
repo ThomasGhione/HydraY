@@ -46,7 +46,12 @@ constexpr int32_t  DRAW_ADJ_CP              = 10;
 constexpr int      DRAW_ADJ_PLIES           = 8;
 constexpr int      DRAW_ADJ_MIN_PLY         = 80;
 constexpr int      MAX_GAME_PLIES           = 400;
-constexpr uint64_t TARGET_POSITIONS         = 5'000'000'000; // v4 target (ETA line only)
+// Only the ETA line reads this. Overridable via CHESS_DATAGEN_TARGET, because a
+// dedicated batch (endgame seeding, an A/B arm) wants a horizon of tens of
+// millions, not the 5B of a full generation cycle -- an ETA quoting the wrong
+// target is worse than none, since it reads as "weeks left" on a one-day job.
+constexpr uint64_t TARGET_POSITIONS_DEFAULT = 5'000'000'000;
+uint64_t           g_targetPositions        = TARGET_POSITIONS_DEFAULT;
 // WDL probes ignore the 50-move counter: with a high clock a "won" table
 // position can still be drawn by the rule before conversion. Draw results
 // are always safe; decisive ones are trusted only below this clock.
@@ -438,6 +443,11 @@ int runDatagen(int argc, char* argv[]) {
         g_endgameSeedEvery = std::clamp(std::atoi(egEvery), 1, 1000);
     }
 
+    if (const char* target = std::getenv("CHESS_DATAGEN_TARGET")) {
+        const uint64_t parsed = std::strtoull(target, nullptr, 10);
+        if (parsed > 0) g_targetPositions = parsed;
+    }
+
     // Labeler network: an explicit path when given, the embedded net
     // otherwise. Fail hard on a bad path: silently falling back to a
     // different net would poison days of generation with unintended labels.
@@ -484,6 +494,8 @@ int runDatagen(int argc, char* argv[]) {
               << "  threads: " << threads << "  nodes/move: " << nodesPerMove << "\n"
               << "  filters: ply>=" << MIN_RECORD_PLY << ", not in check, quiet bestmove, |cp|<="
               << MAX_RECORD_SCORE_CP << "\n"
+              << "  target : " << fmtCount(g_targetPositions)
+              << " positions (ETA line only; CHESS_DATAGEN_TARGET)\n"
               << "  endgame: " << (g_endgameSeedEvery == 1
                      ? std::string("EVERY game")
                      : std::string("1 game in ") + std::to_string(g_endgameSeedEvery))
@@ -519,7 +531,7 @@ int runDatagen(int argc, char* argv[]) {
         // everything already on disk for the prefix.
         const double rate = (elapsed > 0.0) ? static_cast<double>(generated) / elapsed : 0.0;
         const double etaDays = (rate > 0.0)
-            ? static_cast<double>(TARGET_POSITIONS - std::min(total, TARGET_POSITIONS))
+            ? static_cast<double>(g_targetPositions - std::min(total, g_targetPositions))
                 / rate / 86400.0
             : 0.0;
         const MetaCounters meta{
@@ -534,7 +546,8 @@ int runDatagen(int argc, char* argv[]) {
                   << "  eg-seed "
                   << fmtCount(g_totalEndgameSeeded.load(std::memory_order_relaxed))
                   << "  pos/s " << static_cast<uint64_t>(rate)
-                  << "  ETA(5B) " << std::round(etaDays * 10.0) / 10.0 << " days\n" << std::flush;
+                  << "  ETA(" << fmtCount(g_targetPositions) << ") "
+                  << std::round(etaDays * 10.0) / 10.0 << " days\n" << std::flush;
     }
 
     for (std::thread& t : workers) t.join();

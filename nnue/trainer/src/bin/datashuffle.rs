@@ -8,6 +8,9 @@
 //      appeso all'output.
 // Il risultato è una permutazione uniforme globale (shuffle a shard).
 //
+// Il pass 1 streama a blocchi di 16 MiB: la RAM non dipende dalla taglia dei
+// singoli input.
+//
 // Uso: cargo run -r --bin datashuffle -- <out.bin> <in1.bin> [in2.bin ...]
 // Gli shard temporanei (<out>.shard<N>) vengono rimossi a fine run.
 
@@ -44,18 +47,32 @@ fn main() {
         .collect();
     let mut total: u64 = 0;
     let mut stripped: u64 = 0;
+    // Lo scatter STREAMA a blocchi: leggere un input intero in RAM costava
+    // O(file piu grande), non O(dataset/K) come dice l'intestazione. Finche
+    // gli input erano gli shard grezzi da pochi GB non si notava; un singolo
+    // prefisso da 37 GB ha fatto scattare l'OOM killer su una macchina da 30.
+    const CHUNK: usize = 1 << 24; // 16 MiB, multiplo di REC
+    let mut buf = vec![0u8; CHUNK];
     for path in inputs {
-        let mut buf = Vec::new();
-        std::fs::File::open(path)
-            .unwrap_or_else(|e| panic!("apertura {path}: {e}"))
-            .read_to_end(&mut buf)
-            .unwrap_or_else(|e| panic!("lettura {path}: {e}"));
-        let usable = buf.len() - buf.len() % REC;
-        for rec in buf[..usable].chunks_exact(REC) {
-            if rec[..8] == [0u8; 8] { stripped += 1; continue; }
-            let s = (rng.next() % SHARDS as u64) as usize;
-            shards[s].write_all(rec).expect("scrittura shard");
-            total += 1;
+        let mut f = std::fs::File::open(path)
+            .unwrap_or_else(|e| panic!("apertura {path}: {e}"));
+        // Byte di coda che non completano un record: restano in testa al buffer
+        // per il giro successivo, perche read() puo tornare meno di CHUNK.
+        let mut carry = 0usize;
+        loop {
+            let n = f.read(&mut buf[carry..])
+                .unwrap_or_else(|e| panic!("lettura {path}: {e}"));
+            if n == 0 { break; }
+            let avail = carry + n;
+            let usable = avail - avail % REC;
+            for rec in buf[..usable].chunks_exact(REC) {
+                if rec[..8] == [0u8; 8] { stripped += 1; continue; }
+                let s = (rng.next() % SHARDS as u64) as usize;
+                shards[s].write_all(rec).expect("scrittura shard");
+                total += 1;
+            }
+            buf.copy_within(usable..avail, 0);
+            carry = avail - usable;
         }
     }
     for w in &mut shards { w.flush().expect("flush shard"); }

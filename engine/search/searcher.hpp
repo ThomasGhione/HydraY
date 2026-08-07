@@ -18,10 +18,9 @@ public:
     Searcher() = delete;
 
     // Backward-compat aliases.
-    static constexpr int32_t  POS_INF               = std::numeric_limits<int32_t>::max();
-    // Negamax-safe: NEG_INF == -POS_INF so -(NEG_INF) == POS_INF is valid
-    // (negating std::numeric_limits<int32_t>::min() is undefined behaviour).
-    static constexpr int32_t  NEG_INF               = -POS_INF;
+    static constexpr int32_t  POS_INF               = ::engine::POS_INF;
+    static constexpr int32_t  NEG_INF               = ::engine::NEG_INF;
+    static constexpr int32_t  MATE_VALUE            = ::engine::MATE_VALUE;
     static constexpr int      DEFAULT_DEPTH         = ::engine::DEFAULT_DEPTH;
     static constexpr int      MAX_PLY               = ::engine::MAX_PLY;
     static constexpr int      CAPTURE_HISTORY_SLOTS = ::engine::CAPTURE_HISTORY_SLOTS;

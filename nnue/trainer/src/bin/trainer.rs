@@ -1,6 +1,6 @@
 // HydraY NNUE v4 trainer (HALFKA_PLAN.md: HalfKA + king bucket).
 //
-// Architecture: (768x4kb_hm -> 512)x2 -> 8ob — 4 mirrored king buckets on the
+// Architecture: (768x4kb_hm -> 1024)x2 -> 8ob — 4 mirrored king buckets on the
 // inputs (bullet ChessBucketsMirrored: feature = 768*bucket[ksq] + (feat768 ^
 // flip), flip = 7 iff file(ksq) > d), material-count output buckets as in the
 // ob cycle, SCReLU, QA=255/QB=64. Input-layer factoriser l0f (shared 768xH
@@ -10,8 +10,42 @@
 // of the two, and |sum| must stay <= ~1.98 for i16 quantisation at QA=255.
 // Adapted from bullet's examples/progression/3_input_buckets.rs (pinned rev).
 //
-// Usage: cargo run -r --bin trainer --features cuda -- <data.bin> [superbatches] [net_id]
+// Usage: cargo run -r --bin trainer --features cuda -- <data.bin> [superbatches]
+//                                                       [net_id] [start_sb] [resume_ckpt]
 //   shakedown: ~10 superbatches; full run: ~40.
+//
+// STAGED TRAINING (start_sb + resume_ckpt) exists because the free Colab
+// runtime has ~66 GB of local disk while the full dataset is 88 GB, and the
+// Drive mount caches locally everything it reads — so streaming a 40-superbatch
+// run fills the disk around superbatch 28. Instead, train on one slice at a
+// time: each stage exits (releasing the cache), the local file is replaced with
+// the next slice, and training resumes from the checkpoint. The net ends up
+// having seen the whole dataset with no slice ever exceeding the disk.
+//
+// Stage boundaries must land on multiples of `save_rate` (10 below), since a
+// stage can only resume from a checkpoint that was actually written. Four
+// slices of a quarter of the dataset each therefore fit the 40-superbatch
+// schedule exactly, and 10 superbatches consume 1B samples against a 688M
+// slice — the same 1.45 epochs the whole run would do over the whole dataset:
+//
+//   STAGE_END=10 stage 1:  <slice A> 40 hydray-x
+//   STAGE_END=20 stage 2:  <slice B> 40 hydray-x 11 checkpoints/hydray-x-10
+//   STAGE_END=30 stage 3:  <slice C> 40 hydray-x 21 checkpoints/hydray-x-20
+//   STAGE_END=40 stage 4:  <slice D> 40 hydray-x 31 checkpoints/hydray-x-30
+//
+// STAGE_END is what stops a stage at its boundary; the second argument stays
+// the total for the whole run so the learning-rate decay lands where planned.
+//
+// Two properties of bullet make this sound, both verified in its source rather
+// than assumed: `Step::new` iterates from `start_superbatch`, so `StepLR` sees
+// ABSOLUTE indices and the learning-rate drop still lands where the schedule
+// says; and `load_from_checkpoint` restores `optimiser_state`, so AdamW's
+// moments carry across a stage boundary instead of restarting cold.
+//
+// TEST_PATH (env var) points at a held-out slice and turns on validation loss.
+// Without it only training loss is reported, which cannot show overfitting —
+// the 8-bucket map had a BETTER training loss than the 4-bucket one while
+// playing 12 Elo worse, and that was only diagnosable by elimination.
 
 use bullet_lib::{
     game::{
@@ -25,12 +59,12 @@ use bullet_lib::{
     trainer::{
         save::SavedFormat,
         schedule::{lr, wdl, TrainingSchedule, TrainingSteps},
-        settings::LocalSettings,
+        settings::{LocalSettings, TestDataset},
     },
     value::{loader, ValueTrainerBuilder},
 };
 
-const HIDDEN_SIZE: usize = 512;
+const HIDDEN_SIZE: usize = 1024;
 const OUTPUT_BUCKETS: usize = 8;
 const SCALE: i32 = 400;
 const QA: i16 = 255;
@@ -62,6 +96,21 @@ fn main() {
         .get(3)
         .cloned()
         .unwrap_or_else(|| "hydray-halfka-shakedown".to_string());
+    // Absolute index of the first superbatch of THIS stage; `superbatches` stays
+    // the total for the whole run so the learning-rate schedule is unchanged.
+    let start_superbatch: usize = args.get(4).and_then(|s| s.parse().ok()).unwrap_or(1);
+    let resume_from = args.get(5).cloned();
+    let test_path = std::env::var("TEST_PATH").ok();
+    // Last superbatch of THIS stage. Without it a stage runs to `superbatches`
+    // on its own slice — which still ends up correct, since each stage resumes
+    // from the previous boundary and overwrites the later checkpoints, but it
+    // burns 2.5x the GPU time on data that gets thrown away. The learning-rate
+    // schedule below keys off `superbatches` regardless, so bounding the stage
+    // does not move where the decay lands.
+    let stage_end: usize = std::env::var("STAGE_END")
+        .ok()
+        .and_then(|s| s.parse().ok())
+        .unwrap_or(superbatches);
 
     let mut trainer = ValueTrainerBuilder::default()
         .dual_perspective()
@@ -111,8 +160,8 @@ fn main() {
         steps: TrainingSteps {
             batch_size: 16_384,
             batches_per_superbatch: 6104, // ~100M samples per superbatch
-            start_superbatch: 1,
-            end_superbatch: superbatches,
+            start_superbatch,
+            end_superbatch: stage_end,
         },
         // NNUE_PLAN lambda = 0.7 on the search score; bullet's `wdl` weights the
         // game RESULT, so wdl = 1 - lambda = 0.3.
@@ -129,12 +178,20 @@ fn main() {
 
     let settings = LocalSettings {
         threads: 2,
-        test_set: None,
+        test_set: test_path.as_deref().map(TestDataset::at),
         output_directory: "checkpoints",
         batch_queue_size: 64,
     };
 
     let data_loader = loader::DirectSequentialDataLoader::new(&[data_path.as_str()]);
+
+    // Resume before run(): load_from_checkpoint restores the optimiser state,
+    // so AdamW's moments survive the stage boundary. Loading after run() would
+    // silently train from scratch on this slice.
+    if let Some(ckpt) = &resume_from {
+        println!("resuming from {ckpt} at superbatch {start_superbatch}");
+        trainer.load_from_checkpoint(ckpt);
+    }
 
     trainer.run(&schedule, &settings, &data_loader);
 

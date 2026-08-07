@@ -255,7 +255,89 @@ Da fare **solo** se A3 dà HalfKA perdente o marginale. Addestrare HalfKA su
   davvero e il target volumetrico ha una base;
 - curva piatta → il collo di bottiglia non sono i dati.
 
-### A4-bis. Mappa a 8 bucket — ✅ **TESTATA** (2026-07-31): si tiene la mappa a 4
+### A5-dati. Quanto valgono i dati da soli — ✅ **CHIUSA** (2026-08-02): niente
+
+Prima misura **diretta** del contributo dei dati (prima era solo una sottrazione:
++104 totali meno +26 di architettura). Stessa architettura della 3.0.0, stesso
+budget di 40 superbatch, stesso schedule. **Unica variabile: 2,72B di posizioni
+contro 1,18B** — tutte e quattro le fette, `STAGE_END` attivo, nessuna saltata.
+
+Testa a testa, stesso binario, `EvalFile` contro la rete incorporata:
+
+```
+Elo: -7,30 +/- 8,61   nElo: -9,13 +/- 10,77   LOS 4,83%
+Games: 4000, W1254 L1338 D1408 (48,95%)   LLR -1,93 (nessun bound)
+ordo: base 2303,7 ±4,1  |  new 2296,3 ±4,1
+```
+
+**L'intervallo è [−15,9; +1,3]: qualsiasi guadagno sopra ~1 Elo è escluso al
+95%.** Più che raddoppiare il dataset non compra niente. Il ciclo dati, con la
+ricetta di datagen attuale, è **saturo**: non rimettere le macchine a generare.
+
+⚠️ **Cosa NON dice.** A budget fisso di 40 SB, 2,72B significa **1,47 epoche**
+mentre 1,18B ne faceva 3,4. Il test quindi risponde a "più dati **a parità di
+costo di training** rendono?" — no — e non a "i dati sono inutili in assoluto".
+La variante ancora aperta è **80 superbatch sui 2,72B** (~2h di T4, otto tappe):
+separa "i dati non servono" da "i dati chiedono anche più calcolo". È l'unica
+domanda sui dati che valga ancora la pena di porre.
+
+Ricaduta su A4-bis: se i dati non muovono di un Elo nemmeno la mappa a 4 bucket,
+l'ipotesi che la mappa a 8 fosse semplicemente affamata diventa molto meno
+credibile — resta non testata, ma non è più la spiegazione naturale.
+
+Rete conservata in `nnue/net/a5_halfka4_full.nnue` (non spedita). Sanity: layout
+OK, specchio esatto, startpos +51, **KQvK 169** contro i 128 della 3.0.0 — il
+bucket 0 migliora un po' col seeding B1 ma resta lontano dal vero.
+
+### A4-bis. Mappa a 8 bucket — ✅ **CHIUSA** (2026-08-01): 4 bucket, definitivamente
+
+Due SPRT ben potenziati e concordi, con l'ipotesi di riserva ora **esclusa**:
+
+| confronto | dati della 8 bucket | esito |
+|---|---|---|
+| 8 vs 4 | 1,18B contro 1,18B | −12,37 ±9,34 (3073 partite) |
+| 8 vs 4 (secondo run) | ~1,36B contro 1,18B (vedi sotto) | **−10,43 ±8,41** (4000, LOS 0,75%) |
+
+⚠️ **Il secondo run NON ha visto i 2,75B: ne ha visti ~1,36B.** Il trainer non si
+fermava al confine della tappa (corretto poi da `STAGE_END`, c125cc3) e furono
+eseguite solo `stage(1)` e `stage(3)`. La tappa 1 tirò quindi dritto fino al
+superbatch 20 sulla **sola fetta A**; la tappa 3 ripartì dal checkpoint 20 e tirò
+fino al 40 sulla **sola fetta C**, scrivendo il checkpoint finale. **Le fette B e
+D non sono mai entrate**: due fette, ~1,36B di posizioni distinte contro gli
+1,18B dell'avversaria — il **15%** di dati in più, non il 133%. Ogni fetta è
+stata inoltre ripassata ~2,9 volte invece di ~1,45.
+
+Conseguenza in due direzioni:
+
+- **il verdetto sui 4 bucket ne esce rafforzato.** I due SPRT non sono più "dati
+  pari" + "più dati": sono due **repliche quasi a dati pari**, indipendenti e
+  concordi su circa −11 Elo. Una replica vale più di una misura sola.
+- **la fame di dati non è stata refutata: non è stata testata.** Un +15% di dati
+  non poteva dire nulla, e la mia conclusione "l'ipotesi era sbagliata" era
+  infondata. Va considerata **aperta e non verificata**, non esclusa.
+
+Il test pulito, se un giorno servisse, è la mappa a 8 bucket sui 2,75B interi con
+tutte e quattro le tappe eseguite. **Non è però la prossima cosa da fare**: la
+priorità è A5 sui 4 bucket, che misura se i dati sono ancora una leva viva per
+l'architettura che spediamo davvero. Se lì il guadagno è piccolo, la questione
+della fame di dati a 8 bucket diventa irrilevante da sé.
+
+**Resta da spiegare** il fatto anomalo: train loss migliore, NPS identico, meno
+nodi cercati, e gioco peggiore. Ipotesi superstiti, coi dati ormai esclusi:
+
+- la **loss di training non misura ciò che serve alla ricerca**: una eval può
+  predire meglio il WDL medio e ordinare peggio le mosse in posizioni concrete,
+  e l'albero alpha-beta è sensibile all'ordinamento, non all'accuratezza media;
+- la mappa fitta introduce **discontinuità**: caselle di re adiacenti cadono in
+  bucket con pesi indipendenti, quindi una mossa di re cambia la valutazione a
+  parità di struttura. La più plausibile, perché la suddivisione riguarda
+  proprio la **traversa 1** — dove il re sta quasi sempre, cioè il punto di
+  massimo traffico. Con 4 bucket i confini sono meno e più lontani dall'azione.
+
+Se un giorno si riprovasse, la leva NON è più dataset: è una mappa che tenga i
+confini lontani dalle case di arrocco, oppure più bucket a parità di traversa 1.
+
+### A4-bis-storico. Prima misura (2026-07-31)
 
 **Testa a testa 8 vs 4 bucket: −12,37 ±9,34 per la mappa fitta** (3073 partite,
 LLR −2,38 = 81% verso H0, fermato). Branch `halfka8` (`8ca0508`); i due branch

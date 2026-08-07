@@ -66,15 +66,17 @@ constexpr int32_t Searcher::saturatingSub32(int32_t lhs, int32_t rhs) noexcept {
     return static_cast<int32_t>(std::clamp<int64_t>(diff, NEG_INF, POS_INF));
 }
 
+// Plain arithmetic: |score| <= MATE_VALUE and ply <= MAX_PLY, so the rebased
+// value stays well inside int32_t (and inside int16_t, see search_constants).
 constexpr int32_t Searcher::scoreToTT(int32_t score, int ply) noexcept {
-    if (score >= MATE_BOUND)  return saturatingAdd32(score, ply);
-    if (score <= -MATE_BOUND) return saturatingSub32(score, ply);
+    if (score >= MATE_BOUND)  return score + ply;
+    if (score <= -MATE_BOUND) return score - ply;
     return score;
 }
 
 constexpr int32_t Searcher::scoreFromTT(int32_t score, int ply) noexcept {
-    if (score >= MATE_BOUND)  return saturatingSub32(score, ply);
-    if (score <= -MATE_BOUND) return saturatingAdd32(score, ply);
+    if (score >= MATE_BOUND)  return score - ply;
+    if (score <= -MATE_BOUND) return score + ply;
     return score;
 }
 
@@ -107,11 +109,11 @@ bool Searcher::checkEarlyTerminalConditions(
 
     // Terminal king-capture states are possible in this codebase's move model.
     // Negamax / side-to-move relative: losing our own king is a mated score
-    // (NEG_INF + ply); capturing the opponent's king is a winning score.
+    // (-MATE_VALUE + ply); capturing the opponent's king is a winning score.
     if (b.kings_bb[0] == 0ULL || b.kings_bb[1] == 0ULL) {
         const bool whiteToMove = (b.getActiveColor() == chess::Board::WHITE);
         const bool ourKingGone = (b.kings_bb[0] == 0ULL) ? whiteToMove : !whiteToMove;
-        outScore = ourKingGone ? (NEG_INF + ply) : (POS_INF - ply);
+        outScore = ourKingGone ? (-MATE_VALUE + ply) : (MATE_VALUE - ply);
         return true;
     }
 
@@ -171,12 +173,7 @@ bool Searcher::checkDrawTerminalConditions(
         }
     }
 
-    if (b.isFiftyMoveRule()) [[unlikely]] {
-        outScore = 0;
-        return true;
-    }
-
-    if (b.hasInsufficientMaterialDraw()) [[unlikely]] {
+    if (b.isFiftyMoveRule() || b.hasInsufficientMaterialDraw()) [[unlikely]] {
         outScore = 0;
         return true;
     }
@@ -677,10 +674,10 @@ int32_t Searcher::searchPosition(
     if (enterNode(b, runtime, ply, counter, earlyScore)) return earlyScore;
 
     const bool isPVNode = (static_cast<int64_t>(beta) - static_cast<int64_t>(alpha) > 1);
-
+    // Narrowing here can never demote a PV node to a null-window one.
     if (ply > 0) {
-        alpha = std::max(alpha, NEG_INF + ply);
-        beta  = std::min(beta,  POS_INF - ply);
+        alpha = std::max(alpha, -MATE_VALUE + ply);
+        beta  = std::min(beta,   MATE_VALUE - ply - 1);
         if (alpha >= beta) return alpha;
     }
 
@@ -760,8 +757,16 @@ int32_t Searcher::searchPosition(
     // `improving` heuristic can compare evalStack[ply-2] vs current eval
     // starting from ply >= 2. Previously the root left evalStack[0] at its
     // zero-initialised value, biasing `improving` to (staticEval > 0) at ply 2.
+    // The raw eval of this position, before the TT-bound tightening and the
+    // corrHist nudge below. That is what goes back into the TT: a later visit
+    // then skips the NNUE forward pass entirely. NO_EVAL while in check, where
+    // there is no meaningful static eval to record.
+    int32_t rawStaticEval = TT::Entry::NO_EVAL;
     if (!node.inCheck) {
-        node.staticEval = Evaluator::evaluate(b);
+        rawStaticEval = (tte.hit && tte.staticEval != TT::Entry::NO_EVAL)
+            ? tte.staticEval
+            : Evaluator::evaluate(b);
+        node.staticEval = rawStaticEval;
         if (tte.hit) {
             const int32_t ttStaticScore = scoreFromTT(tte.score, ply); // re-base mate scores
             // Negamax (STM-relative): a LOWERBOUND tightens upward, an
@@ -890,7 +895,7 @@ int32_t Searcher::searchPosition(
         : engine::MoveGenerator::generateLegalMoves(b, /*knownNotInCheck=*/true);
     if (moves.is_empty()) {
         return node.inCheck
-            ? (NEG_INF + ply)  // side to move is checkmated (negamax)
+            ? (-MATE_VALUE + ply)  // side to move is checkmated (negamax)
             : 0;               // stalemate
     }
 
@@ -938,7 +943,8 @@ int32_t Searcher::searchPosition(
             hashKey, static_cast<uint8_t>(ctx.depth),
             scoreToTT(best, ctx.ply),
             static_cast<uint8_t>(determineFlag(best, alpha, beta)),
-            TT::Entry::encodeMove(result.move));
+            TT::Entry::encodeMove(result.move),
+            rawStaticEval);
     }
 
     return best;
@@ -961,8 +967,9 @@ int32_t Searcher::quiescenceSearch(
     }
 
     const bool canUseTT = (runtime.transpositionTable != nullptr);
+    TT::ProbeResult tte{};
     if (canUseTT) {
-        const auto tte = runtime.transpositionTable->probeEntry(b.getHash());
+        tte = runtime.transpositionTable->probeEntry(b.getHash());
         // Any depth qualifies at a quiescence node (stored qsearch depth is 0).
         if (tte.hit && ttBoundCutoff(tte.flag, tte.score, alpha, beta)) {
             return scoreFromTT(tte.score, ply);
@@ -977,7 +984,7 @@ int32_t Searcher::quiescenceSearch(
         if (inCheck) {
             MoveList evasions = engine::MoveGenerator::generateLegalEvasions(b, checkers);
             if (evasions.is_empty()) {
-                return NEG_INF + ply; // side to move is checkmated (negamax)
+                return -MATE_VALUE + ply; // side to move is checkmated (negamax)
             }
         }
         return Evaluator::evaluate(b);
@@ -986,21 +993,28 @@ int32_t Searcher::quiescenceSearch(
     MovePicker movePicker;
     int32_t best;
     const int32_t alphaOrig = alpha;
+    int32_t rawStaticEval = TT::Entry::NO_EVAL;
 
     if (inCheck) {
         movePicker = engine::MoveGenerator::generateQSearchEvasions(b, checkers);
         if (!movePicker.hasNext()) {
-            return NEG_INF + ply; // side to move is checkmated (negamax)
+            return -MATE_VALUE + ply; // side to move is checkmated (negamax)
         }
         best = NEG_INF;
     } else {
-        const int32_t standPat = Evaluator::evaluate(b) + runtime.corrHist.correction(b);
+        // The probe above already pulled this bucket into cache, so a recorded
+        // static eval is free here and this is where 50-80% of all nodes are.
+        rawStaticEval = (tte.hit && tte.staticEval != TT::Entry::NO_EVAL)
+            ? tte.staticEval
+            : Evaluator::evaluate(b);
+        const int32_t standPat = rawStaticEval + runtime.corrHist.correction(b);
         if (isBetaCutoff(standPat, beta)) {
             // Bound-only store (bestMove 0 preserves any stored move): sibling
             // qsearch nodes can then cut on this stand-pat without re-evaluating.
             if (canUseTT) {
                 runtime.transpositionTable->store(
-                    b.getHash(), 0, scoreToTT(standPat, ply), TT::Entry::LOWERBOUND);
+                    b.getHash(), 0, scoreToTT(standPat, ply), TT::Entry::LOWERBOUND,
+                    /*bestMove=*/0, rawStaticEval);
             }
             return standPat; // fail-soft: tighter bound than a flat beta
         }
@@ -1049,7 +1063,7 @@ int32_t Searcher::quiescenceSearch(
     if (!inCheck && canUseTT) {
         runtime.transpositionTable->store(
             b.getHash(), 0, scoreToTT(best, ply),
-            static_cast<uint8_t>(determineFlag(best, alphaOrig, beta)));
+            static_cast<uint8_t>(determineFlag(best, alphaOrig, beta)), /*bestMove=*/0, rawStaticEval);
     }
 
     return best;
@@ -1175,7 +1189,7 @@ void emitUciInfoLine(int depth, int32_t score, const SearchRuntime& runtime,
     std::cout << "info depth " << depth << " score ";
     const int32_t absScore = (score < 0) ? -score : score;
     if (absScore >= MATE_BOUND) {
-        const int32_t plies = Searcher::POS_INF - absScore;
+        const int32_t plies = Searcher::MATE_VALUE - absScore;
         const int32_t mateMoves = (plies + 1) / 2;
         std::cout << "mate " << (score > 0 ? mateMoves : -mateMoves);
     } else {
@@ -1206,7 +1220,7 @@ Searcher::IterativeSearchResult Searcher::runIterativeDeepening(
         const bool ourKingGone = (rootBoard.kings_bb[0] == 0) ? rootWhite : !rootWhite;
         result.terminalRoot = true;
         result.completedAnyDepth = true;
-        result.bestScore = ourKingGone ? NEG_INF : POS_INF; // STM-relative
+        result.bestScore = ourKingGone ? -MATE_VALUE : MATE_VALUE; // STM-relative
         runtime.eval = result.bestScore;
         return result;
     }
@@ -1226,7 +1240,7 @@ Searcher::IterativeSearchResult Searcher::runIterativeDeepening(
     if (moves.is_empty()) {
         const uint8_t toMove = rootBoard.getActiveColor();
         if (rootBoard.isCheckmate(toMove)) {
-            result.bestScore = NEG_INF; // side to move is mated (negamax/STM)
+            result.bestScore = -MATE_VALUE; // side to move is mated (negamax/STM)
         } else if (rootBoard.isDraw(toMove)) {
             result.bestScore = 0;
         } else {

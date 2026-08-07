@@ -1,0 +1,11 @@
+{
+  "parameter_ranges": {
+    "SEE_CAPTURE_MARGIN": "Integer(30, 140)",
+    "HISTORY_PRUNE_D1": "Integer(-9000, -1500)",
+    "HISTORY_PRUNE_D2": "Integer(-12000, -2500)",
+    "HISTORY_PRUNE_D3": "Integer(-14000, -4000)"
+  },
+  "data_path": "search_ordering_data.npz",
+  "model_path": "search_ordering_model.pkl",
+  "log_path": "log_search_ordering.txt"
+}

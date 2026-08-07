@@ -20,10 +20,6 @@
 
 namespace engine {
 
-static inline constexpr int32_t POS_INF = std::numeric_limits<int32_t>::max();
-// Negamax-safe: NEG_INF == -POS_INF so it can be negated without UB.
-static inline constexpr int32_t NEG_INF = -POS_INF;
-
 class Engine final {
 public:
     enum class GameResult : uint8_t {

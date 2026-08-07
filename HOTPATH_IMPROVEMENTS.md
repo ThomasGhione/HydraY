@@ -79,7 +79,7 @@ board doMove/undoMove/inCheck), evaluator escluso (futuro NNUE). Ordinata per cr
   Quando `evalStack[ply-2] == NEG_INF` (in scacco 2 ply fa) `improving` è sempre false;
   fallback standard a ply−4. ~3 LOC.
 
-- [ ] **9. Campagna SMAC3 sulle costanti di search** — Elo: **+15–40**
+- [x] **9. Campagna SMAC3 sulle costanti di search** — RESA: **+17,74** (2026-08-03)
   Tutti i margini vinti a giugno (FUTILITY_MARGINS, LMP, HISTORY_PRUNE, SEE_CAPTURE, RFP,
   NMP_EVAL_*, PROBCUT_*, SE_*) sono guessed, not tuned.
   - [x] **Esposizione UCI FATTA 2026-07-05**: 16 spin (pattern eval_constants: globali
@@ -88,10 +88,31 @@ board doMove/undoMove/inCheck), evaluator escluso (futuro NNUE). Ordinata per cr
         node-identico 5.782.300 ai default, roundtrip set/restore verificato).
         Gruppi pronti: `tuning/groups/search_pruning.json` (8 param margini) e
         `search_shape.json` (8 param futility/LMP/LMR/SE).
-  - [ ] **RUN tuning**: `cd tuning && ./run_tune_local.sh search_pruning` poi
-        `search_shape` — SOLO a laptop libero (datagen NNUE occupa 3 core fino a
-        ~2026-07-09; partite a TC falsate fino ad allora). Poi ri-congelare gli optimum
-        nei default di search_constants.hpp + SPRT di conferma.
+  - [x] **RUN tuning FATTO 2026-08-03** — risultato: **+17,74 ±8,67** (SPRT 3294 partite,
+        LOS 100%, H1 raggiunto da solo), commit a1dcbaf. I gruppi sono stati ridivisi in
+        tre insiemi disgiunti perché quelli originali si sovrapponevano e `search_shape`
+        tarava due costanti cancellate a luglio (`FUTILITY_EG_*`), bruciando due
+        dimensioni su rumore puro.
+        - `search_evalmargins` (RFP, NMP_EVAL_*, FUTILITY_MID_STEP, PROBCUT) →
+          **+17,74**. Sono le uniche costanti che confrontano una eval statica con una
+          soglia in centipawn, cioè le uniche starate dal passaggio a NNUE.
+        - `search_shape` (LMP ×2, LMR_C, SE ×2) → **−1,3 ±4,6 dopo 153 iterazioni,
+          NESSUN margine**. Girato DOPO aver applicato i margini nuovi, quindi vale anche
+          con le potature correnti: la geometria dell'albero non dipende dalla scala dei
+          punteggi ed è sopravvissuta intatta alla rimozione dell'HCE. **Non ritarare.**
+        - `search_ordering` (SEE_CAPTURE, HISTORY_PRUNE ×3) → **+1,0 ±3,7 dopo 128
+          iterazioni, NESSUN margine**. L'argmax è saltato fra due regioni lontane
+          (SEE 74/HP_D3 −11350 e SEE 35/HP_D3 −4000) valutandole uguali: firma di
+          superficie piatta, più netta dell'Elo stesso. **Non ritarare.**
+        **Conclusione**: si erano starate SOLO le costanti che confrontano una eval
+        statica con una soglia in cp. Geometria dell'albero e statistiche di
+        ordinamento non dipendono dalla scala dei punteggi e sono sopravvissute
+        intatte alla rimozione dell'HCE. La campagna è CHIUSA.
+        ⚠️ **Il tuner girava a profondità fissa 8** (`base_config.json`, dall'era HCE): a
+        profondità fissa una costante di pruning può solo essere premiata se pota di meno,
+        quindi la prima campagna è finita nell'angolo della scatola dichiarando +40 falsi.
+        Corretto in controllo di tempo. Profondità fissa va bene solo per i **pesi di
+        valutazione**, che non barattano nodi contro profondità.
 
 - [x] **10. TB probe dopo il TT probe** — ✅ **FATTO** 2026-07-04
   Node-identico senza TB (blocco inerte); con TB attive = meno probeWDL a parità di cutoff.

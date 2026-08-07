@@ -22,9 +22,22 @@ inline constexpr int32_t  CAPTURE_HISTORY_SLOTS  = 2;
 inline constexpr int32_t  CORR_HISTORY_SIZE      = 1 << 14;
 inline constexpr int DEFAULT_DEPTH               = 11;
 
-// Scores within MATE_BOUND of ±INF encode a forced mate at a ply distance and
-// are rebased on TT store/load (see scoreToTT / scoreFromTT).
-inline constexpr int32_t MATE_BOUND = std::numeric_limits<int32_t>::max() - 2048;
+// Score scale. A forced mate `n` plies away scores ±(MATE_VALUE - n), so every
+// score the search can produce fits in int16_t — the precondition for packing a
+// static eval next to the score in the TT payload. Scores at or beyond
+// MATE_BOUND carry a ply distance and are rebased on TT store/load (see
+// scoreToTT / scoreFromTT).
+inline constexpr int32_t MATE_VALUE = 32000;
+inline constexpr int32_t MATE_BOUND = MATE_VALUE - MAX_PLY;
+
+// Window sentinel: one past the best reachable score, so no real score can ever
+// equal it. Negamax-safe (NEG_INF == -POS_INF, negating it is well defined).
+inline constexpr int32_t POS_INF = MATE_VALUE + 1;
+inline constexpr int32_t NEG_INF = -POS_INF;
+
+// scoreToTT pushes a mate score away from zero by up to MAX_PLY before storing.
+static_assert(MATE_VALUE + MAX_PLY <= std::numeric_limits<int16_t>::max(),
+              "rebased mate scores must fit the int16_t TT score field");
 
 // ===================================================
 // PRUNING / EXTENSION PARAMETERS
@@ -37,15 +50,17 @@ inline constexpr int32_t MATE_BOUND = std::numeric_limits<int32_t>::max() - 2048
 // June values exactly.
 inline constexpr int     NULL_MOVE_VERIFICATION_DEPTH = 10;
 // Null-move reduction eval scaling: deeper reduction the further eval beats beta.
-inline int32_t NMP_EVAL_DIV = 150;
+inline int32_t NMP_EVAL_DIV = 265;
 inline int32_t NMP_EVAL_MAX = 4;
 // Reverse futility pruning margin per remaining ply.
-inline int32_t RFP_MARGIN_PER_DEPTH = 90;
+inline int32_t RFP_MARGIN_PER_DEPTH = 70;
 // Futility margin generator: FUTILITY_MARGINS[depth] = MID_STEP*d, consumed
 // by the move loop (gated to depth 1..6). The HCE-era endgame row (phase split
 // on nonPawnMajors) was removed — see HCE_RESIDUE_AUDIT.md section 1b.
-inline int32_t FUTILITY_MID_STEP = 260;
-inline int32_t FUTILITY_MARGINS[7] = {0, 260, 520, 780, 1040, 1300, 1560};
+// NOTE: rebuildSearchDerivedTables() only runs on a UCI option change, so this
+// row is what a plain build actually uses — keep it == MID_STEP * d by hand.
+inline int32_t FUTILITY_MID_STEP = 176;
+inline int32_t FUTILITY_MARGINS[7] = {0, 176, 352, 528, 704, 880, 1056};
 // LMP_THRESHOLDS[improving][depth]: higher = more permissive.
 // Gated to depth 1..4. Derived: base table scaled by LMP_SCALE_PCT[improving].
 inline constexpr int LMP_BASE_THRESHOLDS[2][5] = {
@@ -69,7 +84,7 @@ inline constexpr int SE_DEPTH_MARGIN  = 3;
 inline int32_t SE_BETA_MARGIN   = 3;  // seBeta = ttScore - margin*depth
 inline int32_t SE_DOUBLE_MARGIN = 16; // double-extend when seScore < seBeta - 16
 // ProbCut.
-inline int32_t PROBCUT_MARGIN    = 80;
+inline int32_t PROBCUT_MARGIN    = 149;
 inline constexpr int32_t PROBCUT_MIN_DEPTH = 3;
 
 // Rebuilds the derived tables above plus the LMR reduction table
