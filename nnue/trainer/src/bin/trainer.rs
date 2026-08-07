@@ -42,10 +42,19 @@
 // says; and `load_from_checkpoint` restores `optimiser_state`, so AdamW's
 // moments carry across a stage boundary instead of restarting cold.
 //
-// TEST_PATH (env var) points at a held-out slice and turns on validation loss.
-// Without it only training loss is reported, which cannot show overfitting —
-// the 8-bucket map had a BETTER training loss than the 4-bucket one while
-// playing 12 Elo worse, and that was only diagnosable by elimination.
+// TEST_PATH (env var) points at a held-out slice and is passed to bullet as a
+// TestDataset. ⚠️ IT DOES NOTHING on the pinned rev: bullet's value.rs only
+// checks `test_set.is_some()` to print "Validation data not currently
+// implemented", and never reads the slice. Every run that set TEST_PATH — the
+// 4-bucket runs, the 512, both 1024s — reported training loss only, and the
+// notebooks that claimed otherwise were wrong.
+//
+// So the one number that separates "under-trained" from "out of data" is not
+// available here, and training loss cannot stand in for it: the 8-bucket map
+// had a BETTER training loss than the 4-bucket one while playing 12 Elo worse.
+// Until bullet implements it, overfitting is diagnosed by SPRT or not at all —
+// and bumping the pinned rev to get the feature would change training
+// semantics mid-campaign, which costs more than the number is worth.
 
 use bullet_lib::{
     game::{
