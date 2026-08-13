@@ -21,6 +21,11 @@ path = "src/bin/trainer.rs"
 required-features = ["train"]
 
 [[bin]]
+name = "trainer_deep"
+path = "src/bin/trainer_deep.rs"
+required-features = ["train"]
+
+[[bin]]
 name = "sanity"
 path = "src/bin/sanity.rs"
 
