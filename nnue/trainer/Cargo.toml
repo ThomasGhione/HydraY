@@ -30,6 +30,10 @@ name = "sanity"
 path = "src/bin/sanity.rs"
 
 [[bin]]
+name = "sanity_deep"
+path = "src/bin/sanity_deep.rs"
+
+[[bin]]
 name = "datastats"
 path = "src/bin/datastats.rs"
 
