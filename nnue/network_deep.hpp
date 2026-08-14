@@ -71,6 +71,13 @@ struct alignas(64) NetworkDeep {
     float   l2b[OUTPUT_BUCKETS][L2_SIZE];
     float   l3w[OUTPUT_BUCKETS][L2_SIZE];
     float   l3b[OUTPUT_BUCKETS];
+
+    // Copia di l1w gia' allargata a i16, riempita al caricamento. Serve solo al
+    // percorso SENZA AVX-VNNI, dove il prodotto scalare lavora a corsie i16:
+    // convertire i pesi a ogni valutazione costava una cvtepi8_epi16 per
+    // istruzione utile. 256 KiB in piu' in cambio di un ciclo interno pulito.
+    // NON sta nel file: e' derivata, e va rigenerata a ogni caricamento.
+    alignas(64) int16_t l1w16[OUTPUT_BUCKETS][L1_SIZE][HIDDEN];
 };
 
 // Taglia del payload sul file, indipendente dal padding della struct: e' il
@@ -93,6 +100,18 @@ static_assert(PAYLOAD_BYTES == 6'443'552, "layout cambiato: aggiorna sanity_deep
                                     const int16_t* accStm,
                                     const int16_t* accNtm,
                                     int outputBucket) noexcept;
+
+// Stessa funzione, vettoriale. DEVE restituire lo stesso valore di
+// forwardScalar per ogni ingresso: e' un'ottimizzazione, non un'altra rete.
+[[nodiscard]] int32_t forwardSimd(const NetworkDeep& net,
+                                  const int16_t* accStm,
+                                  const int16_t* accNtm,
+                                  int outputBucket) noexcept;
+
+// true se il binario e' stato compilato con AVX-VNNI (vpdpbusd), che raddoppia
+// le moltiplicazioni per istruzione nel layer l1. Senza, forwardSimd usa un
+// percorso a corsie i16 che e' esatto ma costa il doppio delle istruzioni.
+[[nodiscard]] bool hasVnniPath() noexcept;
 
 // Carica un file quantised.bin nel formato sopra. Ritorna false (senza
 // scrivere in `net`) se taglia o padding non tornano.

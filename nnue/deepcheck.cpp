@@ -124,6 +124,67 @@ constexpr Case DEFAULT_CASES[] = {
 
 } // namespace
 
+
+// --- misura: costo del forward profondo contro quello a un layer ---------
+// Il secondo e' una copia locale dell'aritmetica di nnue.cpp (SCReLU su
+// 2*HIDDEN i16), non il codice del motore: serve un confronto fra due cicli
+// sugli stessi dati, non un profilo del binario di produzione.
+#include <chrono>
+#include <immintrin.h>
+namespace {
+
+// Copia dell'aritmetica AVX2 di nnue.cpp::forwardHalf (mullo + madd), NON una
+// versione scalare: confrontare il forward profondo vettoriale con un
+// riferimento scalare gonfierebbe il risultato di parecchio.
+int32_t singleLayerForward(const int16_t* accStm, const int16_t* accNtm,
+                           const int16_t* w) noexcept {
+    const __m256i zero = _mm256_setzero_si256();
+    const __m256i qa   = _mm256_set1_epi16(static_cast<int16_t>(QA));
+    int64_t out = 0;
+    for (int half = 0; half < 2; ++half) {
+        const int16_t* a  = half == 0 ? accStm : accNtm;
+        const int16_t* ww = w + half * HIDDEN;
+        __m256i sum = _mm256_setzero_si256();
+        for (int i = 0; i < HIDDEN; i += 16) {
+            const __m256i v  = _mm256_loadu_si256(reinterpret_cast<const __m256i*>(a + i));
+            const __m256i t  = _mm256_min_epi16(_mm256_max_epi16(v, zero), qa);
+            const __m256i wi = _mm256_loadu_si256(reinterpret_cast<const __m256i*>(ww + i));
+            const __m256i pr = _mm256_mullo_epi16(t, wi);
+            sum = _mm256_add_epi32(sum, _mm256_madd_epi16(pr, t));
+        }
+        const __m128i lo = _mm256_castsi256_si128(sum);
+        const __m128i hi = _mm256_extracti128_si256(sum, 1);
+        __m128i sN = _mm_add_epi32(lo, hi);
+        sN = _mm_add_epi32(sN, _mm_shuffle_epi32(sN, 0x4E));
+        sN = _mm_add_epi32(sN, _mm_shuffle_epi32(sN, 0xB1));
+        out += _mm_cvtsi128_si32(sN);
+    }
+    return static_cast<int32_t>(out / (QA * QB));
+}
+
+void bench(const NetworkDeep& net, const std::vector<int16_t>& us,
+           const std::vector<int16_t>& them, int bucket) {
+    constexpr int N = 200000;
+    std::vector<int16_t> w(2 * HIDDEN);
+    for (int i = 0; i < 2 * HIDDEN; ++i) w[i] = static_cast<int16_t>((i * 37) % 127 - 63);
+
+    volatile int32_t sink = 0;
+    auto t0 = std::chrono::steady_clock::now();
+    for (int i = 0; i < N; ++i) sink = singleLayerForward(us.data(), them.data(), w.data());
+    auto t1 = std::chrono::steady_clock::now();
+    for (int i = 0; i < N; ++i) sink = forwardSimd(net, us.data(), them.data(), bucket);
+    auto t2 = std::chrono::steady_clock::now();
+    (void)sink;
+
+    const double a = std::chrono::duration<double, std::nano>(t1 - t0).count() / N;
+    const double b = std::chrono::duration<double, std::nano>(t2 - t1).count() / N;
+    std::printf("\nforward a un layer (riferimento locale): %6.1f ns/eval\n", a);
+    std::printf("forward profondo (SIMD):                %6.1f ns/eval   = %.2fx\n", b, b / a);
+    std::printf("percorso VNNI: %s\n", hasVnniPath() ? "attivo" : "NON attivo (fallback i16)");
+}
+
+} // namespace
+
 int main(int argc, char** argv) {
     if (argc < 2) {
         std::fprintf(stderr, "uso: deepcheck <net.bin> [fen]...\n");
@@ -152,8 +213,18 @@ int main(int argc, char** argv) {
             std::fprintf(stderr, "FEN non valida: %s\n", c.fen);
             return 1;
         }
-        std::printf("%s: %d cp (stm)\n", c.label,
-                    forwardScalar(net, accUs.data(), accThem.data(), bucket));
+        const int32_t sc = forwardScalar(net, accUs.data(), accThem.data(), bucket);
+        const int32_t sd = forwardSimd(net, accUs.data(), accThem.data(), bucket);
+        if (sc != sd) {
+            std::fprintf(stderr, "DIVERGENZA scalare/SIMD su '%s': %d vs %d\n", c.label, sc, sd);
+            return 1;
+        }
+        std::printf("%s: %d cp (stm)\n", c.label, sc);
+    }
+    if (const char* e = std::getenv("DEEPCHECK_BENCH"); e != nullptr && e[0] == '1') {
+        int bucket = 0;
+        accumulate(net, DEFAULT_CASES[6].fen, accUs, accThem, bucket);
+        bench(net, accUs, accThem, bucket);
     }
     return 0;
 }
