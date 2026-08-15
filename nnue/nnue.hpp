@@ -28,6 +28,12 @@ struct Network;
 
 [[nodiscard]] bool networkLoaded() noexcept;
 
+// True when the active network is a DEEP one (1024 -> 16 -> 1). Selected
+// automatically by loadNetwork() from the file size; the embedded net is always
+// the single-layer one. Exposed for `info string` diagnostics: loading the
+// wrong format silently would be the worst way to lose an SPRT.
+[[nodiscard]] bool deepNetworkActive() noexcept;
+
 // stm-relative centipawns from the board's incrementally-maintained
 // accumulator. Requires networkLoaded().
 [[nodiscard]] int32_t evaluate(const chess::Board& board) noexcept;

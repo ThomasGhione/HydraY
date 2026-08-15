@@ -16,6 +16,7 @@
 #include "../board/board.hpp"
 #include "accumulator.hpp"
 #include "network.hpp"
+#include "network_deep.hpp"
 
 // Symbols from nnue/embedded.cpp (.incbin of nnue/net/hydray.nnue).
 extern "C" const unsigned char g_hydrayEmbeddedNetStart[];
@@ -28,6 +29,30 @@ const Network* activeNetwork = nullptr;
 namespace {
 
 std::unique_ptr<Network> ownedNetwork;
+
+// --- rete profonda (network_deep.hpp) --------------------------------------
+// Convive con quella a un layer invece di sostituirla: la singola resta in
+// produzione finche' la profonda non vince un SPRT.
+//
+// I due formati hanno lo STESSO prefisso — l0w poi l0b, stesse taglie — e
+// l'accumulatore legge solo quello. Quindi con una rete profonda attiva
+// `activeNetwork` punta all'inizio della struct profonda e l'accumulatore
+// continua a funzionare senza sapere niente di tutto questo. Gli static_assert
+// qui sotto verificano l'ipotesi: se un layout cambia, non compila.
+//
+// REGOLA: con una rete profonda attiva, `activeNetwork->outputWeights` e
+// `->outputBias` aliasano i pesi di l1 e NON vanno letti. L'unico lettore e'
+// evaluate(), che smista sul flag.
+std::unique_ptr<Deep::NetworkDeep> ownedDeep;
+const Deep::NetworkDeep* activeDeep = nullptr;
+
+static_assert(offsetof(Network, featureWeights) == offsetof(Deep::NetworkDeep, l0w));
+static_assert(sizeof(Network::featureWeights) == sizeof(Deep::NetworkDeep::l0w));
+static_assert(offsetof(Network, featureBias) == offsetof(Deep::NetworkDeep, l0b));
+static_assert(sizeof(Network::featureBias) == sizeof(Deep::NetworkDeep::l0b));
+
+// Taglia del file di una rete profonda, padding di bullet incluso.
+constexpr size_t DEEP_FILE_BYTES = (Deep::PAYLOAD_BYTES + 63) / 64 * 64;
 
 // The AVX2 forward multiplies clamped activations (<= QA) by output weights in
 // int16: |w| must stay <= 32767/QA or mullo_epi16 wraps. bullet's AdamW clips
@@ -102,6 +127,25 @@ bool loadNetwork(const std::string& path) {
     const auto fileSize = static_cast<size_t>(in.tellg());
     in.seekg(0);
 
+    // Il formato si riconosce dalla TAGLIA: le due architetture hanno file di
+    // dimensione diversa e non c'e' intestazione nel formato di bullet.
+    if (fileSize == DEEP_FILE_BYTES) {
+        auto deep = std::make_unique<Deep::NetworkDeep>();
+        if (!Deep::loadFromFile(path.c_str(), *deep)) {
+            std::cout << "info string EvalFile error: deep net failed validation\n";
+            return false;
+        }
+        ownedDeep = std::move(deep);
+        activeDeep = ownedDeep.get();
+        ownedNetwork.reset();
+        // L'accumulatore legge solo il prefisso l0, identico nei due formati.
+        activeNetwork = reinterpret_cast<const Network*>(activeDeep);
+        std::cout << "info string EvalFile: deep network (1024 -> "
+                  << Deep::L1_SIZE << " -> 1)"
+                  << (Deep::hasVnniPath() ? ", VNNI" : ", no VNNI") << "\n";
+        return true;
+    }
+
     std::vector<unsigned char> blob(fileSize);
     if (!in.read(reinterpret_cast<char*>(blob.data()),
                  static_cast<std::streamsize>(fileSize))) {
@@ -116,6 +160,8 @@ bool loadNetwork(const std::string& path) {
     auto net = std::make_unique<Network>();
     std::memcpy(net.get(), blob.data(), NETWORK_PAYLOAD_BYTES);
     ownedNetwork = std::move(net);
+    ownedDeep.reset();
+    activeDeep = nullptr;
     activeNetwork = ownedNetwork.get();
     return true;
 }
@@ -135,9 +181,13 @@ bool activateEmbedded() noexcept {
     const Network* net = embeddedNetwork();
     if (net == nullptr) return false;
     ownedNetwork.reset();
+    ownedDeep.reset();
+    activeDeep = nullptr;
     activeNetwork = net;
     return true;
 }
+
+bool deepNetworkActive() noexcept { return activeDeep != nullptr; }
 
 bool networkLoaded() noexcept {
     return activeNetwork != nullptr;
@@ -155,6 +205,10 @@ int32_t evaluate(const chess::Board& b) noexcept {
     // (and sanity.rs): (popcount - 2) / ceil(32/8). Kings are always on the
     // board, so popcount is in [2, 32] and the bucket in [0, 7].
     const int bucket = (std::popcount(b.getPiecesBitMap()) - 2) / 4;
+
+    if (activeDeep != nullptr) [[unlikely]] {
+        return Deep::forwardSimd(*activeDeep, acc.v[stm], acc.v[stm ^ 1], bucket);
+    }
 
     int32_t out = forwardHalf(acc.v[stm], net.outputWeights[bucket][0])
                 + forwardHalf(acc.v[stm ^ 1], net.outputWeights[bucket][1]);
