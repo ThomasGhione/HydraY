@@ -93,14 +93,36 @@ inline __m256i pairwiseBlock(const int16_t* acc, int j) noexcept {
     return _mm256_srli_epi16(m, 7);                            // == p / 255
 }
 
-inline int32_t hsum(__m256i v) noexcept {
-    const __m128i lo = _mm256_castsi256_si128(v);
-    const __m128i hi = _mm256_extracti128_si256(v, 1);
-    __m128i s = _mm_add_epi32(lo, hi);
-    s = _mm_add_epi32(s, _mm_shuffle_epi32(s, 0x4E));
-    s = _mm_add_epi32(s, _mm_shuffle_epi32(s, 0xB1));
-    return _mm_cvtsi128_si32(s);
+// Quattro accumulatori -> quattro interi, in un colpo solo. Ridurli uno per uno
+// costava sette operazioni ciascuno e finiva comunque in memoria: qui sono
+// undici in tutto e il risultato esce gia' come un blocco di quattro int32.
+// L'ordine delle somme cambia rispetto a una riduzione lineare, ma sono interi:
+// esatti e associativi, quindi il risultato e' identico.
+inline void reduce4(__m256i a0, __m256i a1, __m256i a2, __m256i a3, int32_t* out) noexcept {
+    const __m256i s = _mm256_hadd_epi32(_mm256_hadd_epi32(a0, a1), _mm256_hadd_epi32(a2, a3));
+    _mm_store_si128(reinterpret_cast<__m128i*>(out),
+                    _mm_add_epi32(_mm256_castsi256_si128(s), _mm256_extracti128_si256(s, 1)));
 }
+
+// SCReLU su tutte le L1_SIZE uscite insieme. Scritto a mano e non lasciato al
+// compilatore perche' la versione scalare pagava due cose: `std::clamp` che GCC
+// traduce in confronti e SALTI (imprevedibili, dipendono dai dati) e una
+// divisione in virgola mobile per uscita — sedici `vdivss` per valutazione.
+// Corsia per corsia sono le stesse operazioni IEEE nello stesso ordine, quindi
+// il risultato resta identico bit per bit a quello di forwardScalar.
+inline void activate(const int32_t* sums, const float* bias, float* out) noexcept {
+    const __m256 scale = _mm256_set1_ps(static_cast<float>(QA * QB));
+    const __m256 zero  = _mm256_setzero_ps();
+    const __m256 one   = _mm256_set1_ps(1.0f);
+    for (int o = 0; o < L1_SIZE; o += 8) {
+        const __m256i raw = _mm256_load_si256(reinterpret_cast<const __m256i*>(sums + o));
+        __m256 z = _mm256_div_ps(_mm256_cvtepi32_ps(raw), scale);
+        z = _mm256_add_ps(z, _mm256_loadu_ps(bias + o));
+        z = _mm256_min_ps(_mm256_max_ps(z, zero), one);
+        _mm256_store_ps(out + o, _mm256_mul_ps(z, z));
+    }
+}
+static_assert(L1_SIZE % 8 == 0, "activate lavora a otto uscite per volta");
 
 } // namespace
 #endif // __AVX2__
@@ -120,71 +142,72 @@ int32_t forwardSimd(const NetworkDeep& net,
 #if !defined(__AVX2__)
     return forwardScalar(net, accStm, accNtm, outputBucket);
 #else
-    alignas(32) int16_t hl1[HIDDEN];
-    for (int j = 0; j < PAIRWISE_OUT; j += 16) {
-        _mm256_store_si256(reinterpret_cast<__m256i*>(hl1 + j), pairwiseBlock(accStm, j));
-        _mm256_store_si256(reinterpret_cast<__m256i*>(hl1 + PAIRWISE_OUT + j), pairwiseBlock(accNtm, j));
-    }
-
-    float a1[L1_SIZE];
+    // Otto righe per gruppo, ciascuna col proprio accumulatore. Non e'
+    // srotolamento per gusto: il prodotto scalare ha ~5 cicli di latenza, e con
+    // pochi accumulatori le iterazioni formano catene dipendenti in cui si
+    // aspetta la latenza invece di sfruttare il throughput. Otto catene la
+    // coprono e il caricamento di `h` viene ammortizzato su otto righe di pesi.
+    // Otto e' il massimo utile: a sedici gli accumulatori piu' `h` non stanno
+    // nei sedici registri ymm e lo spill costa piu' di quanto rendano le catene
+    // in piu' (misurato: 165 ns contro 128).
+    constexpr int GROUP = 8;
+    static_assert(L1_SIZE % GROUP == 0, "il ciclo elabora GROUP uscite per volta");
+    alignas(32) int32_t sums[L1_SIZE];
 
 #if defined(__AVXVNNI__)
-    // I valori del pairwise stanno in [0, 255]: impacchettarli in u8 costa una
-    // packus + una permute ogni 32, e in cambio dpbusd macina 32 prodotti per
-    // istruzione invece di 16. packus_epi16 satura, ma qui non c'e' niente da
-    // saturare — il pairwise non puo' uscire da [0, QA] per costruzione.
-    alignas(32) uint8_t hl1u8[HIDDEN];
-    for (int i = 0; i < HIDDEN; i += 32) {
-        const __m256i lo = _mm256_load_si256(reinterpret_cast<const __m256i*>(hl1 + i));
-        const __m256i hi = _mm256_load_si256(reinterpret_cast<const __m256i*>(hl1 + i + 16));
-        const __m256i pk = _mm256_packus_epi16(lo, hi);
-        // packus lavora per corsia da 128 bit: la permute rimette i 32 byte
-        // nell'ordine di origine.
-        _mm256_store_si256(reinterpret_cast<__m256i*>(hl1u8 + i),
-                           _mm256_permute4x64_epi64(pk, 0xD8));
+    // Il pairwise scrive DIRETTAMENTE in u8: i suoi valori stanno in [0, QA] per
+    // costruzione, quindi packus non ha niente da saturare, e passare per un
+    // buffer i16 intermedio significherebbe scrivere 2 KiB e rileggerli subito.
+    // packus lavora per corsia da 128 bit: la permute rimette i 32 byte
+    // nell'ordine di origine.
+    alignas(32) uint8_t h8[HIDDEN];
+    for (int j = 0; j < PAIRWISE_OUT; j += 32) {
+        const __m256i s = _mm256_packus_epi16(pairwiseBlock(accStm, j), pairwiseBlock(accStm, j + 16));
+        _mm256_store_si256(reinterpret_cast<__m256i*>(h8 + j), _mm256_permute4x64_epi64(s, 0xD8));
+        const __m256i n = _mm256_packus_epi16(pairwiseBlock(accNtm, j), pairwiseBlock(accNtm, j + 16));
+        _mm256_store_si256(reinterpret_cast<__m256i*>(h8 + PAIRWISE_OUT + j),
+                           _mm256_permute4x64_epi64(n, 0xD8));
     }
-    // Quattro uscite per volta, ciascuna con il proprio accumulatore. Non e'
-    // srotolamento per gusto: dpbusd ha ~5 cicli di latenza, e con un solo
-    // accumulatore le 32 iterazioni formano una catena dipendente in cui si
-    // aspetta la latenza invece di sfruttare il throughput. Quattro catene
-    // indipendenti la coprono, e in piu' il caricamento di `h` viene
-    // ammortizzato su quattro righe di pesi invece di essere rifatto ogni volta.
-    static_assert(L1_SIZE % 4 == 0, "il ciclo elabora quattro uscite per volta");
-    for (int o = 0; o < L1_SIZE; o += 4) {
-        const int8_t* r0 = net.l1w[outputBucket][o + 0];
-        const int8_t* r1 = net.l1w[outputBucket][o + 1];
-        const int8_t* r2 = net.l1w[outputBucket][o + 2];
-        const int8_t* r3 = net.l1w[outputBucket][o + 3];
-        __m256i a0 = _mm256_setzero_si256(), a1v = _mm256_setzero_si256();
-        __m256i a2v = _mm256_setzero_si256(), a3 = _mm256_setzero_si256();
+
+    for (int o = 0; o < L1_SIZE; o += GROUP) {
+        __m256i a[GROUP];
+        for (int g = 0; g < GROUP; ++g) a[g] = _mm256_setzero_si256();
         for (int i = 0; i < HIDDEN; i += 32) {
-            const __m256i h = _mm256_load_si256(reinterpret_cast<const __m256i*>(hl1u8 + i));
-            a0  = _mm256_dpbusd_avx_epi32(a0,  h, _mm256_loadu_si256(reinterpret_cast<const __m256i*>(r0 + i)));
-            a1v = _mm256_dpbusd_avx_epi32(a1v, h, _mm256_loadu_si256(reinterpret_cast<const __m256i*>(r1 + i)));
-            a2v = _mm256_dpbusd_avx_epi32(a2v, h, _mm256_loadu_si256(reinterpret_cast<const __m256i*>(r2 + i)));
-            a3  = _mm256_dpbusd_avx_epi32(a3,  h, _mm256_loadu_si256(reinterpret_cast<const __m256i*>(r3 + i)));
+            const __m256i h = _mm256_load_si256(reinterpret_cast<const __m256i*>(h8 + i));
+            for (int g = 0; g < GROUP; ++g) {
+                const int8_t* row = net.l1w[outputBucket][o + g];
+                a[g] = _mm256_dpbusd_avx_epi32(a[g], h,
+                        _mm256_loadu_si256(reinterpret_cast<const __m256i*>(row + i)));
+            }
         }
-        const int32_t sums[4] = {hsum(a0), hsum(a1v), hsum(a2v), hsum(a3)};
-        for (int k = 0; k < 4; ++k) {
-            a1[o + k] = screlu(static_cast<float>(sums[k]) / static_cast<float>(QA * QB)
-                               + net.l1b[outputBucket][o + k]);
-        }
+        for (int g = 0; g < GROUP; g += 4) reduce4(a[g], a[g + 1], a[g + 2], a[g + 3], sums + o + g);
     }
 #else
     // Senza VNNI: corsie i16, con i pesi gia' convertiti al caricamento (vedi
     // l1w16 in loadFromFile) per togliere una cvtepi8_epi16 dal ciclo interno.
-    for (int o = 0; o < L1_SIZE; ++o) {
-        const int16_t* row = net.l1w16[outputBucket][o];
-        __m256i acc = _mm256_setzero_si256();
+    alignas(32) int16_t h16[HIDDEN];
+    for (int j = 0; j < PAIRWISE_OUT; j += 16) {
+        _mm256_store_si256(reinterpret_cast<__m256i*>(h16 + j), pairwiseBlock(accStm, j));
+        _mm256_store_si256(reinterpret_cast<__m256i*>(h16 + PAIRWISE_OUT + j), pairwiseBlock(accNtm, j));
+    }
+
+    for (int o = 0; o < L1_SIZE; o += GROUP) {
+        __m256i a[GROUP];
+        for (int g = 0; g < GROUP; ++g) a[g] = _mm256_setzero_si256();
         for (int i = 0; i < HIDDEN; i += 16) {
-            const __m256i h = _mm256_load_si256(reinterpret_cast<const __m256i*>(hl1 + i));
-            const __m256i w = _mm256_load_si256(reinterpret_cast<const __m256i*>(row + i));
-            acc = _mm256_add_epi32(acc, _mm256_madd_epi16(h, w));
+            const __m256i h = _mm256_load_si256(reinterpret_cast<const __m256i*>(h16 + i));
+            for (int g = 0; g < GROUP; ++g) {
+                const int16_t* row = net.l1w16[outputBucket][o + g];
+                a[g] = _mm256_add_epi32(a[g], _mm256_madd_epi16(h,
+                        _mm256_load_si256(reinterpret_cast<const __m256i*>(row + i))));
+            }
         }
-        a1[o] = screlu(static_cast<float>(hsum(acc)) / static_cast<float>(QA * QB)
-                       + net.l1b[outputBucket][o]);
+        for (int g = 0; g < GROUP; g += 4) reduce4(a[g], a[g + 1], a[g + 2], a[g + 3], sums + o + g);
     }
 #endif
+
+    alignas(32) float a1[L1_SIZE];
+    activate(sums, net.l1b[outputBucket], a1);
 
     float y = net.l2b[outputBucket];
     for (int o = 0; o < L1_SIZE; ++o) {
