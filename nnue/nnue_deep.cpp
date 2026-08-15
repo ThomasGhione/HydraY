@@ -46,18 +46,9 @@ int32_t forwardScalar(const NetworkDeep& net,
                        + net.l1b[outputBucket][o]);
     }
 
-    float a2[L2_SIZE];
-    for (int k = 0; k < L2_SIZE; ++k) {
-        float sum = net.l2b[outputBucket][k];
-        for (int o = 0; o < L1_SIZE; ++o) {
-            sum += a1[o] * net.l2w[outputBucket][k][o];
-        }
-        a2[k] = screlu(sum);
-    }
-
-    float y = net.l3b[outputBucket];
-    for (int k = 0; k < L2_SIZE; ++k) {
-        y += a2[k] * net.l3w[outputBucket][k];
+    float y = net.l2b[outputBucket];
+    for (int o = 0; o < L1_SIZE; ++o) {
+        y += a1[o] * net.l2w[outputBucket][o];
     }
     return static_cast<int32_t>(std::lround(y * static_cast<float>(SCALE)));
 }
@@ -195,14 +186,10 @@ int32_t forwardSimd(const NetworkDeep& net,
     }
 #endif
 
-    float a2[L2_SIZE];
-    for (int k = 0; k < L2_SIZE; ++k) {
-        float sum = net.l2b[outputBucket][k];
-        for (int o = 0; o < L1_SIZE; ++o) sum += a1[o] * net.l2w[outputBucket][k][o];
-        a2[k] = screlu(sum);
+    float y = net.l2b[outputBucket];
+    for (int o = 0; o < L1_SIZE; ++o) {
+        y += a1[o] * net.l2w[outputBucket][o];
     }
-    float y = net.l3b[outputBucket];
-    for (int k = 0; k < L2_SIZE; ++k) y += a2[k] * net.l3w[outputBucket][k];
     return static_cast<int32_t>(std::lround(y * static_cast<float>(SCALE)));
 #endif
 }
@@ -231,9 +218,7 @@ bool loadFromFile(const char* path, NetworkDeep& net) noexcept {
         && rd(net.l1w, sizeof(net.l1w))
         && rd(net.l1b, sizeof(net.l1b))
         && rd(net.l2w, sizeof(net.l2w))
-        && rd(net.l2b, sizeof(net.l2b))
-        && rd(net.l3w, sizeof(net.l3w))
-        && rd(net.l3b, sizeof(net.l3b));
+        && rd(net.l2b, sizeof(net.l2b));
     if (!ok) { std::fclose(f); return false; }
 
     // La coda e' "bullet" ripetuto: qualunque altra cosa significa che il

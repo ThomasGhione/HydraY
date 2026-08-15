@@ -2,7 +2,10 @@
 
 // Rete quantizzata con layer intermedi (progetto "layer intermedio").
 //
-//   (768x4kb_hm -> 1024)x2 -> pairwise -> 1024 -> 16 -> 32 -> 1
+//   (768x4kb_hm -> 1024)x2 -> pairwise -> 1024 -> 16 -> 1
+//
+// UN SOLO layer intermedio: vedi trainer_deep.rs per il perche' si e' scelto di
+// non replicare il 16->32->1 dell'esempio di bullet.
 //
 // Gli INPUT sono identici alla rete a un layer (network.hpp): stessi 4 king
 // bucket specchiati, stessa formula della feature, stesso accumulatore i16.
@@ -23,11 +26,9 @@
 //   l0b [1024]         i16  QA
 //   l1w [8][16][1024]  i8   QB=64    (trasposto: ogni bucket contiguo)
 //   l1b [8][16]        f32  scala reale
-//   l2w [8][32][16]    f32
-//   l2b [8][32]        f32
-//   l3w [8][1][32]     f32
-//   l3b [8]            f32
-//   payload 6.443.552 B, file 6.443.584 B
+//   l2w [8][1][16]     f32
+//   l2b [8]            f32
+//   payload 6.425.632 B, file 6.425.664 B
 //
 // ARITMETICA (deve combaciare con sanity_deep.rs riga per riga):
 //
@@ -35,7 +36,7 @@
 //   p[j] = c[j] * c[j+512] / QA                  divisione INTERA troncata
 //   z[o] = SUM(p[i] * l1w[o][i]) / (QA*QB) + l1b[o]   divisione in FLOAT
 //   a[o] = clamp(z[o], 0, 1)^2                   SCReLU in float
-//   ... l2, l3 ...
+//   y    = SUM a[o]*l2w[o] + l2b                 lineare
 //   cp   = round(y * SCALE)
 //
 // La divisione di p e' intera e quella di z e' in virgola mobile: non e' una
@@ -49,7 +50,6 @@ namespace NNUE::Deep {
 inline constexpr int INPUTS        = 768;
 inline constexpr int HIDDEN        = 1024;
 inline constexpr int L1_SIZE       = 16;
-inline constexpr int L2_SIZE       = 32;
 inline constexpr int INPUT_BUCKETS = 4;
 inline constexpr int OUTPUT_BUCKETS = 8;
 inline constexpr int32_t QA    = 255;
@@ -67,10 +67,8 @@ struct alignas(64) NetworkDeep {
     int16_t l0b[HIDDEN];
     int8_t  l1w[OUTPUT_BUCKETS][L1_SIZE][HIDDEN];
     float   l1b[OUTPUT_BUCKETS][L1_SIZE];
-    float   l2w[OUTPUT_BUCKETS][L2_SIZE][L1_SIZE];
-    float   l2b[OUTPUT_BUCKETS][L2_SIZE];
-    float   l3w[OUTPUT_BUCKETS][L2_SIZE];
-    float   l3b[OUTPUT_BUCKETS];
+    float   l2w[OUTPUT_BUCKETS][L1_SIZE];
+    float   l2b[OUTPUT_BUCKETS];
 
     // Copia di l1w gia' allargata a i16, riempita al caricamento. Serve solo al
     // percorso SENZA AVX-VNNI, dove il prodotto scalare lavora a corsie i16:
@@ -88,11 +86,9 @@ inline constexpr size_t PAYLOAD_BYTES =
     + static_cast<size_t>(HIDDEN) * sizeof(int16_t)
     + static_cast<size_t>(OUTPUT_BUCKETS) * L1_SIZE * HIDDEN * sizeof(int8_t)
     + static_cast<size_t>(OUTPUT_BUCKETS) * L1_SIZE * sizeof(float)
-    + static_cast<size_t>(OUTPUT_BUCKETS) * L2_SIZE * L1_SIZE * sizeof(float)
-    + static_cast<size_t>(OUTPUT_BUCKETS) * L2_SIZE * sizeof(float)
-    + static_cast<size_t>(OUTPUT_BUCKETS) * L2_SIZE * sizeof(float)
+    + static_cast<size_t>(OUTPUT_BUCKETS) * L1_SIZE * sizeof(float)
     + static_cast<size_t>(OUTPUT_BUCKETS) * sizeof(float);
-static_assert(PAYLOAD_BYTES == 6'443'552, "layout cambiato: aggiorna sanity_deep.rs");
+static_assert(PAYLOAD_BYTES == 6'425'632, "layout cambiato: aggiorna sanity_deep.rs");
 
 // Forward scalare, dagli accumulatori delle due prospettive alla valutazione
 // in centipedine. Riferimento di correttezza per la versione vettoriale.

@@ -164,20 +164,27 @@ int32_t singleLayerForward(const int16_t* accStm, const int16_t* accNtm,
 
 void bench(const NetworkDeep& net, const std::vector<int16_t>& us,
            const std::vector<int16_t>& them, int bucket) {
-    constexpr int N = 200000;
+    constexpr int N = 100000;
+    constexpr int ROUNDS = 7;
     std::vector<int16_t> w(2 * HIDDEN);
     for (int i = 0; i < 2 * HIDDEN; ++i) w[i] = static_cast<int16_t>((i * 37) % 127 - 63);
 
+    // MINIMO su piu' giri, non media: su una macchina non quieta il rumore puo'
+    // solo RALLENTARE una misura, mai accelerarla, quindi il minimo e' la stima
+    // meno contaminata. I due percorsi si alternano dentro lo stesso giro cosi'
+    // un rallentamento transitorio li colpisce entrambi.
     volatile int32_t sink = 0;
-    auto t0 = std::chrono::steady_clock::now();
-    for (int i = 0; i < N; ++i) sink = singleLayerForward(us.data(), them.data(), w.data());
-    auto t1 = std::chrono::steady_clock::now();
-    for (int i = 0; i < N; ++i) sink = forwardSimd(net, us.data(), them.data(), bucket);
-    auto t2 = std::chrono::steady_clock::now();
+    double a = 1e18, b = 1e18;
+    for (int r = 0; r < ROUNDS; ++r) {
+        auto t0 = std::chrono::steady_clock::now();
+        for (int i = 0; i < N; ++i) sink = singleLayerForward(us.data(), them.data(), w.data());
+        auto t1 = std::chrono::steady_clock::now();
+        for (int i = 0; i < N; ++i) sink = forwardSimd(net, us.data(), them.data(), bucket);
+        auto t2 = std::chrono::steady_clock::now();
+        a = std::min(a, std::chrono::duration<double, std::nano>(t1 - t0).count() / N);
+        b = std::min(b, std::chrono::duration<double, std::nano>(t2 - t1).count() / N);
+    }
     (void)sink;
-
-    const double a = std::chrono::duration<double, std::nano>(t1 - t0).count() / N;
-    const double b = std::chrono::duration<double, std::nano>(t2 - t1).count() / N;
     std::printf("\nforward a un layer (riferimento locale): %6.1f ns/eval\n", a);
     std::printf("forward profondo (SIMD):                %6.1f ns/eval   = %.2fx\n", b, b / a);
     std::printf("percorso VNNI: %s\n", hasVnniPath() ? "attivo" : "NON attivo (fallback i16)");

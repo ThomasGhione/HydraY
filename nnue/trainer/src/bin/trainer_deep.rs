@@ -1,7 +1,15 @@
 // HydraY NNUE v8 — rete con layer intermedi (progetto "layer intermedio").
 //
-// Architettura: (768x4kb_hm -> 1024)x2 -> pairwise -> 1024 -> 16 -> 32 -> 1,
-// con 8 output bucket su OGNI layer dopo il feature transformer.
+// Architettura: (768x4kb_hm -> 1024)x2 -> pairwise -> 1024 -> 16 -> 1,
+// con 8 output bucket su ENTRAMBI i layer dopo il feature transformer.
+//
+// UN SOLO layer intermedio, non due. L'esempio di bullet ne usa due
+// (16 -> 32 -> 1) e il secondo costa pochissimo — 544 moltiplicazioni contro le
+// 16.384 del primo — ma e' un elemento in piu' non validato su questa rete, che
+// e' un terzo di quelle per cui quella proporzione e' stata trovata. La prima
+// prova porta gia' tre cambiamenti inseparabili (layer intermedio, CReLU al
+// posto di SCReLU, init con fan-in 32): un quarto allungherebbe la lista dei
+// sospetti in caso di risultato negativo, in cambio di poco.
 // Adattato da bullet examples/progression/4_multi_layer.rs, che e' il seguito
 // diretto di 3_input_buckets.rs da cui e' adattato trainer.rs.
 //
@@ -36,14 +44,12 @@
 //   l0b  [1024]         i16  QA=255
 //   l1w  [8][16][1024]  i8   QB=64    (trasposto: ogni bucket contiguo)
 //   l1b  [8][16]        f32
-//   l2w  [8][32][16]    f32           (trasposto)
-//   l2b  [8][32]        f32
-//   l3w  [8][1][32]     f32           (trasposto)
-//   l3b  [8]            f32
+//   l2w  [8][1][16]     f32           (trasposto)
+//   l2b  [8]            f32
 //
-//   totale 6.443.552 B (la rete a un layer: 6.326.288 B)
+//   totale 6.425.632 B (la rete a un layer: 6.326.288 B)
 //
-// Solo l0 e l1w sono quantizzati: la coda 16->32->1 costa una manciata di
+// Solo l0 e l1w sono quantizzati: la coda 16->1 costa una manciata di
 // operazioni per valutazione e in float evita ogni grattacapo di scala.
 // sanity.rs va aggiornato PRIMA di fidarsi di un file prodotto da qui: e' il
 // lettore di riferimento, e il C++ deve concordare con lui byte per byte.
@@ -72,11 +78,10 @@ use bullet_lib::{
 };
 
 const HIDDEN_SIZE: usize = 1024;
-// Larghezza dei due layer intermedi. L1 e' il costoso (1024 ingressi per
-// bucket), L2 e' gratis. Partire da 16 e non da 32: il costo del forward
-// scala lineare con L1_SIZE, e 16 dice gia' se il guadagno c'e'.
+// Larghezza dell'unico layer intermedio, ed e' il parametro caro: il costo del
+// forward scala lineare con L1_SIZE (1024 ingressi per uscita). 16 dice gia' se
+// il guadagno c'e'; 32 raddoppierebbe il conto.
 const L1_SIZE: usize = 16;
-const L2_SIZE: usize = 32;
 const OUTPUT_BUCKETS: usize = 8;
 const SCALE: i32 = 400;
 const QA: i16 = 255;
@@ -135,8 +140,6 @@ fn main() {
             SavedFormat::id("l1b"),
             SavedFormat::id("l2w").transpose(),
             SavedFormat::id("l2b"),
-            SavedFormat::id("l3w").transpose(),
-            SavedFormat::id("l3b"),
         ])
         .loss_fn(|output, target| output.sigmoid().squared_error(target))
         .build(|builder, stm_inputs, ntm_inputs, output_buckets| {
@@ -146,8 +149,7 @@ fn main() {
             l0.weights = l0.weights + l0f.repeat(INPUT_BUCKETS);
 
             let l1 = builder.new_affine("l1", HIDDEN_SIZE, OUTPUT_BUCKETS * L1_SIZE);
-            let l2 = builder.new_affine("l2", L1_SIZE, OUTPUT_BUCKETS * L2_SIZE);
-            let l3 = builder.new_affine("l3", L2_SIZE, OUTPUT_BUCKETS);
+            let l2 = builder.new_affine("l2", L1_SIZE, OUTPUT_BUCKETS);
 
             // Pairwise: CReLU sulle due meta' del feature transformer, poi
             // prodotto. Forma veloce di `.crelu().pairwise_mul()`. L'uscita e'
@@ -159,8 +161,7 @@ fn main() {
 
             let hl1 = stm_hidden.concat(ntm_hidden);
             let hl2 = l1.forward(hl1).select(output_buckets).screlu();
-            let hl3 = l2.forward(hl2).select(output_buckets).screlu();
-            l3.forward(hl3).select(output_buckets)
+            l2.forward(hl2).select(output_buckets)
         });
 
     // Il peso SALVATO di l0 e' l0w + l0f: clippare entrambi a ±0.99 tiene la

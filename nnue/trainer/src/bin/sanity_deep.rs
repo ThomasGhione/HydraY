@@ -5,8 +5,8 @@
 // l'ORACOLO. Il C++ deve concordare con questo file, non viceversa, e va
 // scritto dopo averlo letto.
 //
-// Rete: (768x4kb_hm -> 1024)x2 -> pairwise -> 1024 -> 16 -> 32 -> 1,
-// 8 output bucket applicati a l1, l2, l3. QA=255 QB=64 SCALE=400.
+// Rete: (768x4kb_hm -> 1024)x2 -> pairwise -> 1024 -> 16 -> 1,
+// 8 output bucket applicati sia a l1 sia a l2. QA=255 QB=64 SCALE=400.
 //
 // Input identici alla rete a un layer (4 king bucket specchiati, 8 output
 // bucket su popcount): quella parte e' copiata da sanity.rs apposta, cosi' un
@@ -19,11 +19,9 @@
 //   6.291.456       l0b [1024]                 i16    QA
 //   6.293.504       l1w [8][16][1024]          i8     QB
 //   6.424.576       l1b [8][16]                f32    reale
-//   6.425.088       l2w [8][32][16]            f32    reale
-//   6.441.472       l2b [8][32]                f32    reale
-//   6.442.496       l3w [8][1][32]             f32    reale
-//   6.443.520       l3b [8]                    f32    reale
-//   6.443.552       fine payload (pad a 6.443.584)
+//   6.425.088       l2w [8][1][16]             f32    reale
+//   6.425.600       l2b [8]                    f32    reale
+//   6.425.632       fine payload (pad a 6.425.664)
 //
 // ARITMETICA, che e' il punto delicato:
 //
@@ -35,14 +33,13 @@
 //   hl1   = [p_stm (512), p_ntm (512)]              1024 valori, scala QA
 //   z[o]  = (SUM hl1[i]*l1w[o][i]) / (QA*QB) + l1b[o]     reale
 //   a[o]  = clamp(z[o], 0, 1)^2                     SCReLU in float
-//   ...idem per l2, poi l3 lineare
+//   y     = SUM a[o]*l2w[o] + l2b        lineare
 //   cp    = y * SCALE
 //
 // Uso: cargo run -r --bin sanity_deep -- <quantised.bin> [fen]...
 
 const HIDDEN: usize = 1024;
 const L1_SIZE: usize = 16;
-const L2_SIZE: usize = 32;
 const INPUT_BUCKETS: usize = 4;
 const OUTPUT_BUCKETS: usize = 8;
 const QA: i32 = 255;
@@ -72,10 +69,8 @@ pub struct Network {
     pub l0b: Vec<i16>,  // [HIDDEN]
     pub l1w: Vec<i8>,   // [OB * L1 * HIDDEN]
     pub l1b: Vec<f32>,  // [OB * L1]
-    pub l2w: Vec<f32>,  // [OB * L2 * L1]
-    pub l2b: Vec<f32>,  // [OB * L2]
-    pub l3w: Vec<f32>,  // [OB * L2]
-    pub l3b: Vec<f32>,  // [OB]
+    pub l2w: Vec<f32>,  // [OB * L1]
+    pub l2b: Vec<f32>,  // [OB]
 }
 
 pub const L0W: usize = INPUT_BUCKETS * 768 * HIDDEN;
@@ -84,9 +79,7 @@ pub const PAYLOAD: usize = L0W * 2
     + HIDDEN * 2
     + L1W
     + OUTPUT_BUCKETS * L1_SIZE * 4
-    + OUTPUT_BUCKETS * L2_SIZE * L1_SIZE * 4
-    + OUTPUT_BUCKETS * L2_SIZE * 4
-    + OUTPUT_BUCKETS * L2_SIZE * 4
+    + OUTPUT_BUCKETS * L1_SIZE * 4
     + OUTPUT_BUCKETS * 4;
 
 pub fn load(path: &str) -> Network {
@@ -127,13 +120,11 @@ pub fn load(path: &str) -> Network {
         v
     };
     let l1b = f32s(OUTPUT_BUCKETS * L1_SIZE, &mut off);
-    let l2w = f32s(OUTPUT_BUCKETS * L2_SIZE * L1_SIZE, &mut off);
-    let l2b = f32s(OUTPUT_BUCKETS * L2_SIZE, &mut off);
-    let l3w = f32s(OUTPUT_BUCKETS * L2_SIZE, &mut off);
-    let l3b = f32s(OUTPUT_BUCKETS, &mut off);
+    let l2w = f32s(OUTPUT_BUCKETS * L1_SIZE, &mut off);
+    let l2b = f32s(OUTPUT_BUCKETS, &mut off);
     assert_eq!(off, PAYLOAD, "il parsing non ha consumato esattamente il payload");
 
-    Network { l0w, l0b, l1w, l1b, l2w, l2b, l3w, l3b }
+    Network { l0w, l0b, l1w, l1b, l2w, l2b }
 }
 
 fn screlu_f32(x: f32) -> f32 {
@@ -233,21 +224,9 @@ pub fn evaluate(net: &Network, fen: &str) -> i32 {
         a1[o] = screlu_f32(sum as f32 / (QA * QB) as f32 + b1[o]);
     }
 
-    let w2 = &net.l2w[ob * L2_SIZE * L1_SIZE..(ob + 1) * L2_SIZE * L1_SIZE];
-    let b2 = &net.l2b[ob * L2_SIZE..(ob + 1) * L2_SIZE];
-    let mut a2 = [0f32; L2_SIZE];
-    for k in 0..L2_SIZE {
-        let row = &w2[k * L1_SIZE..(k + 1) * L1_SIZE];
-        let mut sum = b2[k];
-        for (a, w) in a1.iter().zip(row) {
-            sum += a * w;
-        }
-        a2[k] = screlu_f32(sum);
-    }
-
-    let w3 = &net.l3w[ob * L2_SIZE..(ob + 1) * L2_SIZE];
-    let mut y = net.l3b[ob];
-    for (a, w) in a2.iter().zip(w3) {
+    let w2 = &net.l2w[ob * L1_SIZE..(ob + 1) * L1_SIZE];
+    let mut y = net.l2b[ob];
+    for (a, w) in a1.iter().zip(w2) {
         y += a * w;
     }
     (y * SCALE).round() as i32
