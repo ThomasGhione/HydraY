@@ -76,6 +76,30 @@ struct alignas(64) NetworkDeep {
     // istruzione utile. 256 KiB in piu' in cambio di un ciclo interno pulito.
     // NON sta nel file: e' derivata, e va rigenerata a ogni caricamento.
     alignas(64) int16_t l1w16[OUTPUT_BUCKETS][L1_SIZE][HIDDEN];
+
+    // Pesi TRASPOSTI per il percorso sparso (solo AVX-VNNI). L'85% dell'ingresso
+    // di l1 e' zero, ma il ciclo guidato dalle uscite moltiplica per zero lo
+    // stesso. Guidandolo dagli ingressi NON nulli servono, per un dato gruppo di
+    // quattro ingressi, i pesi verso tutte e 16 le uscite: 16*4 = 64 byte
+    // contigui. I primi 32 sono le uscite 0-7 (quattro pesi ciascuna), i secondi
+    // 32 le uscite 8-15, cioe' esattamente i due operandi di vpdpbusd.
+    //
+    // L'indice di riga e' il gruppo da quattro nell'ordine in cui il pairwise
+    // SCRIVE, che non e' quello di l1w: packus lavora per corsia da 128 bit e
+    // scambia le due meta' centrali di ogni blocco da 32. Assorbire quello
+    // scambio qui e' gratis (la tabella si costruisce comunque) e toglie una
+    // vpermq ogni 32 uscite dal ciclo caldo.
+    //
+    // Derivata, non letta dal file. 128 KiB.
+    alignas(64) int8_t l1wT[OUTPUT_BUCKETS][HIDDEN / 4][L1_SIZE * 4];
+};
+
+// Ordine in cui packus_epi16 lascia i 32 byte di un blocco rispetto alla
+// sorgente: le due meta' centrali risultano scambiate. Serve a l1wT e al
+// controllo di coerenza fra i due percorsi.
+inline constexpr int PACKUS_MAP[32] = {
+     0,  1,  2,  3,  4,  5,  6,  7, 16, 17, 18, 19, 20, 21, 22, 23,
+     8,  9, 10, 11, 12, 13, 14, 15, 24, 25, 26, 27, 28, 29, 30, 31,
 };
 
 // Taglia del payload sul file, indipendente dal padding della struct: e' il

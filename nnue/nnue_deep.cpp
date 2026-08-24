@@ -93,9 +93,24 @@ inline __m256i pairwiseBlock(const int16_t* acc, int j) noexcept {
     return _mm256_srli_epi16(m, 7);                            // == p / 255
 }
 
-// Quattro accumulatori -> quattro interi, in un colpo solo. Ridurli uno per uno
-// costava sette operazioni ciascuno e finiva comunque in memoria: qui sono
-// undici in tutto e il risultato esce gia' come un blocco di quattro int32.
+// Per ogni maschera a 8 bit, le posizioni dei bit accesi. Traduce in un colpo
+// solo il risultato di movemask nell'elenco dei gruppi non nulli.
+struct NnzTable {
+    uint16_t idx[256][8];
+    constexpr NnzTable() : idx{} {
+        for (int m = 0; m < 256; ++m) {
+            int c = 0;
+            for (int b = 0; b < 8; ++b)
+                if ((m & (1 << b)) != 0) idx[m][c++] = static_cast<uint16_t>(b);
+        }
+    }
+};
+inline constexpr NnzTable NNZ{};
+
+#if !defined(__AVXVNNI__)
+// Quattro accumulatori -> quattro interi, in un colpo solo. Serve solo al
+// percorso a corsie i16: quello sparso ottiene le uscite gia' separate per
+// corsia e non ha niente da ridurre.
 // L'ordine delle somme cambia rispetto a una riduzione lineare, ma sono interi:
 // esatti e associativi, quindi il risultato e' identico.
 inline void reduce4(__m256i a0, __m256i a1, __m256i a2, __m256i a3, int32_t* out) noexcept {
@@ -103,6 +118,7 @@ inline void reduce4(__m256i a0, __m256i a1, __m256i a2, __m256i a3, int32_t* out
     _mm_store_si128(reinterpret_cast<__m128i*>(out),
                     _mm_add_epi32(_mm256_castsi256_si128(s), _mm256_extracti128_si256(s, 1)));
 }
+#endif
 
 // SCReLU su tutte le L1_SIZE uscite insieme. Scritto a mano e non lasciato al
 // compilatore perche' la versione scalare pagava due cose: `std::clamp` che GCC
@@ -142,49 +158,130 @@ int32_t forwardSimd(const NetworkDeep& net,
 #if !defined(__AVX2__)
     return forwardScalar(net, accStm, accNtm, outputBucket);
 #else
-    // Otto righe per gruppo, ciascuna col proprio accumulatore. Non e'
-    // srotolamento per gusto: il prodotto scalare ha ~5 cicli di latenza, e con
-    // pochi accumulatori le iterazioni formano catene dipendenti in cui si
-    // aspetta la latenza invece di sfruttare il throughput. Otto catene la
-    // coprono e il caricamento di `h` viene ammortizzato su otto righe di pesi.
-    // Otto e' il massimo utile: a sedici gli accumulatori piu' `h` non stanno
-    // nei sedici registri ymm e lo spill costa piu' di quanto rendano le catene
-    // in piu' (misurato: 165 ns contro 128).
-    constexpr int GROUP = 8;
-    static_assert(L1_SIZE % GROUP == 0, "il ciclo elabora GROUP uscite per volta");
     alignas(32) int32_t sums[L1_SIZE];
 
 #if defined(__AVXVNNI__)
-    // Il pairwise scrive DIRETTAMENTE in u8: i suoi valori stanno in [0, QA] per
-    // costruzione, quindi packus non ha niente da saturare, e passare per un
-    // buffer i16 intermedio significherebbe scrivere 2 KiB e rileggerli subito.
-    // packus lavora per corsia da 128 bit: la permute rimette i 32 byte
-    // nell'ordine di origine.
+    // Pairwise: clamp con packus e prodotto su corsie u16.
+    //
+    // packus_epi16 satura in UNSIGNED, cioe' fa esattamente clamp(x, 0, 255) --
+    // il CReLU -- su 32 valori con UNA istruzione, dove min+max ne servivano
+    // quattro. Si paga con quattro unpack per riallargare a u16 e moltiplicare,
+    // e il saldo resta a favore.
+    //
+    // L'ordine dei byte che ne esce non e' quello di origine (packus lavora per
+    // corsia da 128 bit) e NON viene raddrizzato: se lo si rimettesse a posto
+    // servirebbe una vpermq ogni 32 uscite. Lo scambio e' invece assorbito una
+    // volta per tutte in l1wT al caricamento.
     alignas(32) uint8_t h8[HIDDEN];
-    for (int j = 0; j < PAIRWISE_OUT; j += 32) {
-        const __m256i s = _mm256_packus_epi16(pairwiseBlock(accStm, j), pairwiseBlock(accStm, j + 16));
-        _mm256_store_si256(reinterpret_cast<__m256i*>(h8 + j), _mm256_permute4x64_epi64(s, 0xD8));
-        const __m256i n = _mm256_packus_epi16(pairwiseBlock(accNtm, j), pairwiseBlock(accNtm, j + 16));
-        _mm256_store_si256(reinterpret_cast<__m256i*>(h8 + PAIRWISE_OUT + j),
-                           _mm256_permute4x64_epi64(n, 0xD8));
+    {
+        const __m256i zero  = _mm256_setzero_si256();
+        const __m256i magic = _mm256_set1_epi16(static_cast<int16_t>(32897));
+        const auto block = [&](const int16_t* acc, uint8_t* dst, int j) noexcept {
+            // loadu, non load: gli accumulatori arrivano da fuori e la firma non
+            // promette allineamento a 32 byte. Su x86 non costa niente quando lo
+            // sono davvero, e con `load` bastava un chiamante con un vector per
+            // far saltare tutto.
+            const auto ld = [](const int16_t* p) noexcept {
+                return _mm256_loadu_si256(reinterpret_cast<const __m256i*>(p));
+            };
+            const __m256i a = _mm256_packus_epi16(ld(acc + j), ld(acc + j + 16));
+            const __m256i b = _mm256_packus_epi16(ld(acc + j + PAIRWISE_OUT),
+                                                 ld(acc + j + PAIRWISE_OUT + 16));
+            // unpack per corsia: lo copre le uscite j..j+15, hi le j+16..j+31
+            const auto half = [&](__m256i x, __m256i y, bool low) noexcept {
+                const __m256i xa = low ? _mm256_unpacklo_epi8(x, zero) : _mm256_unpackhi_epi8(x, zero);
+                const __m256i yb = low ? _mm256_unpacklo_epi8(y, zero) : _mm256_unpackhi_epi8(y, zero);
+                const __m256i p  = _mm256_mullo_epi16(xa, yb);      // <= 65025, esatto in u16
+                return _mm256_srli_epi16(_mm256_mulhi_epu16(p, magic), 7);   // == p / 255
+            };
+            _mm256_store_si256(reinterpret_cast<__m256i*>(dst + j),
+                               _mm256_packus_epi16(half(a, b, true), half(a, b, false)));
+        };
+        for (int j = 0; j < PAIRWISE_OUT; j += 32) {
+            block(accStm, h8, j);
+            block(accNtm, h8 + PAIRWISE_OUT, j);
+        }
     }
 
-    for (int o = 0; o < L1_SIZE; o += GROUP) {
-        __m256i a[GROUP];
-        for (int g = 0; g < GROUP; ++g) a[g] = _mm256_setzero_si256();
-        for (int i = 0; i < HIDDEN; i += 32) {
-            const __m256i h = _mm256_load_si256(reinterpret_cast<const __m256i*>(h8 + i));
-            for (int g = 0; g < GROUP; ++g) {
-                const int8_t* row = net.l1w[outputBucket][o + g];
-                a[g] = _mm256_dpbusd_avx_epi32(a[g], h,
-                        _mm256_loadu_si256(reinterpret_cast<const __m256i*>(row + i)));
-            }
+    // Indici dei gruppi da quattro NON nulli. Su reti addestrate ne sopravvive
+    // meno della meta': e' tutto lavoro che il ciclo denso faceva moltiplicando
+    // per zero.
+    // La store scrive OTTO indici per volta anche quando il blocco ne ha meno:
+    // il conto sta perche' prima dell'iterazione i vale count <= 8i, quindi
+    // l'ultima scrittura finisce esattamente a HIDDEN/4. Cambiare la taglia del
+    // blocco senza rifare questo conto sborda l'array.
+    alignas(32) uint16_t nnz[HIDDEN / 4];
+    int count = 0;
+    {
+        const __m256i zero = _mm256_setzero_si256();
+        __m128i base = _mm_setzero_si128();
+        const __m128i eight = _mm_set1_epi16(8);
+        for (int i = 0; i < HIDDEN; i += 32) {   // 32 byte = 8 gruppi
+            const __m256i chunk = _mm256_load_si256(reinterpret_cast<const __m256i*>(h8 + i));
+            const unsigned mask =
+                static_cast<unsigned>(_mm256_movemask_ps(_mm256_castsi256_ps(
+                    _mm256_cmpeq_epi32(chunk, zero)))) ^ 0xFFu;
+            _mm_storeu_si128(reinterpret_cast<__m128i*>(nnz + count),
+                _mm_add_epi16(_mm_loadu_si128(
+                    reinterpret_cast<const __m128i*>(NNZ.idx[mask])), base));
+            count += __builtin_popcount(mask);
+            base = _mm_add_epi16(base, eight);
         }
-        for (int g = 0; g < GROUP; g += 4) reduce4(a[g], a[g + 1], a[g + 2], a[g + 3], sums + o + g);
     }
+
+    // Prodotto scalare guidato dagli ingressi. Replicando i quattro byte su
+    // tutte le corsie, la corsia `o` di vpdpbusd accumula gia' il prodotto
+    // scalare dell'uscita `o`: niente riduzioni orizzontali alla fine.
+    // Quattro gruppi per iterazione perche' con due soli accumulatori la catena
+    // dipendente sarebbe lunga quanto tutto il ciclo.
+    {
+        const int32_t* dw = reinterpret_cast<const int32_t*>(h8);
+        const auto (&wT)[HIDDEN / 4][L1_SIZE * 4] = net.l1wT[outputBucket];
+        const auto ldw = [](const int8_t* p) noexcept {
+            return _mm256_loadu_si256(reinterpret_cast<const __m256i*>(p));
+        };
+        __m256i a0 = _mm256_setzero_si256(), a1 = a0, a2 = a0, a3 = a0;
+        __m256i a4 = a0, a5 = a0, a6 = a0, a7 = a0;
+        int n = 0;
+        for (; n + 4 <= count; n += 4) {
+            const int j0 = nnz[n], j1 = nnz[n + 1], j2 = nnz[n + 2], j3 = nnz[n + 3];
+            const __m256i v0 = _mm256_set1_epi32(dw[j0]), v1 = _mm256_set1_epi32(dw[j1]);
+            const __m256i v2 = _mm256_set1_epi32(dw[j2]), v3 = _mm256_set1_epi32(dw[j3]);
+            a0 = _mm256_dpbusd_avx_epi32(a0, v0, ldw(wT[j0]));
+            a1 = _mm256_dpbusd_avx_epi32(a1, v0, ldw(wT[j0] + 32));
+            a2 = _mm256_dpbusd_avx_epi32(a2, v1, ldw(wT[j1]));
+            a3 = _mm256_dpbusd_avx_epi32(a3, v1, ldw(wT[j1] + 32));
+            a4 = _mm256_dpbusd_avx_epi32(a4, v2, ldw(wT[j2]));
+            a5 = _mm256_dpbusd_avx_epi32(a5, v2, ldw(wT[j2] + 32));
+            a6 = _mm256_dpbusd_avx_epi32(a6, v3, ldw(wT[j3]));
+            a7 = _mm256_dpbusd_avx_epi32(a7, v3, ldw(wT[j3] + 32));
+        }
+        for (; n < count; ++n) {
+            const int j = nnz[n];
+            const __m256i v = _mm256_set1_epi32(dw[j]);
+            a0 = _mm256_dpbusd_avx_epi32(a0, v, ldw(wT[j]));
+            a1 = _mm256_dpbusd_avx_epi32(a1, v, ldw(wT[j] + 32));
+        }
+        const __m256i lo = _mm256_add_epi32(_mm256_add_epi32(a0, a2), _mm256_add_epi32(a4, a6));
+        const __m256i hi = _mm256_add_epi32(_mm256_add_epi32(a1, a3), _mm256_add_epi32(a5, a7));
+        _mm256_store_si256(reinterpret_cast<__m256i*>(sums), lo);
+        _mm256_store_si256(reinterpret_cast<__m256i*>(sums + 8), hi);
+    }
+    static_assert(L1_SIZE == 16, "il percorso sparso usa due accumulatori da otto corsie");
 #else
     // Senza VNNI: corsie i16, con i pesi gia' convertiti al caricamento (vedi
     // l1w16 in loadFromFile) per togliere una cvtepi8_epi16 dal ciclo interno.
+    // Qui il ciclo resta guidato dalle uscite: senza vpdpbusd non si puo'
+    // replicare un gruppo da quattro byte sulle corsie, e la sparsita' a corsie
+    // i16 non ripagherebbe il costo di trovare i non-zeri.
+    //
+    // Otto righe per gruppo, ciascuna col proprio accumulatore: il prodotto
+    // scalare ha ~5 cicli di latenza, e con pochi accumulatori le iterazioni
+    // formano catene dipendenti in cui si aspetta la latenza invece di
+    // sfruttare il throughput. Otto e' il massimo utile: a sedici gli
+    // accumulatori piu' `h` non stanno nei sedici registri ymm.
+    constexpr int GROUP = 8;
+    static_assert(L1_SIZE % GROUP == 0, "il ciclo elabora GROUP uscite per volta");
     alignas(32) int16_t h16[HIDDEN];
     for (int j = 0; j < PAIRWISE_OUT; j += 16) {
         _mm256_store_si256(reinterpret_cast<__m256i*>(h16 + j), pairwiseBlock(accStm, j));
@@ -259,11 +356,29 @@ bool loadFromFile(const char* path, NetworkDeep& net) noexcept {
         if (pad[i] != static_cast<unsigned char>(kTag[i % 6])) return false;
     }
 
-    // Derivata, non letta dal file.
+    // Derivate, non lette dal file.
     for (int b = 0; b < OUTPUT_BUCKETS; ++b)
         for (int o = 0; o < L1_SIZE; ++o)
             for (int i = 0; i < HIDDEN; ++i)
                 net.l1w16[b][o][i] = net.l1w[b][o][i];
+
+    // l1wT: stessi pesi, indicizzati per GRUPPO DI QUATTRO INGRESSI invece che
+    // per uscita, cosi' il ciclo sparso trova in 64 byte contigui tutto cio' che
+    // serve a un gruppo. Le due meta' dei 64 byte sono i due operandi di
+    // vpdpbusd: uscite 0-7 e uscite 8-15.
+    //
+    // PACKUS_MAP traduce la posizione nel blocco da 32 in cui il pairwise
+    // scrive verso il neurone di origine. Assorbire qui lo scambio di corsie di
+    // packus costa zero e toglie una vpermq ogni 32 uscite dal ciclo caldo.
+    for (int b = 0; b < OUTPUT_BUCKETS; ++b)
+        for (int g = 0; g < HIDDEN / 4; ++g)
+            for (int o = 0; o < L1_SIZE; ++o)
+                for (int k = 0; k < 4; ++k) {
+                    const int pos   = 4 * g + k;                       // posizione in h8
+                    const int block = pos & ~31;                       // blocco da 32
+                    const int src   = block + PACKUS_MAP[pos - block]; // neurone di origine
+                    net.l1wT[b][g][(o & 7) * 4 + k + (o < 8 ? 0 : 32)] = net.l1w[b][o][src];
+                }
     return true;
 }
 
