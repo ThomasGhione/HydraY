@@ -165,6 +165,10 @@ public:
     __attribute__((always_inline)) void fastUpdateOccupancyBB(uint8_t fromIndex, uint8_t toIndex) noexcept;
     __attribute__((always_inline)) void addPieceToBB(uint8_t piece, uint8_t index) noexcept;
     __attribute__((always_inline)) void removePieceFromBB(uint8_t piece, uint8_t index) noexcept;
+    // Un pezzo che si sposta: stessa cosa di remove+add, ma l'accumulatore fa
+    // una passata invece di due (vedi Accumulator::updateMove).
+    __attribute__((always_inline)) void movePieceOnBB(uint8_t piece, uint8_t fromIndex,
+                                                      uint8_t toIndex) noexcept;
 
     // --- Move execution ---
     void doMove(const Move& m, MoveState& state) noexcept;

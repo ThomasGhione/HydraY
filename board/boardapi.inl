@@ -221,8 +221,7 @@ inline void Board::doMoveByKind(
     set(toIndex, static_cast<piece_id>(moving));
     set(fromIndex, EMPTY);
     fastUpdateOccupancyBB(fromIndex, toIndex);
-    removePieceFromBB(moving, fromIndex);
-    addPieceToBB(moving, toIndex);
+    movePieceOnBB(moving, fromIndex, toIndex);
 
     if constexpr (Kind == MoveKind::Castling) {
         // Move the rook with the same index-based fast path used for the king.
@@ -240,8 +239,7 @@ inline void Board::doMoveByKind(
         set(rookToIndex, static_cast<piece_id>(rook));
         set(rookFromIndex, EMPTY);
         fastUpdateOccupancyBB(rookFromIndex, rookToIndex);
-        removePieceFromBB(rook, rookFromIndex);
-        addPieceToBB(rook, rookToIndex);
+        movePieceOnBB(rook, rookFromIndex, rookToIndex);
     }
 
     updateCastlingRightsOnPieceMove(movingType, movingColor, fromIndex);
@@ -285,8 +283,7 @@ inline void Board::undoMoveByKind(
     set(fromIndex, static_cast<piece_id>(pieceOnTo));
     set(toIndex, EMPTY);
     fastUpdateOccupancyBB(toIndex, fromIndex);
-    removePieceFromBB(pieceOnTo, toIndex);
-    addPieceToBB(pieceOnTo, fromIndex);
+    movePieceOnBB(pieceOnTo, toIndex, fromIndex);
 
     if constexpr (Kind == MoveKind::EnPassant) {
         // Put back the pawn captured en-passant on its original square.
@@ -313,7 +310,6 @@ inline void Board::undoMoveByKind(
         set(rookFromIndex, static_cast<piece_id>(rook));
         set(rookToIndex, EMPTY);
         fastUpdateOccupancyBB(rookToIndex, rookFromIndex);
-        removePieceFromBB(rook, rookToIndex);
-        addPieceToBB(rook, rookFromIndex);
+        movePieceOnBB(rook, rookToIndex, rookFromIndex);
     }
 }

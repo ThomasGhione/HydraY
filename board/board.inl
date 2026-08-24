@@ -173,6 +173,17 @@ inline void Board::removePieceFromBB(uint8_t piece, uint8_t index) noexcept {
     }
 }
 
+__attribute__((always_inline))
+inline void Board::movePieceOnBB(uint8_t piece, uint8_t fromIndex, uint8_t toIndex) noexcept {
+    const uint8_t type = piece & MASK_PIECE_TYPE;
+    const uint8_t color = colorToIndex(piece);
+    dispatchPieceBBUpdate<false>(type, color, BIT_MASKS[fromIndex]);
+    dispatchPieceBBUpdate<true>(type, color, BIT_MASKS[toIndex]);
+    if (NNUE::activeNetwork != nullptr) [[likely]] {
+        nnueAccumulator.updateMove(piece, fromIndex, toIndex);
+    }
+}
+
 // From-scratch accumulator rebuild. Note rebuildBitboardsFromSquares goes
 // through dispatchPieceBBUpdate directly (NOT addPieceToBB), so bulk rebuilds
 // never double-count: they land here once at the end instead.
