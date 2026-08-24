@@ -172,11 +172,24 @@ int32_t forwardSimd(const NetworkDeep& net,
     // corsia da 128 bit) e NON viene raddrizzato: se lo si rimettesse a posto
     // servirebbe una vpermq ogni 32 uscite. Lo scambio e' invece assorbito una
     // volta per tutte in l1wT al caricamento.
-    alignas(32) uint8_t h8[HIDDEN];
+    //
+    // Gli indici dei gruppi NON nulli si raccolgono QUI, non in un secondo giro:
+    // il blocco da 32 byte e' gia' in un registro, mentre una passata separata
+    // doveva rileggersi tutto h8 e pagare il proprio giro di ciclo.
+    //
+    // ⚠️ La store degli indici ne scrive OTTO per volta anche quando il blocco
+    // ne ha meno. Il conto sta perche' prima dell'emissione k vale count <= 8k,
+    // quindi l'ultima finisce esattamente a HIDDEN/4. Cambiare la taglia del
+    // blocco senza rifare questo conto sborda l'array.
+    alignas(32) uint8_t  h8[HIDDEN];
+    alignas(32) uint16_t nnz[HIDDEN / 4];
+    int count = 0;
     {
         const __m256i zero  = _mm256_setzero_si256();
         const __m256i magic = _mm256_set1_epi16(static_cast<int16_t>(32897));
-        const auto block = [&](const int16_t* acc, uint8_t* dst, int j) noexcept {
+        const __m128i eight = _mm_set1_epi16(8);
+
+        const auto block = [&](const int16_t* acc, int j) noexcept {
             // loadu, non load: gli accumulatori arrivano da fuori e la firma non
             // promette allineamento a 32 byte. Su x86 non costa niente quando lo
             // sono davvero, e con `load` bastava un chiamante con un vector per
@@ -194,38 +207,30 @@ int32_t forwardSimd(const NetworkDeep& net,
                 const __m256i p  = _mm256_mullo_epi16(xa, yb);      // <= 65025, esatto in u16
                 return _mm256_srli_epi16(_mm256_mulhi_epu16(p, magic), 7);   // == p / 255
             };
-            _mm256_store_si256(reinterpret_cast<__m256i*>(dst + j),
-                               _mm256_packus_epi16(half(a, b, true), half(a, b, false)));
+            return _mm256_packus_epi16(half(a, b, true), half(a, b, false));
         };
-        for (int j = 0; j < PAIRWISE_OUT; j += 32) {
-            block(accStm, h8, j);
-            block(accNtm, h8 + PAIRWISE_OUT, j);
-        }
-    }
 
-    // Indici dei gruppi da quattro NON nulli. Su reti addestrate ne sopravvive
-    // meno della meta': e' tutto lavoro che il ciclo denso faceva moltiplicando
-    // per zero.
-    // La store scrive OTTO indici per volta anche quando il blocco ne ha meno:
-    // il conto sta perche' prima dell'iterazione i vale count <= 8i, quindi
-    // l'ultima scrittura finisce esattamente a HIDDEN/4. Cambiare la taglia del
-    // blocco senza rifare questo conto sborda l'array.
-    alignas(32) uint16_t nnz[HIDDEN / 4];
-    int count = 0;
-    {
-        const __m256i zero = _mm256_setzero_si256();
-        __m128i base = _mm_setzero_si128();
-        const __m128i eight = _mm_set1_epi16(8);
-        for (int i = 0; i < HIDDEN; i += 32) {   // 32 byte = 8 gruppi
-            const __m256i chunk = _mm256_load_si256(reinterpret_cast<const __m256i*>(h8 + i));
+        const auto emit = [&](__m256i v, uint8_t* dst, __m128i base) noexcept {
+            _mm256_store_si256(reinterpret_cast<__m256i*>(dst), v);
             const unsigned mask =
                 static_cast<unsigned>(_mm256_movemask_ps(_mm256_castsi256_ps(
-                    _mm256_cmpeq_epi32(chunk, zero)))) ^ 0xFFu;
+                    _mm256_cmpeq_epi32(v, zero)))) ^ 0xFFu;
             _mm_storeu_si128(reinterpret_cast<__m128i*>(nnz + count),
                 _mm_add_epi16(_mm_loadu_si128(
                     reinterpret_cast<const __m128i*>(NNZ.idx[mask])), base));
             count += __builtin_popcount(mask);
-            base = _mm_add_epi16(base, eight);
+        };
+
+        // Due basi separate perche' le due prospettive si alternano: tenerle in
+        // registro e incrementarle costa un'istruzione, ricostruirle da j ne
+        // costerebbe due.
+        __m128i baseStm = _mm_setzero_si128();
+        __m128i baseNtm = _mm_set1_epi16(static_cast<int16_t>(PAIRWISE_OUT / 4));
+        for (int j = 0; j < PAIRWISE_OUT; j += 32) {
+            emit(block(accStm, j), h8 + j, baseStm);
+            emit(block(accNtm, j), h8 + PAIRWISE_OUT + j, baseNtm);
+            baseStm = _mm_add_epi16(baseStm, eight);
+            baseNtm = _mm_add_epi16(baseNtm, eight);
         }
     }
 
