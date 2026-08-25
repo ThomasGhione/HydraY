@@ -52,3 +52,14 @@ config.json
 # Python bytecode (never track compiled caches)
 __pycache__/
 *.pyc
+
+# Tuning run artefacts: SPRT/gauntlet/calibration logs and their PGNs. Hundreds
+# of MB each -- GitHub rejects files over 100 MB, and they are reproducible
+# output, not source. (tuning/books/openings.pgn stays tracked: it is input.)
+tuning/log_*.txt
+tuning/*.pgn
+tuning/*.pgn.*
+tuning/sfcal_*.txt
+tuning/sprt_*.txt
+tuning/gauntlet_*.txt
+tuning/chess_baseline

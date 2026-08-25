@@ -45,12 +45,16 @@
 #include <cstddef>
 #include <cstdint>
 
+#include "network.hpp"
+
 namespace NNUE::Deep {
 
 inline constexpr int INPUTS        = 768;
 inline constexpr int HIDDEN        = 1024;
 inline constexpr int L1_SIZE       = 16;
-inline constexpr int INPUT_BUCKETS = 4;
+// Deve coincidere con NNUE::INPUT_BUCKETS: l'accumulatore reinterpreta il
+// prefisso l0 della rete profonda come una Network (vedi nnue.cpp).
+inline constexpr int INPUT_BUCKETS = NNUE::INPUT_BUCKETS;
 inline constexpr int OUTPUT_BUCKETS = 8;
 inline constexpr int32_t QA    = 255;
 inline constexpr int32_t QB    = 64;
@@ -112,7 +116,10 @@ inline constexpr size_t PAYLOAD_BYTES =
     + static_cast<size_t>(OUTPUT_BUCKETS) * L1_SIZE * sizeof(float)
     + static_cast<size_t>(OUTPUT_BUCKETS) * L1_SIZE * sizeof(float)
     + static_cast<size_t>(OUTPUT_BUCKETS) * sizeof(float);
-static_assert(PAYLOAD_BYTES == 6'425'632, "layout cambiato: aggiorna sanity_deep.rs");
+// 12'717'088 a 8 bucket d'ingresso (era 6'425'632 a 4): il valore segue
+// INPUT_BUCKETS. Nota: le reti profonde gia' addestrate sono a 4 bucket e
+// su questo branch non sono caricabili -- qui si misura solo il layer singolo.
+static_assert(PAYLOAD_BYTES == 12'717'088, "layout cambiato: aggiorna sanity_deep.rs");
 
 // Forward scalare, dagli accumulatori delle due prospettive alla valutazione
 // in centipedine. Riferimento di correttezza per la versione vettoriale.

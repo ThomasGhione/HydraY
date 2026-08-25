@@ -2,7 +2,7 @@
 // REFERENCE IMPLEMENTATION for HydraY's engine-side loader/inference.
 // Keep the C++ code byte-for-byte consistent with this.
 //
-// Net (HALFKA_PLAN.md): (768x4kb_hm -> HIDDEN)x2 -> OB, dual perspective,
+// Net (HALFKA_PLAN.md): (768x8kb_hm -> HIDDEN)x2 -> OB, dual perspective,
 // SCReLU, QA=255 QB=64 SCALE=400.
 //  - 4 mirrored king input buckets (bullet ChessBucketsMirrored semantics):
 //      for perspective X with own king on ksq_X (LERF, from X's own view):
@@ -14,7 +14,7 @@
 //  - OB = 8 material-count output buckets: (popcount(occ) - 2) / 4.
 //
 // File layout (little-endian i16, padded to a multiple of 64 B):
-//   l0w: 4*768 columns x HIDDEN  (king-bucketed feature weights, QA,
+//   l0w: 8*768 columns x HIDDEN  (king-bucketed feature weights, QA,
 //                                 factoriser already merged at save)
 //   l0b: HIDDEN                  (accumulator bias, QA)
 //   l1w: OB rows x 2*HIDDEN      (output weights, transposed, QB)
@@ -23,7 +23,7 @@
 // Usage: cargo run -r --bin sanity -- <quantised.bin> [fen]...
 
 const HIDDEN: usize = 1024;
-const INPUT_BUCKETS: usize = 4;
+const INPUT_BUCKETS: usize = 8;
 const OUTPUT_BUCKETS: usize = 8;
 const QA: i32 = 255;
 const QB: i32 = 64;
@@ -33,14 +33,14 @@ const SCALE: i32 = 400;
 // 32 entries: files a-d per rank, rank 1 first; e-h mirror onto d-a.
 #[rustfmt::skip]
 const BUCKET_LAYOUT: [usize; 32] = [
-    0, 0, 1, 1,
-    2, 2, 2, 2,
-    3, 3, 3, 3,
-    3, 3, 3, 3,
-    3, 3, 3, 3,
-    3, 3, 3, 3,
-    3, 3, 3, 3,
-    3, 3, 3, 3,
+    0, 1, 2, 3,
+    4, 4, 5, 5,
+    6, 6, 6, 6,
+    6, 6, 6, 6,
+    7, 7, 7, 7,
+    7, 7, 7, 7,
+    7, 7, 7, 7,
+    7, 7, 7, 7,
 ];
 
 // bullet ChessBucketsMirrored::new expansion: 64-square map from the 32-entry
@@ -51,7 +51,7 @@ fn king_bucket(ksq: usize) -> usize {
 }
 
 struct Network {
-    feature_weights: Vec<i16>, // [4*768 * HIDDEN], column f at f*HIDDEN..
+    feature_weights: Vec<i16>, // [8*768 * HIDDEN], column f at f*HIDDEN..
     feature_bias: Vec<i16>,    // [HIDDEN]
     output_weights: Vec<i16>,  // [OB * 2 * HIDDEN], bucket b at b*2*HIDDEN..
     output_bias: Vec<i16>,     // [OB]
