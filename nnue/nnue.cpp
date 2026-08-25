@@ -30,19 +30,19 @@ namespace {
 
 std::unique_ptr<Network> ownedNetwork;
 
-// --- rete profonda (network_deep.hpp) --------------------------------------
-// Convive con quella a un layer invece di sostituirla: la singola resta in
-// produzione finche' la profonda non vince un SPRT.
+// --- deep network (network_deep.hpp) ---------------------------------------
+// Lives alongside the single-layer net rather than replacing it: either one can
+// be the active evaluator.
 //
-// I due formati hanno lo STESSO prefisso — l0w poi l0b, stesse taglie — e
-// l'accumulatore legge solo quello. Quindi con una rete profonda attiva
-// `activeNetwork` punta all'inizio della struct profonda e l'accumulatore
-// continua a funzionare senza sapere niente di tutto questo. Gli static_assert
-// qui sotto verificano l'ipotesi: se un layout cambia, non compila.
+// The two formats share the SAME prefix -- l0w then l0b, same sizes -- and the
+// accumulator reads only that. So with a deep net active, `activeNetwork`
+// points at the start of the deep struct and the accumulator keeps working
+// without knowing any of this. The static_asserts below check that assumption:
+// if either layout changes, it stops compiling.
 //
-// REGOLA: con una rete profonda attiva, `activeNetwork->outputWeights` e
-// `->outputBias` aliasano i pesi di l1 e NON vanno letti. L'unico lettore e'
-// evaluate(), che smista sul flag.
+// RULE: with a deep net active, `activeNetwork->outputWeights` and
+// `->outputBias` alias l1's weights and must NOT be read. The only reader is
+// evaluate(), which dispatches on the flag.
 std::unique_ptr<Deep::NetworkDeep> ownedDeep;
 const Deep::NetworkDeep* activeDeep = nullptr;
 
@@ -51,7 +51,7 @@ static_assert(sizeof(Network::featureWeights) == sizeof(Deep::NetworkDeep::l0w))
 static_assert(offsetof(Network, featureBias) == offsetof(Deep::NetworkDeep, l0b));
 static_assert(sizeof(Network::featureBias) == sizeof(Deep::NetworkDeep::l0b));
 
-// Taglia del file di una rete profonda, padding di bullet incluso.
+// File size of a deep net, bullet's padding included.
 constexpr size_t DEEP_FILE_BYTES = (Deep::PAYLOAD_BYTES + 63) / 64 * 64;
 
 // The AVX2 forward multiplies clamped activations (<= QA) by output weights in
@@ -127,8 +127,8 @@ bool loadNetwork(const std::string& path) {
     const auto fileSize = static_cast<size_t>(in.tellg());
     in.seekg(0);
 
-    // Il formato si riconosce dalla TAGLIA: le due architetture hanno file di
-    // dimensione diversa e non c'e' intestazione nel formato di bullet.
+    // The format is recognised by SIZE: the two architectures have files of
+    // different length and bullet's format carries no header.
     if (fileSize == DEEP_FILE_BYTES) {
         auto deep = std::make_unique<Deep::NetworkDeep>();
         if (!Deep::loadFromFile(path.c_str(), *deep)) {
@@ -138,7 +138,7 @@ bool loadNetwork(const std::string& path) {
         ownedDeep = std::move(deep);
         activeDeep = ownedDeep.get();
         ownedNetwork.reset();
-        // L'accumulatore legge solo il prefisso l0, identico nei due formati.
+        // The accumulator only reads the l0 prefix, identical in both formats.
         activeNetwork = reinterpret_cast<const Network*>(activeDeep);
         std::cout << "info string EvalFile: deep network (1024 -> "
                   << Deep::L1_SIZE << " -> 1)"
@@ -166,18 +166,36 @@ bool loadNetwork(const std::string& path) {
     return true;
 }
 
+size_t embeddedSize() noexcept {
+    return static_cast<size_t>(g_hydrayEmbeddedNetEnd - g_hydrayEmbeddedNetStart);
+}
+
 const Network* embeddedNetwork() noexcept {
     // Validated once; the blob is 64-byte aligned (.balign in embedded.cpp),
     // so the Network overlay satisfies the AVX2 aligned loads.
     static const Network* const validated = []() -> const Network* {
-        const auto size = static_cast<size_t>(g_hydrayEmbeddedNetEnd - g_hydrayEmbeddedNetStart);
-        if (validateNetworkBlob(g_hydrayEmbeddedNetStart, size) != nullptr) return nullptr;
+        if (validateNetworkBlob(g_hydrayEmbeddedNetStart, embeddedSize()) != nullptr) return nullptr;
         return reinterpret_cast<const Network*>(g_hydrayEmbeddedNetStart);
     }();
     return validated;
 }
 
 bool activateEmbedded() noexcept {
+    // Same size-based format detection as loadNetwork: the two architectures
+    // have different file sizes and bullet's format carries no header. The deep
+    // net cannot be a plain overlay on the blob -- l1w16 and l1wT are derived,
+    // not stored -- so it is copied into an owned NetworkDeep.
+    if (embeddedSize() == DEEP_FILE_BYTES) {
+        auto deep = std::make_unique<Deep::NetworkDeep>();
+        if (!Deep::loadFromMemory(g_hydrayEmbeddedNetStart, embeddedSize(), *deep)) return false;
+        ownedDeep = std::move(deep);
+        activeDeep = ownedDeep.get();
+        ownedNetwork.reset();
+        // The accumulator only reads the l0 prefix, identical in both formats.
+        activeNetwork = reinterpret_cast<const Network*>(activeDeep);
+        return true;
+    }
+
     const Network* net = embeddedNetwork();
     if (net == nullptr) return false;
     ownedNetwork.reset();

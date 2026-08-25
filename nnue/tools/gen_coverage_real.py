@@ -1,21 +1,21 @@
 #!/usr/bin/env python3
-"""Seconda passata dell'audit: posizioni REALI, per i bucket d'uscita densi.
+"""Second audit pass: REAL positions, for the dense output buckets.
 
-La prima passata (gen_coverage.py) enumera firme di materiale e piazza i pezzi a
-caso. Va bene fino a ~8 pezzi, dove ogni disposizione e' una posizione
-plausibile. Sopra non funziona: trenta pezzi a caso non somigliano agli scacchi,
-la rete non li ha mai visti a ragion veduta, e l'audit produrrebbe falsi
-positivi.
+The first pass (gen_coverage.py) enumerates material signatures and places the
+pieces at random. That works up to ~8 pieces, where every arrangement is a
+plausible position. Above that it does not: thirty pieces placed at random do
+not resemble chess, the net has legitimately never seen them, and the audit
+would produce false positives.
 
-Quindi per il mediogioco le posizioni vengono dalle partite, e la stratificazione
-e' sul BUCKET D'USCITA — che e' come la rete stessa partiziona il materiale:
+So for the middlegame the positions come from games, and the stratification is
+on the OUTPUT BUCKET -- which is how the net itself partitions material:
 bucket = (popcount - 2) // 4.
 
   ./gen_coverage_real.py <file.pgn> [per_bucket] > positions_real.tsv
-  formato: b<bucket><TAB>fen
+  format: b<bucket><TAB>fen
 
-Le posizioni sono prese a intervalli lungo la partita e deduplicate, per non
-riempire il campione con la stessa posizione ripetuta a ogni semimossa.
+Positions are taken at intervals along the game and deduplicated, so the sample
+is not filled with the same position repeated at every ply.
 """
 import random
 import sys
@@ -23,7 +23,7 @@ import sys
 import chess
 import chess.pgn
 
-TARGETS = range(2, 8)          # i bucket che la prima passata non tocca
+TARGETS = range(2, 8)          # the buckets the first pass does not reach
 
 
 def main():
@@ -59,7 +59,7 @@ def main():
                 got[bucket] += 1
                 print(f"b{bucket}\t{board.fen()}")
 
-    print(f"# {games} partite, per bucket: "
+    print(f"# {games} games, per bucket: "
           + ", ".join(f"{b}:{got[b]}" for b in TARGETS), file=sys.stderr)
 
 

@@ -4,19 +4,20 @@
 #include <cmath>
 #include <cstdio>
 #include <cstring>
+#include <vector>
 
 namespace NNUE::Deep {
 
 namespace {
 
-// SCReLU in virgola mobile, come nel grafo di bullet: clamp a [0,1] e quadrato.
+// Floating-point SCReLU, as in bullet's graph: clamp to [0,1] and square.
 [[nodiscard]] inline float screlu(float x) noexcept {
     const float y = std::clamp(x, 0.0f, 1.0f);
     return y * y;
 }
 
-// CReLU + prodotto a coppie: 1024 accumulatori i16 -> 512 valori in [0, QA].
-// La divisione per QA e' intera e troncata, come in sanity_deep.rs.
+// CReLU + pairwise product: 1024 i16 accumulators -> 512 values in [0, QA].
+// The division by QA is integer and truncating, as in sanity_deep.rs.
 inline void pairwise(const int16_t* acc, int32_t* out) noexcept {
     for (int j = 0; j < PAIRWISE_OUT; ++j) {
         const int32_t a = std::clamp<int32_t>(acc[j], 0, QA);
@@ -54,25 +55,26 @@ int32_t forwardScalar(const NetworkDeep& net,
 }
 
 // ---------------------------------------------------------------------------
-// Forward vettoriale
+// Vectorised forward
 //
-// Il pairwise resta su corsie a 16 bit per tutto il percorso, e non e' una
-// scelta di comodo:
-//   - a e b stanno in [0, QA] = [0, 255], quindi a*b <= 65025, che ci sta
-//     ESATTAMENTE in un u16. `mullo_epi16` ne restituisce il valore giusto;
-//   - la divisione per 255 diventa `mulhi_epu16(x, 32897) >> 7`, che e'
-//     floor(x*32897 / 2^23) == x/255 per ogni x in [0, 65025]. Verificato sui
-//     due estremi che contano: 254 -> 0 e 65025 -> 255.
+// The pairwise pass stays on 16-bit lanes throughout, and that is not just
+// convenience:
+//   - a and b are in [0, QA] = [0, 255], so a*b <= 65025, which fits EXACTLY in
+//     a u16. `mullo_epi16` returns the right value;
+//   - the division by 255 becomes `mulhi_epu16(x, 32897) >> 7`, which is
+//     floor(x*32897 / 2^23) == x/255 for every x in [0, 65025]. Checked at the
+//     two endpoints that matter: 254 -> 0 and 65025 -> 255.
 //
-// Per il prodotto scalare di l1 la strada ovvia sarebbe `maddubs_epi16`, che
-// macina 32 valori per istruzione. NON si puo' usare: satura a i16, e qui i
-// suoi addendi arrivano a 255*127*2 = 64770, ben oltre 32767. Saturerebbe in
-// silenzio, cioe' la rete giocherebbe peggio senza che nessun test se ne
-// accorga. Restano due strade esatte:
-//   - AVX-VNNI `dpbusd`: accumula in i32, 32 moltiplicazioni per istruzione;
-//   - AVX2 `madd_epi16`: accumula in i32, 16 per istruzione.
-// La prima e' il doppio piu' veloce ma richiede una CPU che la supporti,
-// quindi c'e' il fallback e i due percorsi vanno confrontati fra loro.
+// For l1's dot product the obvious route would be `maddubs_epi16`, which chews
+// through 32 values per instruction. It CANNOT be used: it saturates to i16,
+// and here its addends reach 255*127*2 = 64770, well past 32767. It would
+// saturate silently -- the net would play worse with no test noticing. Two
+// exact routes remain:
+//   - AVX-VNNI `dpbusd`: accumulates in i32, 32 multiplications per instruction;
+//   - AVX2 `madd_epi16`: accumulates in i32, 16 per instruction.
+// The first is twice as fast but needs a CPU that supports it, hence the
+// fallback and the requirement that the two paths be checked against each
+// other.
 // ---------------------------------------------------------------------------
 
 #if defined(__AVX2__)
@@ -88,13 +90,13 @@ inline __m256i pairwiseBlock(const int16_t* acc, int j) noexcept {
     const __m256i hi = _mm256_loadu_si256(reinterpret_cast<const __m256i*>(acc + j + PAIRWISE_OUT));
     const __m256i a  = _mm256_min_epi16(_mm256_max_epi16(lo, zero), qa);
     const __m256i b  = _mm256_min_epi16(_mm256_max_epi16(hi, zero), qa);
-    const __m256i p  = _mm256_mullo_epi16(a, b);              // <= 65025, esatto in u16
+    const __m256i p  = _mm256_mullo_epi16(a, b);              // <= 65025, exact in u16
     const __m256i m  = _mm256_mulhi_epu16(p, _mm256_set1_epi16(static_cast<int16_t>(32897)));
     return _mm256_srli_epi16(m, 7);                            // == p / 255
 }
 
-// Per ogni maschera a 8 bit, le posizioni dei bit accesi. Traduce in un colpo
-// solo il risultato di movemask nell'elenco dei gruppi non nulli.
+// For every 8-bit mask, the positions of the set bits. Turns a movemask result
+// into the list of non-zero groups in one step.
 struct NnzTable {
     uint16_t idx[256][8];
     constexpr NnzTable() : idx{} {
@@ -108,11 +110,11 @@ struct NnzTable {
 inline constexpr NnzTable NNZ{};
 
 #if !defined(__AVXVNNI__)
-// Quattro accumulatori -> quattro interi, in un colpo solo. Serve solo al
-// percorso a corsie i16: quello sparso ottiene le uscite gia' separate per
-// corsia e non ha niente da ridurre.
-// L'ordine delle somme cambia rispetto a una riduzione lineare, ma sono interi:
-// esatti e associativi, quindi il risultato e' identico.
+// Four accumulators -> four integers in one go. Only the i16-lane path needs
+// it: the sparse path already gets its outputs separated per lane and has
+// nothing to reduce.
+// The summation order differs from a linear reduction, but these are integers:
+// exact and associative, so the result is identical.
 inline void reduce4(__m256i a0, __m256i a1, __m256i a2, __m256i a3, int32_t* out) noexcept {
     const __m256i s = _mm256_hadd_epi32(_mm256_hadd_epi32(a0, a1), _mm256_hadd_epi32(a2, a3));
     _mm_store_si128(reinterpret_cast<__m128i*>(out),
@@ -120,12 +122,12 @@ inline void reduce4(__m256i a0, __m256i a1, __m256i a2, __m256i a3, int32_t* out
 }
 #endif
 
-// SCReLU su tutte le L1_SIZE uscite insieme. Scritto a mano e non lasciato al
-// compilatore perche' la versione scalare pagava due cose: `std::clamp` che GCC
-// traduce in confronti e SALTI (imprevedibili, dipendono dai dati) e una
-// divisione in virgola mobile per uscita — sedici `vdivss` per valutazione.
-// Corsia per corsia sono le stesse operazioni IEEE nello stesso ordine, quindi
-// il risultato resta identico bit per bit a quello di forwardScalar.
+// SCReLU over all L1_SIZE outputs at once. Written by hand rather than left to
+// the compiler because the scalar version paid for two things: `std::clamp`,
+// which GCC turns into compares and BRANCHES (unpredictable, data-dependent),
+// and one floating-point division per output -- sixteen `vdivss` per
+// evaluation. Lane by lane these are the same IEEE operations in the same
+// order, so the result stays bit-identical to forwardScalar's.
 inline void activate(const int32_t* sums, const float* bias, float* out) noexcept {
     const __m256 scale = _mm256_set1_ps(static_cast<float>(QA * QB));
     const __m256 zero  = _mm256_setzero_ps();
@@ -161,26 +163,26 @@ int32_t forwardSimd(const NetworkDeep& net,
     alignas(32) int32_t sums[L1_SIZE];
 
 #if defined(__AVXVNNI__)
-    // Pairwise: clamp con packus e prodotto su corsie u16.
+    // Pairwise: clamp via packus, product on u16 lanes.
     //
-    // packus_epi16 satura in UNSIGNED, cioe' fa esattamente clamp(x, 0, 255) --
-    // il CReLU -- su 32 valori con UNA istruzione, dove min+max ne servivano
-    // quattro. Si paga con quattro unpack per riallargare a u16 e moltiplicare,
-    // e il saldo resta a favore.
+    // packus_epi16 saturates UNSIGNED, which is exactly clamp(x, 0, 255) -- the
+    // CReLU -- over 32 values in ONE instruction, where min+max needed four. It
+    // costs four unpacks to widen back to u16 and multiply, and the balance is
+    // still favourable.
     //
-    // L'ordine dei byte che ne esce non e' quello di origine (packus lavora per
-    // corsia da 128 bit) e NON viene raddrizzato: se lo si rimettesse a posto
-    // servirebbe una vpermq ogni 32 uscite. Lo scambio e' invece assorbito una
-    // volta per tutte in l1wT al caricamento.
+    // The byte order it produces is not the source order (packus works per
+    // 128-bit lane) and is NOT straightened out: putting it back would cost one
+    // vpermq per 32 outputs. The swap is absorbed once and for all into l1wT at
+    // load time instead.
     //
-    // Gli indici dei gruppi NON nulli si raccolgono QUI, non in un secondo giro:
-    // il blocco da 32 byte e' gia' in un registro, mentre una passata separata
-    // doveva rileggersi tutto h8 e pagare il proprio giro di ciclo.
+    // The indices of the NON-zero groups are collected HERE, not in a second
+    // pass: the 32-byte block is already in a register, whereas a separate pass
+    // had to re-read all of h8 and pay for its own loop.
     //
-    // ⚠️ La store degli indici ne scrive OTTO per volta anche quando il blocco
-    // ne ha meno. Il conto sta perche' prima dell'emissione k vale count <= 8k,
-    // quindi l'ultima finisce esattamente a HIDDEN/4. Cambiare la taglia del
-    // blocco senza rifare questo conto sborda l'array.
+    // WARNING: the index store writes EIGHT at a time even when the block holds
+    // fewer. It is in bounds because before the k-th emission count <= 8k, so
+    // the last one ends exactly at HIDDEN/4. Changing the block size without
+    // redoing that arithmetic overruns the array.
     alignas(32) uint8_t  h8[HIDDEN];
     alignas(32) uint16_t nnz[HIDDEN / 4];
     int count = 0;
@@ -190,21 +192,21 @@ int32_t forwardSimd(const NetworkDeep& net,
         const __m128i eight = _mm_set1_epi16(8);
 
         const auto block = [&](const int16_t* acc, int j) noexcept {
-            // loadu, non load: gli accumulatori arrivano da fuori e la firma non
-            // promette allineamento a 32 byte. Su x86 non costa niente quando lo
-            // sono davvero, e con `load` bastava un chiamante con un vector per
-            // far saltare tutto.
+            // loadu, not load: the accumulators come from outside and the
+            // signature promises no 32-byte alignment. On x86 it costs nothing
+            // when they are aligned anyway, and with `load` a single caller
+            // passing a vector was enough to crash.
             const auto ld = [](const int16_t* p) noexcept {
                 return _mm256_loadu_si256(reinterpret_cast<const __m256i*>(p));
             };
             const __m256i a = _mm256_packus_epi16(ld(acc + j), ld(acc + j + 16));
             const __m256i b = _mm256_packus_epi16(ld(acc + j + PAIRWISE_OUT),
                                                  ld(acc + j + PAIRWISE_OUT + 16));
-            // unpack per corsia: lo copre le uscite j..j+15, hi le j+16..j+31
+            // unpack per lane: lo covers outputs j..j+15, hi covers j+16..j+31
             const auto half = [&](__m256i x, __m256i y, bool low) noexcept {
                 const __m256i xa = low ? _mm256_unpacklo_epi8(x, zero) : _mm256_unpackhi_epi8(x, zero);
                 const __m256i yb = low ? _mm256_unpacklo_epi8(y, zero) : _mm256_unpackhi_epi8(y, zero);
-                const __m256i p  = _mm256_mullo_epi16(xa, yb);      // <= 65025, esatto in u16
+                const __m256i p  = _mm256_mullo_epi16(xa, yb);      // <= 65025, exact in u16
                 return _mm256_srli_epi16(_mm256_mulhi_epu16(p, magic), 7);   // == p / 255
             };
             return _mm256_packus_epi16(half(a, b, true), half(a, b, false));
@@ -221,9 +223,9 @@ int32_t forwardSimd(const NetworkDeep& net,
             count += __builtin_popcount(mask);
         };
 
-        // Due basi separate perche' le due prospettive si alternano: tenerle in
-        // registro e incrementarle costa un'istruzione, ricostruirle da j ne
-        // costerebbe due.
+        // Two separate bases because the perspectives alternate: keeping them
+        // in registers and incrementing costs one instruction, rebuilding them
+        // from j would cost two.
         __m128i baseStm = _mm_setzero_si128();
         __m128i baseNtm = _mm_set1_epi16(static_cast<int16_t>(PAIRWISE_OUT / 4));
         for (int j = 0; j < PAIRWISE_OUT; j += 32) {
@@ -234,11 +236,11 @@ int32_t forwardSimd(const NetworkDeep& net,
         }
     }
 
-    // Prodotto scalare guidato dagli ingressi. Replicando i quattro byte su
-    // tutte le corsie, la corsia `o` di vpdpbusd accumula gia' il prodotto
-    // scalare dell'uscita `o`: niente riduzioni orizzontali alla fine.
-    // Quattro gruppi per iterazione perche' con due soli accumulatori la catena
-    // dipendente sarebbe lunga quanto tutto il ciclo.
+    // Input-driven dot product. By broadcasting the four bytes across every
+    // lane, vpdpbusd's lane `o` already accumulates output `o`'s dot product:
+    // no horizontal reductions at the end.
+    // Four groups per iteration because with only two accumulators the
+    // dependent chain would be as long as the whole loop.
     {
         const int32_t* dw = reinterpret_cast<const int32_t*>(h8);
         const auto (&wT)[HIDDEN / 4][L1_SIZE * 4] = net.l1wT[outputBucket];
@@ -274,17 +276,17 @@ int32_t forwardSimd(const NetworkDeep& net,
     }
     static_assert(L1_SIZE == 16, "il percorso sparso usa due accumulatori da otto corsie");
 #else
-    // Senza VNNI: corsie i16, con i pesi gia' convertiti al caricamento (vedi
-    // l1w16 in loadFromFile) per togliere una cvtepi8_epi16 dal ciclo interno.
-    // Qui il ciclo resta guidato dalle uscite: senza vpdpbusd non si puo'
-    // replicare un gruppo da quattro byte sulle corsie, e la sparsita' a corsie
-    // i16 non ripagherebbe il costo di trovare i non-zeri.
+    // Without VNNI: i16 lanes, with the weights already widened at load time
+    // (see l1w16 in loadFromMemory) to drop a cvtepi8_epi16 from the inner loop.
+    // Here the loop stays output-driven: without vpdpbusd a four-byte group
+    // cannot be broadcast across the lanes, and sparsity on i16 lanes would not
+    // repay the cost of finding the non-zeros.
     //
-    // Otto righe per gruppo, ciascuna col proprio accumulatore: il prodotto
-    // scalare ha ~5 cicli di latenza, e con pochi accumulatori le iterazioni
-    // formano catene dipendenti in cui si aspetta la latenza invece di
-    // sfruttare il throughput. Otto e' il massimo utile: a sedici gli
-    // accumulatori piu' `h` non stanno nei sedici registri ymm.
+    // Eight rows per group, each with its own accumulator: the dot product has
+    // ~5 cycles of latency, and with few accumulators the iterations form
+    // dependent chains that wait on latency instead of using throughput. Eight
+    // is the useful maximum: at sixteen, the accumulators plus `h` no longer fit
+    // in the sixteen ymm registers.
     constexpr int GROUP = 8;
     static_assert(L1_SIZE % GROUP == 0, "il ciclo elabora GROUP uscite per volta");
     alignas(32) int16_t h16[HIDDEN];
@@ -319,10 +321,61 @@ int32_t forwardSimd(const NetworkDeep& net,
 #endif
 }
 
+bool loadFromMemory(const unsigned char* data, size_t size, NetworkDeep& net) noexcept {
+    if (size < PAYLOAD_BYTES || size % 64 != 0) return false;
+
+    // Fields are read in order: the struct matches the file's layout, but a
+    // single bulk copy is NOT possible, because struct alignment can insert
+    // padding between blocks that the file does not have.
+    size_t off = 0;
+    const auto rd = [&](void* dst, size_t bytes) noexcept {
+        std::memcpy(dst, data + off, bytes);
+        off += bytes;
+    };
+    rd(net.l0w, sizeof(net.l0w));
+    rd(net.l0b, sizeof(net.l0b));
+    rd(net.l1w, sizeof(net.l1w));
+    rd(net.l1b, sizeof(net.l1b));
+    rd(net.l2w, sizeof(net.l2w));
+    rd(net.l2b, sizeof(net.l2b));
+
+    // The tail is "bullet" repeated: anything else means the layout has
+    // drifted, and it is better to find out here than as a net that plays badly
+    // for no apparent reason.
+    static const char kTag[] = "bullet";
+    for (size_t i = PAYLOAD_BYTES; i < size; ++i) {
+        if (data[i] != static_cast<unsigned char>(kTag[(i - PAYLOAD_BYTES) % 6])) return false;
+    }
+
+    // Derived, not read from the file.
+    for (int b = 0; b < OUTPUT_BUCKETS; ++b)
+        for (int o = 0; o < L1_SIZE; ++o)
+            for (int i = 0; i < HIDDEN; ++i)
+                net.l1w16[b][o][i] = net.l1w[b][o][i];
+
+    // l1wT: the same weights, indexed by GROUP OF FOUR INPUTS instead of by
+    // output, so the sparse loop finds everything a group needs in 64
+    // contiguous bytes. The two halves of those 64 bytes are the two vpdpbusd
+    // operands: outputs 0-7 and outputs 8-15.
+    //
+    // PACKUS_MAP maps the position within the 32-wide block that the pairwise
+    // pass writes to the originating neuron. Absorbing packus's lane swap here
+    // is free and removes one vpermq per 32 outputs from the hot loop.
+    for (int b = 0; b < OUTPUT_BUCKETS; ++b)
+        for (int g = 0; g < HIDDEN / 4; ++g)
+            for (int o = 0; o < L1_SIZE; ++o)
+                for (int k = 0; k < 4; ++k) {
+                    const int pos   = 4 * g + k;                       // position in h8
+                    const int block = pos & ~31;                       // 32-wide block
+                    const int src   = block + PACKUS_MAP[pos - block]; // source neuron
+                    net.l1wT[b][g][(o & 7) * 4 + k + (o < 8 ? 0 : 32)] = net.l1w[b][o][src];
+                }
+    return true;
+}
+
 bool loadFromFile(const char* path, NetworkDeep& net) noexcept {
     std::FILE* f = std::fopen(path, "rb");
     if (f == nullptr) return false;
-
     if (std::fseek(f, 0, SEEK_END) != 0) { std::fclose(f); return false; }
     const long size = std::ftell(f);
     std::rewind(f);
@@ -330,61 +383,10 @@ bool loadFromFile(const char* path, NetworkDeep& net) noexcept {
         std::fclose(f);
         return false;
     }
-
-    // I campi si leggono in sequenza: la struct ha lo stesso ordine del file,
-    // ma NON se ne puo' fare una fread unica, perche' l'allineamento della
-    // struct puo' inserire padding fra i blocchi che nel file non esiste.
-    const auto rd = [&](void* dst, size_t bytes) noexcept {
-        return std::fread(dst, 1, bytes, f) == bytes;
-    };
-    const bool ok =
-           rd(net.l0w, sizeof(net.l0w))
-        && rd(net.l0b, sizeof(net.l0b))
-        && rd(net.l1w, sizeof(net.l1w))
-        && rd(net.l1b, sizeof(net.l1b))
-        && rd(net.l2w, sizeof(net.l2w))
-        && rd(net.l2b, sizeof(net.l2b));
-    if (!ok) { std::fclose(f); return false; }
-
-    // La coda e' "bullet" ripetuto: qualunque altra cosa significa che il
-    // layout e' andato alla deriva, ed e' meglio saperlo qui che come una rete
-    // che gioca male senza motivo apparente.
-    const size_t padBytes = static_cast<size_t>(size) - PAYLOAD_BYTES;
-    unsigned char pad[64];
-    if (padBytes > sizeof(pad) || std::fread(pad, 1, padBytes, f) != padBytes) {
-        std::fclose(f);
-        return false;
-    }
+    std::vector<unsigned char> blob(static_cast<size_t>(size));
+    const bool read = std::fread(blob.data(), 1, blob.size(), f) == blob.size();
     std::fclose(f);
-    static const char kTag[] = "bullet";
-    for (size_t i = 0; i < padBytes; ++i) {
-        if (pad[i] != static_cast<unsigned char>(kTag[i % 6])) return false;
-    }
-
-    // Derivate, non lette dal file.
-    for (int b = 0; b < OUTPUT_BUCKETS; ++b)
-        for (int o = 0; o < L1_SIZE; ++o)
-            for (int i = 0; i < HIDDEN; ++i)
-                net.l1w16[b][o][i] = net.l1w[b][o][i];
-
-    // l1wT: stessi pesi, indicizzati per GRUPPO DI QUATTRO INGRESSI invece che
-    // per uscita, cosi' il ciclo sparso trova in 64 byte contigui tutto cio' che
-    // serve a un gruppo. Le due meta' dei 64 byte sono i due operandi di
-    // vpdpbusd: uscite 0-7 e uscite 8-15.
-    //
-    // PACKUS_MAP traduce la posizione nel blocco da 32 in cui il pairwise
-    // scrive verso il neurone di origine. Assorbire qui lo scambio di corsie di
-    // packus costa zero e toglie una vpermq ogni 32 uscite dal ciclo caldo.
-    for (int b = 0; b < OUTPUT_BUCKETS; ++b)
-        for (int g = 0; g < HIDDEN / 4; ++g)
-            for (int o = 0; o < L1_SIZE; ++o)
-                for (int k = 0; k < 4; ++k) {
-                    const int pos   = 4 * g + k;                       // posizione in h8
-                    const int block = pos & ~31;                       // blocco da 32
-                    const int src   = block + PACKUS_MAP[pos - block]; // neurone di origine
-                    net.l1wT[b][g][(o & 7) * 4 + k + (o < 8 ? 0 : 32)] = net.l1w[b][o][src];
-                }
-    return true;
+    return read && loadFromMemory(blob.data(), blob.size(), net);
 }
 
 } // namespace NNUE::Deep

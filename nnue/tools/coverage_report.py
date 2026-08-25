@@ -1,17 +1,17 @@
 #!/usr/bin/env python3
-"""Confronta la nostra eval statica con l'oracolo Stockfish, per firma di materiale.
+"""Compare our static eval against the Stockfish oracle, per material signature.
 
   ./coverage_report.py <oracle.tsv> <ours.tsv> [frequenze.tsv]
 
-Il problema di scala: le due eval sono in "centipedine" diverse (SCALE=400 da
-noi, la normalizzazione di SF da loro). Confrontarle grezze misurerebbe la
-differenza di taratura, non i buchi. Quindi si stima UNA volta sola la mappa
-globale ours ~ a*sf, e si guardano i residui PER FIRMA: una regione dove il
-residuo e' sistematicamente negativo e' un bucket-0, cioe' una zona dello spazio
-d'ingresso che la rete non ha mai visto.
+The scale problem: the two evaluations are in different "centipawns" (SCALE=400
+on our side, Stockfish's own normalisation on theirs). Comparing them raw would
+measure the calibration difference, not the holes. So the global map ours ~ a*sf
+is estimated ONCE, and the residuals are read PER SIGNATURE: a region whose
+residual is systematically negative is a bucket-0, i.e. a part of the input
+space the net has never seen.
 
-Le firme sono ordinate per |bias| (errore sistematico), non per errore assoluto:
-il rumore su singole posizioni non e' il difetto che cerchiamo.
+Signatures are ranked by |bias| (systematic error), not by absolute error: noise
+on individual positions is not the defect we are looking for.
 """
 import statistics
 import sys
@@ -57,17 +57,17 @@ def main():
     common = [(sig, sf, ours_raw[fen]) for fen, (sig, sf) in oracle.items()
               if fen in ours_raw]
     if not common:
-        sys.exit("nessuna posizione in comune")
+        sys.exit("no positions in common")
 
-    # Mappa globale ours ~ a*sf, dalla mediana dei rapporti (robusta alle code).
+    # Global map ours ~ a*sf, from the median of the ratios (robust to tails).
     ratios = [o / s for _, s, o in common if abs(s) > 100]
     a = statistics.median(ratios) if ratios else 1.0
 
-    # ⚠️ Ritagliare PRIMA di riscalare fabbrica un bias enorme sulle posizioni
-    # stravinte: con a~3, un SF ritagliato a CLAMP diventa 3*CLAMP contro il
-    # nostro CLAMP, e ogni materiale schiacciante sembra sottovalutato di
-    # migliaia di centipedine. Si porta tutto nella STESSA scala e si ritaglia
-    # dopo.
+    # WARNING: clamping BEFORE rescaling manufactures a huge bias on crushing
+    # positions: with a~3, a Stockfish score clamped to CLAMP becomes 3*CLAMP
+    # against our CLAMP, and every overwhelming material edge looks
+    # underestimated by thousands of centipawns. Bring both to the SAME scale
+    # first, clamp afterwards.
     clip = lambda v: max(-CLAMP, min(CLAMP, v))
     per = defaultdict(list)
     for sig, s, o in common:
@@ -80,22 +80,22 @@ def main():
         rows.append((sig, len(res), statistics.mean(res),
                      statistics.mean(abs(r) for r in res), freq.get(sig, 0)))
 
-    print(f"posizioni confrontate: {len(common)}   fattore di scala stimato a = {a:.3f}")
-    print(f"firme con >=20 posizioni: {len(rows)}\n")
+    print(f"positions compared: {len(common)}   estimated scale factor a = {a:.3f}")
+    print(f"signatures with >=20 positions: {len(rows)}\n")
 
     def show(title, key, n=18):
         print(title)
-        print(f"  {'firma':<16}{'n':>5}{'bias':>9}{'|err|':>9}{'in partita':>12}")
+        print(f"  {'signature':<16}{'n':>5}{'bias':>9}{'|err|':>9}{'in games':>12}")
         for sig, cnt, bias, mae, fr in sorted(rows, key=key)[:n]:
             print(f"  {sig:<16}{cnt:>5}{bias:>9.0f}{mae:>9.0f}{fr:>12}")
         print()
 
-    show("SOTTOVALUTATE — la rete vede meno vantaggio del vero (il caso bucket 0):",
+    show("UNDERESTIMATED -- the net sees less edge than the truth (the bucket-0 case):",
          lambda r: r[2])
-    show("SOPRAVVALUTATE — la rete vede piu' vantaggio del vero:",
+    show("OVERESTIMATED -- the net sees more edge than the truth:",
          lambda r: -r[2])
     if freq:
-        show("PESATE PER FREQUENZA IN PARTITA (|bias| x occorrenze):",
+        show("WEIGHTED BY IN-GAME FREQUENCY (|bias| x occurrences):",
              lambda r: -abs(r[2]) * r[4])
 
 

@@ -1,13 +1,13 @@
 #!/usr/bin/env python3
-"""Genera posizioni legali casuali per firma di materiale, per l'audit di copertura.
+"""Generate random legal positions per material signature, for the coverage audit.
 
-Perche' enumerare invece di pescare dalle nostre partite: il bucket 0 era vuoto
-proprio perche' datagen non produceva mai quelle posizioni (l'adjudication
-chiudeva a <=5 pezzi). Campionare da cio' che giochiamo rimancherebbe il buco
-per la stessa ragione. Qui la copertura e' decisa a priori dalla lista di firme.
+Why enumerate rather than sample from our own games: bucket 0 was empty
+precisely because datagen never produced those positions (adjudication cut at
+<=5 pieces). Sampling what we play would miss the same hole for the same reason.
+Here coverage is decided up front by the list of signatures.
 
-  ./gen_coverage.py [posizioni_per_firma] > positions.tsv
-  formato: firma<TAB>fen
+  ./gen_coverage.py [positions_per_signature] > positions.tsv
+  format: signature<TAB>fen
 """
 import itertools
 import random
@@ -21,10 +21,10 @@ SYM = {chess.PAWN: "P", chess.KNIGHT: "N", chess.BISHOP: "B",
 
 
 def signatures(max_per_side=3):
-    """Tutte le combinazioni con <= max_per_side pezzi non-re per lato.
+    """All combinations with <= max_per_side non-king pieces per side.
 
-    Solo meta' delle coppie (white >= black in ordine canonico): la valutazione
-    e' antisimmetrica, quindi KQvKR e KRvKQ sono la stessa domanda.
+    Only half the pairs (white >= black in canonical order): the evaluation is
+    antisymmetric, so KQvKR and KRvKQ are the same question.
     """
     combos = []
     for n in range(0, max_per_side + 1):
@@ -32,9 +32,9 @@ def signatures(max_per_side=3):
     out = []
     for w, b in itertools.product(combos, repeat=2):
         if len(w) + len(b) == 0:
-            continue                      # K vs K: patta per materiale
+            continue                      # K vs K: drawn by material
         if (len(w), w) < (len(b), b):
-            continue                      # tenuta una sola delle due direzioni
+            continue                      # keep only one of the two directions
         out.append((w, b))
     return out
 
@@ -56,7 +56,7 @@ def random_position(w, b, rng, tries=400):
         rng.shuffle(free)
         ok = True
         for piece, colour in [(p, chess.WHITE) for p in w] + [(p, chess.BLACK) for p in b]:
-            # I pedoni non stanno su traversa 1 o 8.
+            # Pawns do not sit on rank 1 or 8.
             pool = free if piece != chess.PAWN else [s for s in free if 8 <= s < 56]
             if not pool:
                 ok = False
@@ -68,17 +68,18 @@ def random_position(w, b, rng, tries=400):
             continue
         board.turn = rng.choice([chess.WHITE, chess.BLACK])
         board.clear_stack()
-        # Deve essere una posizione giocabile: legale, non gia' finita, e il re
-        # avversario non sotto scacco (sarebbe il turno sbagliato).
+        # It has to be a playable position: legal, not already over, and the
+        # opponent's king not in check (that would be the wrong side to move).
         if not board.is_valid():
             continue
         if board.is_game_over(claim_draw=False):
             continue
-        # Niente scacchi. Scegliendo il tratto a caso e filtrando poi con
-        # is_valid(), le posizioni in cui il lato FORTE da' scacco vengono
-        # scartate solo quando tocca a lui: il campione si riempie di posizioni
-        # in cui il lato al tratto e' sotto scacco (misurato: 33,5%) e ogni
-        # firma sembra sottovalutata. Escluderle rende il campione simmetrico.
+        # No checks. Choosing the side to move at random and then filtering
+        # with is_valid() discards the positions where the STRONGER side gives
+        # check only when it is that side's turn: the sample fills up with
+        # positions where the side to move is in check (measured: 33.5%) and
+        # every signature looks underestimated. Excluding them keeps the sample
+        # symmetric.
         if board.is_check():
             continue
         return board.fen()
@@ -89,7 +90,7 @@ def main():
     per_sig = int(sys.argv[1]) if len(sys.argv) > 1 else 100
     rng = random.Random(20260825)
     sigs = signatures()
-    print(f"# {len(sigs)} firme x {per_sig} posizioni", file=sys.stderr)
+    print(f"# {len(sigs)} signatures x {per_sig} positions", file=sys.stderr)
     emitted = 0
     for w, b in sigs:
         label = name(w, b)
@@ -102,7 +103,7 @@ def main():
                 seen.add(fen)
                 print(f"{label}\t{fen}")
                 emitted += 1
-    print(f"# {emitted} posizioni emesse", file=sys.stderr)
+    print(f"# {emitted} positions emitted", file=sys.stderr)
 
 
 if __name__ == "__main__":

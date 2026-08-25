@@ -1,18 +1,18 @@
-// Valutazione statica in blocco della rete a un layer, una FEN per riga da
-// stdin, "eval<TAB>bucket<TAB>fen" su stdout. Serve all'audit di copertura:
-// misurare dove la rete sbaglia richiede decine di migliaia di posizioni, e
-// sanity.rs prende le FEN da argv, una manciata alla volta.
+// Bulk static evaluation with the single-layer net: one FEN per line on stdin,
+// "eval<TAB>bucket<TAB>fen" on stdout. The coverage audit needs it: measuring
+// where the net is wrong takes tens of thousands of positions, and sanity.rs
+// takes its FENs from argv, a handful at a time.
 //
 //   g++ -std=c++23 -O2 -march=native nnue/tools/evalfens.cpp -o /tmp/evalfens
 //   /tmp/evalfens <net.bin> < fens.txt
 //
-// Il forward e' la trascrizione di NNUE::evaluate (nnue.cpp): SCReLU sulle due
-// prospettive, somma, /QA, bias, *SCALE/(QA*QB). L'accumulatore viene da
-// fen_accumulator.hpp, gia' condivisa con deepcheck e reorder.
+// The forward is a transcription of NNUE::evaluate (nnue.cpp): SCReLU over the
+// two perspectives, sum, /QA, bias, *SCALE/(QA*QB). The accumulator comes from
+// fen_accumulator.hpp, already shared with deepcheck and reorder.
 //
-// La rete a un layer viene letta ANCHE come NetworkDeep per il solo prefisso
-// l0: i due formati hanno l0w/l0b identici per costruzione, ed e' esattamente
-// cio' su cui il motore fa affidamento (vedi gli static_assert in nnue.cpp).
+// The single-layer net is ALSO read as a NetworkDeep for the l0 prefix alone:
+// the two formats have identical l0w/l0b by construction, which is exactly what
+// the engine relies on (see the static_asserts in nnue.cpp).
 
 #include "fen_accumulator.hpp"
 #include "../network.hpp"
@@ -40,14 +40,14 @@ int32_t forwardHalf(const int16_t* acc, const int16_t* w) {
 
 int main(int argc, char** argv) {
     if (argc < 2) {
-        std::fprintf(stderr, "uso: evalfens <net.bin> < fens.txt\n");
+        std::fprintf(stderr, "usage: evalfens <net.bin> < fens.txt\n");
         return 2;
     }
     std::ifstream in(argv[1], std::ios::binary | std::ios::ate);
-    if (!in) { std::fprintf(stderr, "non apribile: %s\n", argv[1]); return 1; }
+    if (!in) { std::fprintf(stderr, "cannot open: %s\n", argv[1]); return 1; }
     const auto size = static_cast<size_t>(in.tellg());
     if (size < NNUE::NETWORK_PAYLOAD_BYTES) {
-        std::fprintf(stderr, "taglia %zu: non e' una rete a un layer (attesi >= %zu)\n",
+        std::fprintf(stderr, "size %zu: not a single-layer net (expected >= %zu)\n",
                      size, NNUE::NETWORK_PAYLOAD_BYTES);
         return 1;
     }
@@ -56,11 +56,11 @@ int main(int argc, char** argv) {
     auto buf = std::unique_ptr<NNUE::Network>(new NNUE::Network);
     if (!in.read(reinterpret_cast<char*>(buf.get()),
                  static_cast<std::streamsize>(NNUE::NETWORK_PAYLOAD_BYTES))) {
-        std::fprintf(stderr, "lettura corta\n");
+        std::fprintf(stderr, "short read\n");
         return 1;
     }
     const NNUE::Network& net = *buf;
-    // Vista sul solo prefisso l0, che i due formati condividono byte per byte.
+    // A view on the l0 prefix alone, which both formats share byte for byte.
     const auto& deepView = *reinterpret_cast<const NNUE::Deep::NetworkDeep*>(buf.get());
 
     std::vector<int16_t> accUs, accThem;

@@ -1,17 +1,17 @@
 #!/usr/bin/env python3
-"""Oracolo Stockfish per l'audit di copertura.
+"""Stockfish oracle for the coverage audit.
 
-Legge "firma<TAB>fen" da stdin, scrive "firma<TAB>cp<TAB>fen" su stdout, con cp
-dal punto di vista del lato al tratto (come la nostra eval). I punteggi di matto
-diventano +-MATE_CP: per l'audit conta "quanto in vantaggio", non il numero di
-mosse.
+Reads "signature<TAB>fen" on stdin, writes "signature<TAB>cp<TAB>fen" on stdout,
+with cp from the side-to-move's point of view (like our own eval). Mate scores
+become +-MATE_CP: what matters for the audit is "how far ahead", not the number
+of moves.
 
   ./sf_oracle.py <sf_bin> [nodi|static] [processi] < positions.tsv > oracle.tsv
 
-Con "static" si usa il comando `eval` di Stockfish invece della ricerca. Serve
-per confrontare mele con mele: la nostra e' una valutazione STATICA, e una
-ricerca da 200k nodi trova tattiche che nessuna statica puo' vedere -- il
-confronto misurerebbe "statica contro ricerca", non i buchi di copertura.
+With "static" it uses Stockfish's `eval` command instead of a search. That is
+needed to compare like with like: ours is a STATIC evaluation, and a 200k-node
+search finds tactics no static eval can see -- the comparison would measure
+"static versus search", not coverage holes.
 """
 import os
 import subprocess
@@ -51,8 +51,8 @@ def run_chunk(args):
                         cp = None
                     break
             if cp is not None:
-                # `eval` riporta dal punto di vista del BIANCO; noi vogliamo
-                # dal lato al tratto, come la nostra eval.
+                # `eval` reports from WHITE's point of view; we want it from
+                # the side to move, like our own eval.
                 if fen.split()[1] == "b":
                     cp = -cp
                 out.append(f"{sig}\t{cp}\t{fen}")
@@ -91,13 +91,13 @@ def main():
     procs = int(sys.argv[3]) if len(sys.argv) > 3 else max(1, (os.cpu_count() or 4) - 1)
 
     rows = [tuple(l.rstrip("\n").split("\t")) for l in sys.stdin if l.strip()]
-    # Molti chunk piccoli invece di uno per processo: i risultati escono via via
-    # (con uno per processo il file resta vuoto fino alla fine) e un chunk lento
-    # non tiene fermo un core.
+    # Many small chunks instead of one per process: results come out as they
+    # land (with one per process the file stays empty until the end) and a slow
+    # chunk does not idle a core.
     size = max(50, len(rows) // (procs * 20))
     chunks = [(sf_bin, nodes, rows[i:i + size]) for i in range(0, len(rows), size)]
-    print(f"# {len(rows)} posizioni, {procs} processi, {nodes} nodi, "
-          f"{len(chunks)} chunk da {size}", file=sys.stderr)
+    print(f"# {len(rows)} positions, {procs} processes, {nodes} nodes, "
+          f"{len(chunks)} chunks of {size}", file=sys.stderr)
     done = 0
     with ProcessPoolExecutor(max_workers=procs) as ex:
         for res in ex.map(run_chunk, chunks):
