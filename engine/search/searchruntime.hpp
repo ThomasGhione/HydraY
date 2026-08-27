@@ -23,6 +23,15 @@ struct SearchRuntime {
     // Lazy SMP helper thread: skips the Syzygy root probe (tb_probe_root is
     // main-thread-only in Fathom) and never writes to stdout.
     bool     isHelper      = false;
+    // Lazy SMP depth diversification. Without it every helper walks the same
+    // depth sequence over the same tree and the pack mostly re-derives the
+    // main thread's work; the shared TT then makes time-to-depth look good
+    // while adding little real information. A helper skips a depth when
+    // ((depth + phase) / size) is odd, so the threads spread across depths
+    // instead of moving in lockstep.
+    // size 0 = never skip: the main thread's schedule, unchanged.
+    int      depthSkipSize  = 0;
+    int      depthSkipPhase = 0;
     // UCI `go nodes N`: 0 = unlimited. Checked per-node against
     // (runtime.nodesSearched + *counter), so the total across IDS iterations
     // is bounded. Each Lazy SMP helper also bounds itself by the same value;

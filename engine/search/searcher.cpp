@@ -257,6 +257,14 @@ chess::Move Searcher::searchBestMove(
         hr.softResetHistory();
         slot.board = board;
 
+        // Spread the helpers over the depth sequence. The pattern repeats every
+        // 20 helpers: with few threads the early entries alternate depths, with
+        // many the later ones sit further apart.
+        static constexpr int SKIP_SIZE[20]  = {1,1,2,2,2,2,3,3,3,3,3,3,4,4,4,4,4,4,4,4};
+        static constexpr int SKIP_PHASE[20] = {0,1,0,1,2,3,0,1,2,3,4,5,0,1,2,3,4,5,6,7};
+        hr.depthSkipSize  = SKIP_SIZE[i % 20];
+        hr.depthSkipPhase = SKIP_PHASE[i % 20];
+
         const int startDepth = 1 + (i & 1);
         helpers.emplace_back([&slot, startDepth, targetDepth] {
             (void)runIterativeDeepening(slot.board, slot.runtime, startDepth, targetDepth);
@@ -1311,6 +1319,12 @@ Searcher::IterativeSearchResult Searcher::runIterativeDeepening(
     for (int currentDepth = firstDepth; currentDepth <= maxDepth; ++currentDepth) {
         if (runtime.shouldAbort()) {
             break;
+        }
+
+        // Depth diversification (helpers only; size 0 on the main thread).
+        if (runtime.depthSkipSize > 0
+            && (((currentDepth + runtime.depthSkipPhase) / runtime.depthSkipSize) & 1) != 0) {
+            continue;
         }
 
         // Soft limit: once a move is in hand, do not open a depth we almost
