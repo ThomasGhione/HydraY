@@ -573,7 +573,7 @@ Searcher::SearchMoveResult Searcher::searchMoves(
 
         // Late captures are reduced too: move ordering ranks good captures early,
         // so a capture reaching this index is almost always a bad/losing one.
-        const bool lmrStructuralCandidate = (ctx.depth >= 4)
+        const bool lmrStructuralCandidate = (ctx.depth >= 3)
             && (moveIndex >= 4)
             && !isPromotionCandidate;
 
