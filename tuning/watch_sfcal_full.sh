@@ -6,7 +6,16 @@
 #   watch -n 30 tuning/watch_sfcal_full.sh [logfile]
 set -uo pipefail
 cd "$(dirname -- "${BASH_SOURCE[0]}")"
-log="${1:-log_sfcal_voting.txt}"
+# Default to the most recently modified calibration log, NOT a hardcoded name:
+# ordo (above) always fits the newest PGN, so a stale default here silently
+# pairs a live rating with a previous run's per-level table — which reads as a
+# real result and is not obviously wrong. Pass a filename to pin one run.
+log="${1:-$(ls -t log_sfcal_*.txt 2>/dev/null | head -1)}"
+if [[ -z "${log}" || ! -f "${log}" ]]; then
+    echo "no calibration log found (looked for log_sfcal_*.txt)" >&2
+    exit 1
+fi
+echo "=== source: ${log} ======================================"
 
 echo "=== fitted ratings (ordo) ==============================="
 ./watch_calibration.sh 2>/dev/null | sed -n '/PLAYER/,/^$/p'
