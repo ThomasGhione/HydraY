@@ -137,7 +137,7 @@ inline constexpr int32_t QSEARCH_DELTA_MARGIN = 1010; // == QUEEN_VALUE + 50
 // ratio runs 2.7 (pawn) to 1.4 (queen); the high end is eval saturation in
 // already-won positions, so the honest figure for the regime that matters
 // (roughly level positions, where pruning decisions bite) is ~2.2x.
-inline constexpr int32_t MATERIAL_TO_EVAL_PCT = 220;
+inline constexpr int32_t MATERIAL_TO_EVAL_PCT = 260;
 
 constexpr int32_t materialToEval(int32_t material) noexcept {
     return material * MATERIAL_TO_EVAL_PCT / 100;
