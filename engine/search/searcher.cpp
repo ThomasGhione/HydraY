@@ -1066,7 +1066,7 @@ int32_t Searcher::quiescenceSearch(
         }
         updateBound(standPat, alpha);
 
-        if (shouldDeltaPrune(standPat, QSEARCH_DELTA_MARGIN, alpha)) {
+        if (shouldDeltaPrune(standPat, materialToEval(QSEARCH_DELTA_MARGIN), alpha)) {
             return alpha; // negamax delta-prune fail-low
         }
 

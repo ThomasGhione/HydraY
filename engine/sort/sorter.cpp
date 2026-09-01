@@ -276,11 +276,11 @@ MovePicker Sorter::sortTacticalMoves(
 
             // Delta prune: capture cannot improve standPat past alpha. Matches
             // Searcher::shouldDeltaPrune semantics (<=, fails low on equal too).
-            if (standPat + capturedValue + FUTILITY_MARGIN <= alpha) continue;
+            if (standPat + materialToEval(capturedValue) + FUTILITY_MARGIN <= alpha) continue;
 
             const int32_t see = staticExchangeEvaluation(b, m);
             if (see < seeThreshold) continue;
-            if (standPat + see + MOVE_DELTA_MARGIN <= alpha) continue;
+            if (standPat + materialToEval(see) + MOVE_DELTA_MARGIN <= alpha) continue;
 
             score = CAPTURE_BASE_SCORE + see + MVV_TABLE[victimType];
         } else {

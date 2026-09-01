@@ -127,6 +127,22 @@ inline constexpr uint8_t MAX_QSEARCH_DEPTH = 48;
 // because each of its widenings pushed the margin above this value.
 inline constexpr int32_t QSEARCH_DELTA_MARGIN = 1010; // == QUEEN_VALUE + 50
 
+// Material and evaluation are denominated in DIFFERENT units. PIECE_VALUES and
+// SEE are handcrafted-era centipawns; the NNUE output runs hotter, so adding a
+// raw material amount to a stand-pat and comparing against alpha understates
+// what a capture can recover, and over-prunes.
+//
+// Measured on the shipped net (177 piece-removal pairs, depth 8): deleting a
+// piece moves the score by 1.9x its piece value overall, and the per-piece
+// ratio runs 2.7 (pawn) to 1.4 (queen); the high end is eval saturation in
+// already-won positions, so the honest figure for the regime that matters
+// (roughly level positions, where pruning decisions bite) is ~2.2x.
+inline constexpr int32_t MATERIAL_TO_EVAL_PCT = 220;
+
+constexpr int32_t materialToEval(int32_t material) noexcept {
+    return material * MATERIAL_TO_EVAL_PCT / 100;
+}
+
 // ===================================================
 // ASPIRATION WINDOW
 // ===================================================
