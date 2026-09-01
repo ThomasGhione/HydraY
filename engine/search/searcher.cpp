@@ -913,7 +913,11 @@ int32_t Searcher::searchPosition(
         for (int i = 0; i < captures.size; ++i) {
             const auto& mc = captures[i];
             const int32_t see = Sorter::staticExchangeEvaluation(b, mc);
-            if (see < PROBCUT_MARGIN) continue;
+            // PROBCUT_MARGIN is an eval-scale quantity (it is added to beta
+            // above), so the SEE it gates has to be converted first — comparing
+            // raw material against it makes the filter ~MATERIAL_TO_EVAL_PCT
+            // too strict and discards captures that would clear the bound.
+            if (materialToEval(see) < PROBCUT_MARGIN) continue;
             chess::Board::MoveState pcState;
             b.doMove(mc, pcState);
             // Negamax child: negate result and swap/negate the scout window.
