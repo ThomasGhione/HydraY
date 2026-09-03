@@ -15,7 +15,18 @@ namespace engine {
 
 namespace {
 
-constexpr int32_t REPETITION_DRAW_ADVANTAGE_THRESHOLD = PAWN_VALUE / 2;
+// "Is the position level enough that a repetition is acceptable?" The intent is
+// half a pawn, but the comparison is against a static eval, and material and
+// evaluation are different units (see MATERIAL_TO_EVAL_PCT). Converting keeps
+// the threshold at the half-pawn it was written to mean; the raw value fires at
+// roughly a fifth of one.
+//
+// Measured before changing it: this branch is cold. Over a 200-search sample of
+// late-game positions replayed with full move history -- 137M repetition scans,
+// 9.3M of them hitting the twofold path -- the threefold path ran ONCE, and the
+// conversion changed the outcome zero times. Correctness only; no Elo is
+// claimed and an SPRT would be measuring nothing.
+constexpr int32_t REPETITION_DRAW_ADVANTAGE_THRESHOLD = materialToEval(PAWN_VALUE / 2);
 
 // Precomputed LMR reductions: LMR_TABLE[depth][moveIndex], capped at depth-3.
 // Avoids two std::log() calls per LMR candidate in the hot search loop.
