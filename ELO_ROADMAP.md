@@ -93,7 +93,50 @@ better. **This is exactly the bug class that just paid +82, in a code path that
 decides whole half-points.** Fix: `materialToEval(PAWN_VALUE / 2)`.
 *Highest-confidence untested item in this document.*
 
-**1.2 Aspiration window magnitudes were never rescaled [C]**
+**1.2 Aspiration windows — TESTED AND DEAD [M]. And it reclassifies the rest of §1.**
+
+> **Resolved 2026-09-03. Rescaled by the measured 2.6x. The mechanism worked
+> exactly as predicted and the engine still got weaker.**
+>
+> | | before | after 2.6x |
+> |---|---|---|
+> | first window OK | 50.2% | **76.7%** |
+> | re-searches / iteration | 0.787 | **0.309** |
+> | fail low / high | 868 / 850 | 322 / 341 |
+> | bench6 nodes | 1,953,820 | **3,344,881 (+71%)** |
+>
+> SPRT: **−7.72 ±10.78, LOS 7.30%, LLR −1.04 @ 1800** (stopped on trend). A wider
+> root window prunes less at *every* node, and that cost buried the 61% cut in
+> re-searches.
+>
+> Then the deciding measurement — sweeping the factor both ways:
+>
+> | factor | 50% | 70% | 85% | **100%** | 130% | 160% | 200% | 260% |
+> |---|---|---|---|---|---|---|---|---|
+> | bench6 vs base | +21.7% | +10.6% | +26.3% | **0.0%** | +15.4% | +41.6% | +55.5% | +71.2% |
+>
+> **The current values are a local minimum in both directions.** They are not
+> mis-set; the search evolved around them.
+>
+> ### ⚠️ The lesson, which invalidates part of this document's premise
+>
+> **"Never rescaled after the eval scale changed" is a hypothesis, not a defect.**
+> Two different things were being conflated:
+>
+> 1. **Dimensional error** — an expression that *adds material to eval*
+>    (`standPat + capturedValue`, `see < PROBCUT_MARGIN`). Objectively wrong at
+>    any magnitude. This is what paid **+82**.
+> 2. **Magnitude drift** — a constant that is dimensionally *consistent* (eval
+>    compared against eval) whose nominal chess meaning shifted. Here the value
+>    may be empirically fine regardless of what the comment claims it means.
+>
+> The aspiration window is type 2, and so are §1.3 and §1.4 below — **downgrade
+> them accordingly.** The type-1 seam is now fully mined: four sites fixed, the
+> fifth (§1.1) was a dead branch. *Do not go looking for more Elo in §1.*
+
+*Original analysis, kept for the record:*
+
+**1.2b Aspiration window magnitudes were never rescaled [C]**
 
 ```cpp
 // searcher.cpp:1412
@@ -319,8 +362,8 @@ Ordered by (expected Elo × confidence) ÷ cost.
 
 | # | action | evidence | cost |
 |---|---|---|---|
-| ~~1~~ | ~~`REPETITION_DRAW_ADVANTAGE_THRESHOLD`~~ | **DONE `5291b28` — dead branch, 0 Elo. Ranking was wrong.** | — |
-| **1** | **Rescale aspiration window constants** | **[C]** never tuned, never rescaled, 2.6× off — and unlike §1.1 this runs *every iteration* | small + SPRT |
+| ~~1~~ | ~~`REPETITION_DRAW_ADVANTAGE_THRESHOLD`~~ | **DONE `5291b28` — dead branch, 0 Elo. Ranking wrong.** | — |
+| ~~2~~ | ~~Rescale aspiration windows~~ | **DEAD — −7.72, and 100% is a local minimum both ways. Premise wrong.** | — |
 | 3 | Finish the ProbCut SPRT | **[M]** unvalidated code is shipped | machine time only |
 | 4 | Settle the `updateMove` benchmark contradiction | **[C]** hottest function | ~1 h |
 | 5 | Hoist the `excludedMove` invariant; fail-soft delta return | **[C]** free, node-identical | ~1 h |
@@ -329,6 +372,15 @@ Ordered by (expected Elo × confidence) ÷ cost.
 | 8 | `contHist` cache-cost experiment | **[M]** 785 KiB, never priced | ~half day |
 | 9 | Hunt the stalls bug | **[M]** 0.17%, whole games | open-ended |
 | 10 | NNUE L2 width 16 → 32 | **[X]** best-evidenced architecture lever | training run |
+
+**Scoreboard on this document's own predictions (2026-09-03).** My top two
+ranked items were both wrong: #1 was a dead branch (0 Elo), #2 measured −7.72
+and its premise turned out to be backwards. What *did* pay was
+`countRepetitions` (§2.5) — which was not on the list at all and surfaced only
+from instrumenting #1. **Treat the ranking below as hypotheses to be measured,
+not a queue to be worked.** Cost so far of following the discipline instead of
+the list: ~2 hours, versus the ~8 an unmeasured march down the ranking would
+have spent to reach the same place.
 
 **Method note.** Today's result did not come from a list like this one. It came
 from analysing 2400 games that had *already been played*. Of the candidates I
