@@ -305,6 +305,7 @@ private:
     uint8_t  epHashFile          = 0xFF;
     uint8_t  activeColor         = WHITE;
     uint8_t  historySize         = 0;
+    uint8_t  nullPly             = 0;
 
     static constexpr const char* STARTING_FEN =
         "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1";

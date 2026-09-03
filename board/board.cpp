@@ -307,6 +307,7 @@ void Board::recomputeHashAndEp() noexcept {
 void Board::rebuildRepetitionHistory() noexcept {
     recomputeHashAndEp();
     historySize = 0;
+    nullPly = 0;
     repetitionHistory[historySize++] = currentHash;
 }
 
@@ -327,8 +328,12 @@ void Board::updateRepetitionAfterMove(bool resetHistory, MoveState& st) noexcept
 }
 
 int Board::countRepetitions() const noexcept {
-    const uint64_t* const begin = repetitionHistory.data();
-    return static_cast<int>(std::count(begin, begin + historySize, currentHash));
+    int i = static_cast<int>(historySize) - 1 - static_cast<int>(nullPly & 1u);
+    int count = 0;
+    for (; i >= 0; i -= 2) {
+        count += (repetitionHistory[static_cast<size_t>(i)] == currentHash);
+    }
+    return count;
 }
 
 bool Board::hasInsufficientMaterialDraw() const noexcept {

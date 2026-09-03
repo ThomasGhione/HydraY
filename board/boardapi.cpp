@@ -165,10 +165,12 @@ void Board::doNullMove(MoveState& st) noexcept {
     currentHash = newHash;
     // Null move is a search artifact and must not enter repetition history.
     // Otherwise threefold detection in subtree can be polluted.
+    ++nullPly;
 }
 
 __attribute__((hot))
 void Board::undoNullMove(const MoveState& st) noexcept {
     restoreState(st);
+    --nullPly;
 }
 } // namespace chess
