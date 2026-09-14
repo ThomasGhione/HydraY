@@ -11,12 +11,27 @@
 #   WATCH=1 ./tuning/watch_sprt.sh                  # refresh every 30s
 
 set -uo pipefail
+# Resolve a path argument against the CALLER's directory, not this one: the cd
+# below used to make the invocation in the usage block above fail with "no SPRT
+# log found", because tuning/log_sprt_foo.txt was looked up inside tuning/.
+orig_pwd="${PWD}"
 cd -- "$(dirname -- "${BASH_SOURCE[0]}")"
 
-log="${1:-$(ls -t log_sprt_*.txt 2>/dev/null | head -1)}"
-if [[ -z "${log}" || ! -f "${log}" ]]; then
-    echo "no SPRT log found (looked for tuning/log_sprt_*.txt)" >&2
-    exit 1
+log="${1:-}"
+if [[ -n "${log}" ]]; then
+    if [[ "${log}" != /* && -f "${orig_pwd}/${log}" ]]; then
+        log="${orig_pwd}/${log}"
+    fi
+    if [[ ! -f "${log}" ]]; then
+        echo "no such SPRT log: ${1}" >&2
+        exit 1
+    fi
+else
+    log="$(ls -t log_sprt_*.txt 2>/dev/null | head -1)"
+    if [[ -z "${log}" || ! -f "${log}" ]]; then
+        echo "no SPRT log found (looked for tuning/log_sprt_*.txt)" >&2
+        exit 1
+    fi
 fi
 
 show() {

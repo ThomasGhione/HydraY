@@ -184,6 +184,11 @@ struct Options {
     uint64_t count = 0;      // 0 = to end of file
     int      threads = 0;    // 0 = hardware concurrency
     uint64_t selfcheck = 0;
+    // Writes one i16 evaluation per record, in file order, so two nets can be
+    // compared position by position. Nets with different king-bucket counts
+    // cannot live in one binary (the map is compiled in), so the comparison has
+    // to go through two runs and a join on record index. Forces one thread.
+    std::string dumpEvals;
 };
 
 // One contiguous record range, read in blocks. A globally shuffled file makes
@@ -196,8 +201,15 @@ void scanRange(const Evaluator& ev, const std::string& path, const Options& opt,
     if (!in) return;
     in.seekg(static_cast<std::streamoff>(first * sizeof(Record)));
 
+    std::ofstream dump;
+    if (!opt.dumpEvals.empty()) {
+        dump.open(opt.dumpEvals, std::ios::binary);
+        if (!dump) return;
+    }
+
     std::vector<Record> buf(BLOCK);
     std::vector<int16_t> accUs(HIDDEN), accThem(HIDDEN);
+    std::vector<int16_t> dumpBuf;
 
     uint64_t left = n;
     while (left > 0) {
@@ -207,6 +219,7 @@ void scanRange(const Evaluator& ev, const std::string& path, const Options& opt,
         const size_t got = static_cast<size_t>(in.gcount()) / sizeof(Record);
         if (got == 0) break;
         left -= got;
+        if (dump.is_open()) dumpBuf.clear();
 
         for (size_t i = 0; i < got; ++i) {
             const Record& r = buf[i];
@@ -222,6 +235,13 @@ void scanRange(const Evaluator& ev, const std::string& path, const Options& opt,
             out.count[bucket] += 1;
             out.absScore += std::abs(static_cast<double>(r.score));
             if (r.result < 3) out.result[r.result] += 1;
+            if (dump.is_open()) {
+                dumpBuf.push_back(static_cast<int16_t>(std::clamp(cp, -32000, 32000)));
+            }
+        }
+        if (dump.is_open() && !dumpBuf.empty()) {
+            dump.write(reinterpret_cast<const char*>(dumpBuf.data()),
+                       static_cast<std::streamsize>(dumpBuf.size() * sizeof(int16_t)));
         }
     }
 }
@@ -316,7 +336,8 @@ int main(int argc, char** argv) {
     if (argc < 3) {
         std::fprintf(stderr,
             "usage: holdoutloss <net.bin> <data.bin> [--offset N] [--count N]\n"
-            "                   [--threads N] [--wdl F] [--scale F] [--selfcheck N]\n");
+            "                   [--threads N] [--wdl F] [--scale F] [--selfcheck N]\n"
+            "                   [--dumpevals FILE]\n");
         return 2;
     }
     const std::string netPath = argv[1];
@@ -331,6 +352,7 @@ int main(int argc, char** argv) {
         else if (a == "--selfcheck" && hasValue) { if (!parseU64(argv[++i], opt.selfcheck)) return 2; }
         else if (a == "--threads" && hasValue) { opt.threads = std::atoi(argv[++i]); }
         else if (a == "--wdl" && hasValue)     { opt.blend = std::atof(argv[++i]); }
+        else if (a == "--dumpevals" && hasValue) { opt.dumpEvals = argv[++i]; }
         else if (a == "--scale" && hasValue)   { opt.scale = std::atof(argv[++i]); }
         else { std::fprintf(stderr, "unknown option: %s\n", a.c_str()); return 2; }
     }
@@ -417,7 +439,9 @@ int main(int argc, char** argv) {
 
     if (opt.selfcheck > 0 && !selfcheck(ev, dataPath, opt.selfcheck)) return 1;
 
-    int threads = opt.threads > 0 ? opt.threads
+    // Dumping must keep file order, so it runs on one thread.
+    int threads = !opt.dumpEvals.empty() ? 1
+                : opt.threads > 0 ? opt.threads
                                   : static_cast<int>(std::thread::hardware_concurrency());
     if (threads < 1) threads = 1;
     if (static_cast<uint64_t>(threads) > n) threads = static_cast<int>(n);
