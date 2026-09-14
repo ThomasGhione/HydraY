@@ -415,6 +415,39 @@ nothing.
 | `fullMoveClock` uint8 saturation | **provably 0 Elo** - see §9 |
 | `MAX_QSEARCH_DEPTH` vs absolute ply | **0 firings in 36.5M qsearch calls** - see §9 |
 | contHist dead row removed (7→6) | node-identical, NPS-neutral - see §9 |
+| 8 king buckets on v7, 160 SB | TC **−4.65 ±5.30 @7700 (H0)**; fixed 150k nodes −2.59 ±4.97 @8576 - see §8.1 |
+
+### 8.1 Eight king buckets (2026-09-14)
+
+Branch `halfka8-v3`: a strict refinement of the 4-bucket map (splits rank 1
+corner/b-g, rank 2 centre/wings, ranks 3-4 from 5-8), deep16, v7, 160 SB, the
+same recipe as the champion. Net kept at `nnue/data/hydray-h8-v7-160sb.nnue`.
+
+Ruled out, each by direct measurement:
+
+- **Undertraining / bad fit.** Train loss on v7 is 0.6-1.4% better than the
+  champion's at every bucket.
+- **Eval scale drift** (the `MATERIAL_TO_EVAL_PCT` question). Slope 0.9991 over
+  1.5M positions; the per-net sigmoid K is identical.
+- **Dead buckets.** Ablating each bucket's delta moves its positions' evals; none
+  is a copy of the factoriser.
+- **Node inflation.** At fixed nodes the searched depth is the same (−0.006 ply).
+  The TC depth loss (−0.095 ply) is the −7.1% NPS, larger in the endgame.
+- **Worse move ranking.** 29,703 parents, quiet siblings scored by Stockfish
+  MultiPV, bootstrapped by game. The positive control (8b@80 vs 8b@160) resolves
+  clearly: top1 −2.5pp, regret +15.3cp. Champion vs 8b@160: top1 +0.25pp
+  [−0.19, +0.66], regret −0.69cp [−2.84, +1.36], rho5 +0.007 [+0.003, +0.011].
+  A tie, with the champion marginally ahead on top-5 order, uniformly across
+  king regions (including the ranks the new map splits).
+
+Not measurable at our scale: out-of-sample WDL. The positive control had 24-34%
+power; separating nets this close needs ~190-280k games.
+
+Open: overfitting vs a better fit the search cannot use. Both predict a lower
+train loss and no ranking gain, and without a real validation split they cannot
+be told apart. The decision does not depend on it: with v7 and this budget the
+extra buckets buy nothing and cost 7% NPS. Revisit only with a different dataset,
+not with more epochs or a retuned eval scale.
 
 ---
 
