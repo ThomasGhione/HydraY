@@ -239,8 +239,11 @@ int32_t forwardSimd(const NetworkDeep& net,
     // Input-driven dot product. By broadcasting the four bytes across every
     // lane, vpdpbusd's lane `o` already accumulates output `o`'s dot product:
     // no horizontal reductions at the end.
-    // Four groups per iteration because with only two accumulators the
-    // dependent chain would be as long as the whole loop.
+    // A group feeds four operands (a*, outputs 0-7 .. 24-31). Two groups per
+    // iteration, each with its own four accumulators, keep eight vpdpbusd per
+    // iteration: with one set of accumulators the dependent chain would be as
+    // long as the whole loop, and three groups would not fit the sixteen ymm
+    // registers together with their broadcasts.
     {
         const int32_t* dw = reinterpret_cast<const int32_t*>(h8);
         const auto (&wT)[HIDDEN / 4][L1_SIZE * 4] = net.l1wT[outputBucket];
@@ -248,33 +251,34 @@ int32_t forwardSimd(const NetworkDeep& net,
             return _mm256_loadu_si256(reinterpret_cast<const __m256i*>(p));
         };
         __m256i a0 = _mm256_setzero_si256(), a1 = a0, a2 = a0, a3 = a0;
-        __m256i a4 = a0, a5 = a0, a6 = a0, a7 = a0;
+        __m256i b0 = a0, b1 = a0, b2 = a0, b3 = a0;
         int n = 0;
-        for (; n + 4 <= count; n += 4) {
-            const int j0 = nnz[n], j1 = nnz[n + 1], j2 = nnz[n + 2], j3 = nnz[n + 3];
+        for (; n + 2 <= count; n += 2) {
+            const int j0 = nnz[n], j1 = nnz[n + 1];
             const __m256i v0 = _mm256_set1_epi32(dw[j0]), v1 = _mm256_set1_epi32(dw[j1]);
-            const __m256i v2 = _mm256_set1_epi32(dw[j2]), v3 = _mm256_set1_epi32(dw[j3]);
             a0 = _mm256_dpbusd_avx_epi32(a0, v0, ldw(wT[j0]));
             a1 = _mm256_dpbusd_avx_epi32(a1, v0, ldw(wT[j0] + 32));
-            a2 = _mm256_dpbusd_avx_epi32(a2, v1, ldw(wT[j1]));
-            a3 = _mm256_dpbusd_avx_epi32(a3, v1, ldw(wT[j1] + 32));
-            a4 = _mm256_dpbusd_avx_epi32(a4, v2, ldw(wT[j2]));
-            a5 = _mm256_dpbusd_avx_epi32(a5, v2, ldw(wT[j2] + 32));
-            a6 = _mm256_dpbusd_avx_epi32(a6, v3, ldw(wT[j3]));
-            a7 = _mm256_dpbusd_avx_epi32(a7, v3, ldw(wT[j3] + 32));
+            a2 = _mm256_dpbusd_avx_epi32(a2, v0, ldw(wT[j0] + 64));
+            a3 = _mm256_dpbusd_avx_epi32(a3, v0, ldw(wT[j0] + 96));
+            b0 = _mm256_dpbusd_avx_epi32(b0, v1, ldw(wT[j1]));
+            b1 = _mm256_dpbusd_avx_epi32(b1, v1, ldw(wT[j1] + 32));
+            b2 = _mm256_dpbusd_avx_epi32(b2, v1, ldw(wT[j1] + 64));
+            b3 = _mm256_dpbusd_avx_epi32(b3, v1, ldw(wT[j1] + 96));
         }
-        for (; n < count; ++n) {
+        if (n < count) {
             const int j = nnz[n];
             const __m256i v = _mm256_set1_epi32(dw[j]);
             a0 = _mm256_dpbusd_avx_epi32(a0, v, ldw(wT[j]));
             a1 = _mm256_dpbusd_avx_epi32(a1, v, ldw(wT[j] + 32));
+            a2 = _mm256_dpbusd_avx_epi32(a2, v, ldw(wT[j] + 64));
+            a3 = _mm256_dpbusd_avx_epi32(a3, v, ldw(wT[j] + 96));
         }
-        const __m256i lo = _mm256_add_epi32(_mm256_add_epi32(a0, a2), _mm256_add_epi32(a4, a6));
-        const __m256i hi = _mm256_add_epi32(_mm256_add_epi32(a1, a3), _mm256_add_epi32(a5, a7));
-        _mm256_store_si256(reinterpret_cast<__m256i*>(sums), lo);
-        _mm256_store_si256(reinterpret_cast<__m256i*>(sums + 8), hi);
+        _mm256_store_si256(reinterpret_cast<__m256i*>(sums),      _mm256_add_epi32(a0, b0));
+        _mm256_store_si256(reinterpret_cast<__m256i*>(sums + 8),  _mm256_add_epi32(a1, b1));
+        _mm256_store_si256(reinterpret_cast<__m256i*>(sums + 16), _mm256_add_epi32(a2, b2));
+        _mm256_store_si256(reinterpret_cast<__m256i*>(sums + 24), _mm256_add_epi32(a3, b3));
     }
-    static_assert(L1_SIZE == 16, "il percorso sparso usa due accumulatori da otto corsie");
+    static_assert(L1_SIZE == 32, "the sparse path feeds four eight-lane operands per group");
 #else
     // Without VNNI: i16 lanes, with the weights already widened at load time
     // (see l1w16 in loadFromMemory) to drop a cvtepi8_epi16 from the inner loop.
@@ -354,9 +358,9 @@ bool loadFromMemory(const unsigned char* data, size_t size, NetworkDeep& net) no
                 net.l1w16[b][o][i] = net.l1w[b][o][i];
 
     // l1wT: the same weights, indexed by GROUP OF FOUR INPUTS instead of by
-    // output, so the sparse loop finds everything a group needs in 64
-    // contiguous bytes. The two halves of those 64 bytes are the two vpdpbusd
-    // operands: outputs 0-7 and outputs 8-15.
+    // output, so the sparse loop finds everything a group needs in 128
+    // contiguous bytes. Output o's four weights sit at 4*o: every 32 bytes are
+    // one vpdpbusd operand covering eight outputs.
     //
     // PACKUS_MAP maps the position within the 32-wide block that the pairwise
     // pass writes to the originating neuron. Absorbing packus's lane swap here
@@ -368,7 +372,7 @@ bool loadFromMemory(const unsigned char* data, size_t size, NetworkDeep& net) no
                     const int pos   = 4 * g + k;                       // position in h8
                     const int block = pos & ~31;                       // 32-wide block
                     const int src   = block + PACKUS_MAP[pos - block]; // source neuron
-                    net.l1wT[b][g][(o & 7) * 4 + k + (o < 8 ? 0 : 32)] = net.l1w[b][o][src];
+                    net.l1wT[b][g][o * 4 + k] = net.l1w[b][o][src];
                 }
     return true;
 }

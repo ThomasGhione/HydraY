@@ -2,7 +2,7 @@
 
 // Quantised network with a hidden layer.
 //
-//   (768x4kb_hm -> 1024)x2 -> pairwise -> 1024 -> 16 -> 1
+//   (768x4kb_hm -> 1024)x2 -> pairwise -> 1024 -> 32 -> 1
 //
 // ONE hidden layer only: see trainer_deep.rs for why bullet's 16->32->1 example
 // was not copied.
@@ -23,11 +23,11 @@
 //
 //   l0w [4*768][1024]  i16  QA=255   (factoriser already folded in at save)
 //   l0b [1024]         i16  QA
-//   l1w [8][16][1024]  i8   QB=64    (transposed: each bucket contiguous)
-//   l1b [8][16]        f32  real scale
-//   l2w [8][1][16]     f32
+//   l1w [8][32][1024]  i8   QB=64    (transposed: each bucket contiguous)
+//   l1b [8][32]        f32  real scale
+//   l2w [8][1][32]     f32
 //   l2b [8]            f32
-//   payload 6,425,632 B, file 6,425,664 B
+//   payload 6,557,728 B, file 6,557,760 B
 //
 // ARITHMETIC (must match sanity_deep.rs line for line):
 //
@@ -49,7 +49,7 @@ namespace NNUE::Deep {
 
 inline constexpr int INPUTS        = 768;
 inline constexpr int HIDDEN        = 1024;
-inline constexpr int L1_SIZE       = 16;
+inline constexpr int L1_SIZE       = 32;
 inline constexpr int INPUT_BUCKETS = 4;
 inline constexpr int OUTPUT_BUCKETS = 8;
 inline constexpr int32_t QA    = 255;
@@ -72,16 +72,16 @@ struct alignas(64) NetworkDeep {
     // A copy of l1w already widened to i16, filled at load time. Only the path
     // WITHOUT AVX-VNNI needs it, where the dot product works on i16 lanes:
     // converting the weights on every evaluation cost one cvtepi8_epi16 per
-    // useful instruction. 256 KiB more for a clean inner loop.
+    // useful instruction. 512 KiB more for a clean inner loop.
     // NOT in the file: derived, and rebuilt on every load.
     alignas(64) int16_t l1w16[OUTPUT_BUCKETS][L1_SIZE][HIDDEN];
 
     // TRANSPOSED weights for the sparse path (AVX-VNNI only). 85% of l1's input
     // is zero, but an output-driven loop multiplies by zero anyway. Driving it
     // from the NON-zero inputs instead needs, for a given group of four inputs,
-    // the weights towards all 16 outputs: 16*4 = 64 contiguous bytes. The first
-    // 32 are outputs 0-7 (four weights each), the second 32 are outputs 8-15 --
-    // exactly the two vpdpbusd operands.
+    // the weights towards all 32 outputs: 32*4 = 128 contiguous bytes, two cache
+    // lines. Every 32 of them cover eight outputs (four weights each): exactly
+    // the four vpdpbusd operands, outputs 0-7, 8-15, 16-23 and 24-31.
     //
     // The row index is the group of four in the order the pairwise pass WRITES,
     // which is not l1w's order: packus works per 128-bit lane and swaps the two
@@ -89,7 +89,7 @@ struct alignas(64) NetworkDeep {
     // (the table is built either way) and removes one vpermq per 32 outputs
     // from the hot loop.
     //
-    // Derived, not read from the file. 128 KiB.
+    // Derived, not read from the file. 256 KiB.
     alignas(64) int8_t l1wT[OUTPUT_BUCKETS][HIDDEN / 4][L1_SIZE * 4];
 };
 
@@ -111,7 +111,7 @@ inline constexpr size_t PAYLOAD_BYTES =
     + static_cast<size_t>(OUTPUT_BUCKETS) * L1_SIZE * sizeof(float)
     + static_cast<size_t>(OUTPUT_BUCKETS) * L1_SIZE * sizeof(float)
     + static_cast<size_t>(OUTPUT_BUCKETS) * sizeof(float);
-static_assert(PAYLOAD_BYTES == 6'425'632, "layout cambiato: aggiorna sanity_deep.rs");
+static_assert(PAYLOAD_BYTES == 6'557'728, "layout changed: update sanity_deep.rs");
 
 // Scalar forward, from the two perspectives' accumulators to the evaluation in
 // centipawns. The correctness reference for the vectorised version.

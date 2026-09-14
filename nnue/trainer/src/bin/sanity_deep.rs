@@ -5,7 +5,7 @@
 // l'ORACOLO. Il C++ deve concordare con questo file, non viceversa, e va
 // scritto dopo averlo letto.
 //
-// Rete: (768x4kb_hm -> 1024)x2 -> pairwise -> 1024 -> 16 -> 1,
+// Rete: (768x4kb_hm -> 1024)x2 -> pairwise -> 1024 -> 32 -> 1,
 // 8 output bucket applicati sia a l1 sia a l2. QA=255 QB=64 SCALE=400.
 //
 // Input identici alla rete a un layer (4 king bucket specchiati, 8 output
@@ -17,11 +17,11 @@
 //   offset          campo                      tipo   scala
 //   0               l0w [4*768][1024]          i16    QA
 //   6.291.456       l0b [1024]                 i16    QA
-//   6.293.504       l1w [8][16][1024]          i8     QB
-//   6.424.576       l1b [8][16]                f32    reale
-//   6.425.088       l2w [8][1][16]             f32    reale
-//   6.425.600       l2b [8]                    f32    reale
-//   6.425.632       fine payload (pad a 6.425.664)
+//   6.293.504       l1w [8][32][1024]          i8     QB
+//   6.555.648       l1b [8][32]                f32    reale
+//   6.556.672       l2w [8][1][32]             f32    reale
+//   6.557.696       l2b [8]                    f32    reale
+//   6.557.728       fine payload (pad a 6.557.760)
 //
 // ARITMETICA, che e' il punto delicato:
 //
@@ -39,7 +39,7 @@
 // Uso: cargo run -r --bin sanity_deep -- <quantised.bin> [fen]...
 
 const HIDDEN: usize = 1024;
-const L1_SIZE: usize = 16;
+const L1_SIZE: usize = 32;
 const INPUT_BUCKETS: usize = 4;
 const OUTPUT_BUCKETS: usize = 8;
 const QA: i32 = 255;

@@ -1,6 +1,6 @@
 // HydraY NNUE v8 - rete con layer intermedi (progetto "layer intermedio").
 //
-// Architettura: (768x4kb_hm -> 1024)x2 -> pairwise -> 1024 -> 16 -> 1,
+// Architettura: (768x4kb_hm -> 1024)x2 -> pairwise -> 1024 -> 32 -> 1,
 // con 8 output bucket su ENTRAMBI i layer dopo il feature transformer.
 //
 // UN SOLO layer intermedio, non due. L'esempio di bullet ne usa due
@@ -42,12 +42,12 @@
 //
 //   l0w  [4*768][1024]  i16  QA=255   (factoriser gia' sommato)
 //   l0b  [1024]         i16  QA=255
-//   l1w  [8][16][1024]  i8   QB=64    (trasposto: ogni bucket contiguo)
-//   l1b  [8][16]        f32
-//   l2w  [8][1][16]     f32           (trasposto)
+//   l1w  [8][32][1024]  i8   QB=64    (trasposto: ogni bucket contiguo)
+//   l1b  [8][32]        f32
+//   l2w  [8][1][32]     f32           (trasposto)
 //   l2b  [8]            f32
 //
-//   totale 6.425.632 B (la rete a un layer: 6.326.288 B)
+//   total 6,557,728 B (L1=16: 6,425,632 B)
 //
 // Solo l0 e l1w sono quantizzati: la coda 16->1 costa una manciata di
 // operazioni per valutazione e in float evita ogni grattacapo di scala.
@@ -78,10 +78,9 @@ use bullet_lib::{
 };
 
 const HIDDEN_SIZE: usize = 1024;
-// Larghezza dell'unico layer intermedio, ed e' il parametro caro: il costo del
-// forward scala lineare con L1_SIZE (1024 ingressi per uscita). 16 dice gia' se
-// il guadagno c'e'; 32 raddoppierebbe il conto.
-const L1_SIZE: usize = 16;
+// Width of the single hidden layer, and the expensive parameter: the l1 dot
+// product scales linearly with it (1024 inputs per output). 16 won +7.89.
+const L1_SIZE: usize = 32;
 const OUTPUT_BUCKETS: usize = 8;
 const SCALE: i32 = 400;
 const QA: i16 = 255;
