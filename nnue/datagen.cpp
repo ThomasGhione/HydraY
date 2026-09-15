@@ -196,6 +196,29 @@ std::string randomEndgameFen(std::mt19937_64& rng) {
     return {};
 }
 
+// Set by CHESS_DATAGEN_START=chess324. A run holds one start regime, so pools
+// keep separate prefixes and are mixed at shuffle time.
+bool g_chess324 = false;
+
+// The DFRC subset with king and rooks on their usual squares, so standard
+// castling still applies. Each side is drawn independently.
+std::string randomChess324Fen(std::mt19937_64& rng) {
+    const auto backRank = [&rng](bool white) {
+        std::string rank = "r...k..r";
+        // One bishop on c/g and one on b/d/f: opposite colours.
+        rank[(rng() & 1) ? 2u : 6u] = 'b';
+        rank[1 + 2 * (rng() % 3)] = 'b';
+        const uint64_t queen = rng() % 3;
+        uint64_t slot = 0;
+        for (char& c : rank) {
+            if (c == '.') c = (slot++ == queen) ? 'q' : 'n';
+            if (white) c = static_cast<char>(c - 'a' + 'A');
+        }
+        return rank;
+    };
+    return backRank(false) + "/pppppppp/8/8/8/8/PPPPPPPP/" + backRank(true) + " w KQkq - 0 1";
+}
+
 // Plays one self-play game; returns the number of positions written
 // (0 = game discarded: unbalanced opening, dead-end opening, or stop request).
 uint64_t playOneGame(WorkerContext& w, uint64_t nodesPerMove, bool endgameSeed) {
@@ -205,8 +228,10 @@ uint64_t playOneGame(WorkerContext& w, uint64_t nodesPerMove, bool endgameSeed) 
     if (endgameSeed) {
         seedFen = randomEndgameFen(w.rng);
         if (seedFen.empty()) return 0;
+    } else if (g_chess324) {
+        seedFen = randomChess324Fen(w.rng);
     }
-    Board b = endgameSeed ? Board{seedFen} : Board{};
+    Board b = seedFen.empty() ? Board{} : Board{seedFen};
 
     // A seeded game starts from its position: there is no random opening walk
     // to skip, so it records from ply 0 (MIN_RECORD_PLY exists only to drop
@@ -443,6 +468,16 @@ int runDatagen(int argc, char* argv[]) {
         g_endgameSeedEvery = std::clamp(std::atoi(egEvery), 1, 1000);
     }
 
+    if (const char* start = std::getenv("CHESS_DATAGEN_START")) {
+        // Rejected, not ignored: a typo would fill a Chess324 pool with standard games.
+        const std::string mode = start;
+        if (mode != "standard" && mode != "chess324") {
+            std::cerr << "datagen: CHESS_DATAGEN_START must be standard or chess324\n";
+            return 1;
+        }
+        g_chess324 = (mode == "chess324");
+    }
+
     if (const char* target = std::getenv("CHESS_DATAGEN_TARGET")) {
         const uint64_t parsed = std::strtoull(target, nullptr, 10);
         if (parsed > 0) g_targetPositions = parsed;
@@ -496,6 +531,9 @@ int runDatagen(int argc, char* argv[]) {
               << MAX_RECORD_SCORE_CP << "\n"
               << "  target : " << fmtCount(g_targetPositions)
               << " positions (ETA line only; CHESS_DATAGEN_TARGET)\n"
+              << "  start  : " << (g_chess324 ? "random Chess324 setup" : "standard position")
+              << " + " << OPENING_PLIES_MIN << "-" << OPENING_PLIES_MIN + 1
+              << " random plies (CHESS_DATAGEN_START)\n"
               << "  endgame: " << (g_endgameSeedEvery == 1
                      ? std::string("EVERY game")
                      : std::string("1 game in ") + std::to_string(g_endgameSeedEvery))

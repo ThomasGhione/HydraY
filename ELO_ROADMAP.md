@@ -315,6 +315,37 @@ L2=32 or a third layer is the natural next step. ⚠️ The *first* deep16 attem
 lost outright (H0, LLR −2.29); only the reordered/sparse variants won - depth
 alone is not sufficient, weight layout matters.
 
+**4.4 v8 dataset recipe (2026-09-15) [M]**
+
+Standard starts (random 8-9 plies) are the backbone, plus the dedicated endgame batch
+(`CHESS_DATAGEN_EG_EVERY=1`, ~7% as in v7). Chess324 (`CHESS_DATAGEN_START=chess324`)
+joins only if its test wins. Each regime gets its own prefix and the mix is chosen at
+shuffle time. Labeler: the embedded deep16 champion; at least 3B positions.
+
+- **Frozen labeler.** Generate from a copy (`cp chess nnue/data/datagen_v8`) whose
+  embedded net matches `nnue/net/hydray.nnue`. A binary built on another branch keeps
+  that branch's net and datagen does not say so: on 2026-09-15 `./chess` still carried
+  the L2=32 net.
+- **Holdout.** The first 20M records of the standard run's `t0` file
+  (`head -c 640000000`). Skip the next 400 records (a game writes at most 384, as one
+  block) and train on the rest (`tail -c +640012801`). Evaluate with
+  `nnue/tools/holdoutloss.cpp`.
+- **Label scale.** Measure the v8/v7 slope before mixing v7 data in: the champion
+  labels 35.5% draws (v7 26.6%) and puts 24.7% in output bucket 1 (v7 17.6%).
+- **Chess324 test.** ~450M positions per pool, 15% of v7. Two deep16 nets at 160 SB:
+  v7 with that slice replaced by fresh standard data, and by Chess324 data;
+  head-to-head SPRT. The fresh-standard arm cancels the newer labeler.
+
+No UHO or biased-opening share, by measurement (`sp-cc.de` gives no training-data mix;
+its UHO books exist to cut top-engine draw rates in testing):
+- Random-walk starts: median |score| 158, 52% at 150 or more. UHO 2024 end positions:
+  median 153 (HydraY reads them at ~1.4x Dragon cp). Our draw rate is 27-36%, not 90%.
+- Two random plies after a UHO line undo its selection (median 222, 31% fail the 400
+  filter); without them, 25% of 40M games over its 92k positions repeats each ~100x.
+- HydraY has no Chess960 castling. Chess324 perft matches python-chess on 284
+  positions (32.4M nodes, 27,164 castling moves).
+- Throughput: ~2,030 pos/s on 16 threads, 72 records per game, so 3B is ~17 days here.
+
 ---
 
 ## 5. Verified sound - no action
