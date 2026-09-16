@@ -29,6 +29,7 @@
 #include <cstring>
 
 #include "network.hpp"
+#include "network_deep.hpp"
 
 namespace NNUE {
 
@@ -58,9 +59,9 @@ struct alignas(64) Accumulator {
     // Wipes both perspectives to the bias and installs the given own-king
     // squares (LERF, already from each perspective's view) as bases.
     inline void resetWithKings(int wKingLerf, int bKingLerfFromBlack) noexcept {
-        const Network& net = *activeNetwork;
-        std::memcpy(v[0], net.featureBias, sizeof(net.featureBias));
-        std::memcpy(v[1], net.featureBias, sizeof(net.featureBias));
+        const Deep::NetworkDeep& net = *activeNetwork;
+        std::memcpy(v[0], net.l0b, sizeof(net.l0b));
+        std::memcpy(v[1], net.l0b, sizeof(net.l0b));
         base[0] = kingFeatureBase(wKingLerf);
         base[1] = kingFeatureBase(bKingLerfFromBlack);
         flip[0] = static_cast<uint8_t>(kingFlip(wKingLerf));
@@ -93,13 +94,13 @@ struct alignas(64) Accumulator {
     // Weight row for one piece feature under this accumulator's current basis;
     // mirrors the index maths in update<>/updateMove.
     [[nodiscard]] inline const int16_t* featureRow(int p, uint8_t piece, uint8_t index) const noexcept {
-        const Network& net = *activeNetwork;
+        const Deep::NetworkDeep& net = *activeNetwork;
         const int type = (piece & 0x7) - 1;
         const bool black = (piece & 0x8) == 0;
         const int lerf = index ^ 56;
         const int feat = (p == 0) ? ((black ? 384 : 0) + type * 64 + lerf)
                                   : ((black ? 0 : 384) + type * 64 + (lerf ^ 56));
-        return net.featureWeights[base[p] + (feat ^ flip[p])];
+        return net.l0w[base[p] + (feat ^ flip[p])];
     }
 
     // Adds/removes one piece feature on an arbitrary accumulator row under a
@@ -107,14 +108,14 @@ struct alignas(64) Accumulator {
     template<bool Add>
     static inline void updateRow(int16_t* __restrict row, int rowBase, int rowFlip,
                                  int p, uint8_t piece, uint8_t index) noexcept {
-        const Network& net = *activeNetwork;
+        const Deep::NetworkDeep& net = *activeNetwork;
         const int type = (piece & 0x7) - 1;      // P..K -> 0..5
         const bool black = (piece & 0x8) == 0;   // Board::WHITE = 0x8
         const int lerf = index ^ 56;
         const int sqView = (p == 1) ? (lerf ^ 56) : lerf;
         const bool isOpp = (p == 1) ? !black : black;
         const int feat768 = (isOpp ? 384 : 0) + type * 64 + sqView;
-        const int16_t* __restrict w = net.featureWeights[rowBase + (feat768 ^ rowFlip)];
+        const int16_t* __restrict w = net.l0w[rowBase + (feat768 ^ rowFlip)];
         for (int i = 0; i < HIDDEN; ++i) {
             if constexpr (Add) row[i] = static_cast<int16_t>(row[i] + w[i]);
             else               row[i] = static_cast<int16_t>(row[i] - w[i]);
@@ -155,11 +156,11 @@ struct alignas(64) Accumulator {
         // Fast path (the overwhelming majority): both perspectives clean -
         // one fused loop updates both rows, same ILP as the pre-HalfKA code.
         if (!dirty[0] && !dirty[1]) [[likely]] {
-            const Network& net = *activeNetwork;
+            const Deep::NetworkDeep& net = *activeNetwork;
             const int featW = (black ? 384 : 0) + type * 64 + lerf;
             const int featB = (black ? 0 : 384) + type * 64 + (lerf ^ 56);
-            const int16_t* __restrict w0 = net.featureWeights[base[0] + (featW ^ flip[0])];
-            const int16_t* __restrict w1 = net.featureWeights[base[1] + (featB ^ flip[1])];
+            const int16_t* __restrict w0 = net.l0w[base[0] + (featW ^ flip[0])];
+            const int16_t* __restrict w1 = net.l0w[base[1] + (featB ^ flip[1])];
             for (int i = 0; i < HIDDEN; ++i) {
                 if constexpr (Add) {
                     v[0][i] = static_cast<int16_t>(v[0][i] + w0[i]);
@@ -200,16 +201,16 @@ struct alignas(64) Accumulator {
             return;
         }
 
-        const Network& net = *activeNetwork;
+        const Deep::NetworkDeep& net = *activeNetwork;
         const bool black = (piece & 0x8) == 0;
         const int lerfFrom = fromIndex ^ 56;
         const int lerfTo   = toIndex ^ 56;
         const int featW = (black ? 384 : 0) + type * 64;
         const int featB = (black ? 0 : 384) + type * 64;
-        const int16_t* __restrict s0 = net.featureWeights[base[0] + ((featW + lerfFrom) ^ flip[0])];
-        const int16_t* __restrict a0 = net.featureWeights[base[0] + ((featW + lerfTo)   ^ flip[0])];
-        const int16_t* __restrict s1 = net.featureWeights[base[1] + ((featB + fromIndex) ^ flip[1])];
-        const int16_t* __restrict a1 = net.featureWeights[base[1] + ((featB + toIndex)   ^ flip[1])];
+        const int16_t* __restrict s0 = net.l0w[base[0] + ((featW + lerfFrom) ^ flip[0])];
+        const int16_t* __restrict a0 = net.l0w[base[0] + ((featW + lerfTo)   ^ flip[0])];
+        const int16_t* __restrict s1 = net.l0w[base[1] + ((featB + fromIndex) ^ flip[1])];
+        const int16_t* __restrict a1 = net.l0w[base[1] + ((featB + toIndex)   ^ flip[1])];
         for (int i = 0; i < HIDDEN; ++i) {
             v[0][i] = static_cast<int16_t>(v[0][i] - s0[i] + a0[i]);
             v[1][i] = static_cast<int16_t>(v[1][i] - s1[i] + a1[i]);
@@ -235,15 +236,15 @@ struct FinnyTable {
     // Cache rows are only valid diff bases for the network they were built
     // with: re-initialise whenever the active network identity changes
     // (EvalFile swap at runtime).
-    const Network* builtFor = nullptr;
+    const Deep::NetworkDeep* builtFor = nullptr;
 
     inline void ensureInitialised() noexcept {
         if (builtFor == activeNetwork) [[likely]] return;
-        const Network& net = *activeNetwork;
+        const Deep::NetworkDeep& net = *activeNetwork;
         for (auto& perPersp : entry)
             for (auto& perBucket : perPersp)
                 for (auto& e : perBucket) {
-                    std::memcpy(e.v, net.featureBias, sizeof(e.v));
+                    std::memcpy(e.v, net.l0b, sizeof(e.v));
                     std::memset(e.bb, 0, sizeof(e.bb));
                 }
         builtFor = activeNetwork;

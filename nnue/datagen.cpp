@@ -101,6 +101,24 @@ std::atomic<uint64_t> g_totalGames{0};
 std::atomic<uint64_t> g_totalTbAdjudications{0};
 std::atomic<uint64_t> g_totalEndgameSeeded{0};
 
+// Benchmark harness (CHESS_DATAGEN_SEED, CHESS_DATAGEN_GAMES). With a seed set,
+// games are numbered globally and each one starts from its own RNG stream, an
+// empty TT and empty history, so the same workload replays identically at any
+// thread count -- the fixed baseline an A/B of two builds needs. It costs a few
+// percent against a production run, which carries that state between games.
+uint64_t              g_benchSeed = 0;   // 0 = off
+uint64_t              g_gameLimit = 0;   // 0 = unlimited
+std::atomic<uint64_t> g_nextGameId{0};
+std::atomic<int>      g_activeWorkers{0};
+
+// splitmix64: consecutive game ids must give uncorrelated streams.
+uint64_t mixSeed(uint64_t x) noexcept {
+    x += 0x9e3779b97f4a7c15ULL;
+    x = (x ^ (x >> 30)) * 0xbf58476d1ce4e5b9ULL;
+    x = (x ^ (x >> 27)) * 0x94d049bb133111ebULL;
+    return x ^ (x >> 31);
+}
+
 // Shared, read-only after load; pyrrhic WDL probes are thread-safe post-init
 // (the search already probes from concurrent Lazy SMP threads).
 syzygy::SyzygyProber g_syzygy;
@@ -388,14 +406,20 @@ void workerLoop(int threadId, const std::string& outPath, uint64_t nodesPerMove)
         g_stop.store(true, std::memory_order_release);
         return;
     }
-    uint64_t gameIndex = 0;
     while (!g_stop.load(std::memory_order_acquire)) {
-        // Deterministic 1-in-N cadence rather than a random draw: the seeded
-        // share stays exact per thread regardless of how long a run lives.
+        // Ids come from one global counter, so the seeded cadence is exact over
+        // the run and a given game is the same game at any thread count.
+        const uint64_t gameId = g_nextGameId.fetch_add(1, std::memory_order_relaxed);
+        if (g_gameLimit != 0 && gameId >= g_gameLimit) break;
+        if (g_benchSeed != 0) {
+            w.rng.seed(mixSeed(g_benchSeed + gameId));
+            w.tt.clear();
+            w.runtime.clearHistory();
+        }
         playOneGame(w, nodesPerMove,
-                    gameIndex % static_cast<uint64_t>(g_endgameSeedEvery) == 0);
-        ++gameIndex;
+                    gameId % static_cast<uint64_t>(g_endgameSeedEvery) == 0);
     }
+    g_activeWorkers.fetch_sub(1, std::memory_order_release);
 }
 
 std::string withThreadSuffix(const std::string& prefix, int threadId) {
@@ -478,6 +502,14 @@ int runDatagen(int argc, char* argv[]) {
         g_chess324 = (mode == "chess324");
     }
 
+    if (const char* seed = std::getenv("CHESS_DATAGEN_SEED")) {
+        g_benchSeed = std::strtoull(seed, nullptr, 10);
+    }
+
+    if (const char* games = std::getenv("CHESS_DATAGEN_GAMES")) {
+        g_gameLimit = std::strtoull(games, nullptr, 10);
+    }
+
     if (const char* target = std::getenv("CHESS_DATAGEN_TARGET")) {
         const uint64_t parsed = std::strtoull(target, nullptr, 10);
         if (parsed > 0) g_targetPositions = parsed;
@@ -548,15 +580,25 @@ int runDatagen(int argc, char* argv[]) {
               << "  stop   : Ctrl+C / SIGTERM (partial games are discarded)\n"
               << std::flush;
 
+    if (g_benchSeed != 0 || g_gameLimit != 0) {
+        std::cout << "  bench  : seed " << g_benchSeed
+                  << (g_benchSeed != 0 ? " (TT and history reset per game)" : " (off)")
+                  << ", games "
+                  << (g_gameLimit != 0 ? std::to_string(g_gameLimit) : std::string("unlimited"))
+                  << "\n" << std::flush;
+    }
+
     std::vector<std::thread> workers;
     workers.reserve(static_cast<size_t>(threads));
+    g_activeWorkers.store(threads, std::memory_order_release);
     for (int t = 0; t < threads; ++t) {
         workers.emplace_back(workerLoop, t, withThreadSuffix(outPrefix, t), nodesPerMove);
     }
 
     const auto start = std::chrono::steady_clock::now();
     auto lastReport = start;
-    while (!g_stop.load(std::memory_order_acquire)) {
+    while (!g_stop.load(std::memory_order_acquire)
+           && g_activeWorkers.load(std::memory_order_acquire) > 0) {
         std::this_thread::sleep_for(std::chrono::seconds(1));
         const auto now = std::chrono::steady_clock::now();
         if (now - lastReport < std::chrono::seconds(30)) continue;

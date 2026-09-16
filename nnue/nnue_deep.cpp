@@ -242,7 +242,14 @@ int32_t forwardSimd(const NetworkDeep& net,
     // Four groups per iteration because with only two accumulators the
     // dependent chain would be as long as the whole loop.
     {
-        const int32_t* dw = reinterpret_cast<const int32_t*>(h8);
+        // h8 is a byte buffer: its four-byte groups are read with memcpy
+        // rather than through an int32_t overlay, which would be an access
+        // outside the object's type.
+        const auto group = [&h8](int j) noexcept {
+            int32_t packed;
+            std::memcpy(&packed, h8 + 4 * j, sizeof(packed));
+            return _mm256_set1_epi32(packed);
+        };
         const auto (&wT)[HIDDEN / 4][L1_SIZE * 4] = net.l1wT[outputBucket];
         const auto ldw = [](const int8_t* p) noexcept {
             return _mm256_loadu_si256(reinterpret_cast<const __m256i*>(p));
@@ -252,8 +259,8 @@ int32_t forwardSimd(const NetworkDeep& net,
         int n = 0;
         for (; n + 4 <= count; n += 4) {
             const int j0 = nnz[n], j1 = nnz[n + 1], j2 = nnz[n + 2], j3 = nnz[n + 3];
-            const __m256i v0 = _mm256_set1_epi32(dw[j0]), v1 = _mm256_set1_epi32(dw[j1]);
-            const __m256i v2 = _mm256_set1_epi32(dw[j2]), v3 = _mm256_set1_epi32(dw[j3]);
+            const __m256i v0 = group(j0), v1 = group(j1);
+            const __m256i v2 = group(j2), v3 = group(j3);
             a0 = _mm256_dpbusd_avx_epi32(a0, v0, ldw(wT[j0]));
             a1 = _mm256_dpbusd_avx_epi32(a1, v0, ldw(wT[j0] + 32));
             a2 = _mm256_dpbusd_avx_epi32(a2, v1, ldw(wT[j1]));
@@ -265,7 +272,7 @@ int32_t forwardSimd(const NetworkDeep& net,
         }
         for (; n < count; ++n) {
             const int j = nnz[n];
-            const __m256i v = _mm256_set1_epi32(dw[j]);
+            const __m256i v = group(j);
             a0 = _mm256_dpbusd_avx_epi32(a0, v, ldw(wT[j]));
             a1 = _mm256_dpbusd_avx_epi32(a1, v, ldw(wT[j] + 32));
         }

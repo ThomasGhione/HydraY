@@ -2,6 +2,7 @@
 
 #include <atomic>
 #include <cstdint>
+#include <cstring>
 
 #include "../../board/board.hpp"
 #include "../../tt/tt.hpp"
@@ -85,6 +86,16 @@ struct SearchRuntime {
     inline void clearInterrupted() noexcept {
         if (searchInterrupted != nullptr)
             searchInterrupted->store(false, std::memory_order_relaxed);
+    }
+
+    // Full wipe. softResetHistory only halves, so a benchmark game would still
+    // inherit the previous one; see CHESS_DATAGEN_SEED in datagen.cpp.
+    inline void clearHistory() noexcept {
+        for (auto& ply : killerMoves) ply[0] = ply[1] = chess::Move{};
+        std::memset(history, 0, sizeof(history));
+        std::memset(counterMoves, 0, sizeof(counterMoves));
+        std::memset(captureHistory, 0, sizeof(captureHistory));
+        std::memset(contHist, 0, sizeof(contHist));
     }
 
     inline void softResetHistory() noexcept {

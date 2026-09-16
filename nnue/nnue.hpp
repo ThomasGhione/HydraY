@@ -13,8 +13,6 @@ namespace chess { class Board; }
 
 namespace NNUE {
 
-struct Network;
-
 // Loads a bullet quantised.bin (validates size and padding signature). Not for
 // use mid-search.
 [[nodiscard]] bool loadNetwork(const std::string& path);

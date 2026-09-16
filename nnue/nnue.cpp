@@ -18,22 +18,11 @@ extern "C" const unsigned char g_hydrayEmbeddedNetEnd[];
 
 namespace NNUE {
 
-const Network* activeNetwork = nullptr;
+const Deep::NetworkDeep* activeNetwork = nullptr;
 
 namespace {
 
-// The accumulator reads only l0, and both the file format and NetworkDeep open
-// with it -- l0w then l0b, same sizes. So `activeNetwork` points at the start of
-// the deep struct and the accumulator keeps working without knowing any of
-// this. The static_asserts check that assumption: if either layout changes, it
-// stops compiling.
 std::unique_ptr<Deep::NetworkDeep> ownedDeep;
-const Deep::NetworkDeep* activeDeep = nullptr;
-
-static_assert(offsetof(Network, featureWeights) == offsetof(Deep::NetworkDeep, l0w));
-static_assert(sizeof(Network::featureWeights) == sizeof(Deep::NetworkDeep::l0w));
-static_assert(offsetof(Network, featureBias) == offsetof(Deep::NetworkDeep, l0b));
-static_assert(sizeof(Network::featureBias) == sizeof(Deep::NetworkDeep::l0b));
 
 // File size of a deep net, bullet's padding included.
 constexpr size_t DEEP_FILE_BYTES = (Deep::PAYLOAD_BYTES + 63) / 64 * 64;
@@ -60,9 +49,7 @@ bool loadNetwork(const std::string& path) {
         return false;
     }
     ownedDeep = std::move(deep);
-    activeDeep = ownedDeep.get();
-    // The accumulator only reads the l0 prefix.
-    activeNetwork = reinterpret_cast<const Network*>(activeDeep);
+    activeNetwork = ownedDeep.get();
     std::cout << "info string EvalFile: network (1024 -> " << Deep::L1_SIZE << " -> 1)"
               << (Deep::hasVnniPath() ? ", VNNI" : ", no VNNI") << "\n";
     return true;
@@ -79,9 +66,7 @@ bool activateEmbedded() noexcept {
     auto deep = std::make_unique<Deep::NetworkDeep>();
     if (!Deep::loadFromMemory(g_hydrayEmbeddedNetStart, embeddedSize(), *deep)) return false;
     ownedDeep = std::move(deep);
-    activeDeep = ownedDeep.get();
-    // The accumulator only reads the l0 prefix.
-    activeNetwork = reinterpret_cast<const Network*>(activeDeep);
+    activeNetwork = ownedDeep.get();
     return true;
 }
 
@@ -101,7 +86,7 @@ int32_t evaluate(const chess::Board& b) noexcept {
     // board, so popcount is in [2, 32] and the bucket in [0, 7].
     const int bucket = (std::popcount(b.getPiecesBitMap()) - 2) / 4;
 
-    return Deep::forwardSimd(*activeDeep, acc.v[stm], acc.v[stm ^ 1], bucket);
+    return Deep::forwardSimd(*activeNetwork, acc.v[stm], acc.v[stm ^ 1], bucket);
 }
 
 } // namespace NNUE
