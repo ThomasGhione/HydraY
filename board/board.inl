@@ -364,6 +364,12 @@ inline void Board::ensureNnueAccumulatorClean() const noexcept {
         NNUE::FinnyEntry& e =
             finny.entry[p][NNUE::KING_BUCKET_MAP[ownKingView]][rowFlip ? 1 : 0];
 
+        // Collect the diff first and apply it in chunks: a board holds at most
+        // 64 pieces, so neither side of the diff can exceed that.
+        const int16_t* sub[64];
+        const int16_t* add[64];
+        int ns = 0;
+        int na = 0;
         for (int c = 0; c < 2; ++c) {
             for (int t = 0; t < 6; ++t) {
                 const uint8_t piece = static_cast<uint8_t>((c == 0 ? 0x8 : 0) | (t + 1));
@@ -372,18 +378,19 @@ inline void Board::ensureNnueAccumulatorClean() const noexcept {
                 while (added) {
                     const int idx = std::countr_zero(added);
                     added &= added - 1;
-                    NNUE::Accumulator::updateRow<true>(e.v, rowBase, rowFlip, p, piece,
-                                                       static_cast<uint8_t>(idx));
+                    add[na++] = NNUE::Accumulator::rowFor(rowBase, rowFlip, p, piece,
+                                                          static_cast<uint8_t>(idx));
                 }
                 while (removed) {
                     const int idx = std::countr_zero(removed);
                     removed &= removed - 1;
-                    NNUE::Accumulator::updateRow<false>(e.v, rowBase, rowFlip, p, piece,
-                                                        static_cast<uint8_t>(idx));
+                    sub[ns++] = NNUE::Accumulator::rowFor(rowBase, rowFlip, p, piece,
+                                                          static_cast<uint8_t>(idx));
                 }
                 e.bb[c][t] = cur[c][t];
             }
         }
+        NNUE::Accumulator::applyRows(e.v, sub, ns, add, na);
 
         std::memcpy(nnueAccumulator.v[p], e.v, sizeof(e.v));
         nnueAccumulator.base[p] = rowBase;

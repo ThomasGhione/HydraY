@@ -91,16 +91,21 @@ struct alignas(64) Accumulator {
         }
     }
 
-    // Weight row for one piece feature under this accumulator's current basis;
-    // mirrors the index maths in update<>/updateMove.
-    [[nodiscard]] inline const int16_t* featureRow(int p, uint8_t piece, uint8_t index) const noexcept {
-        const Deep::NetworkDeep& net = *activeNetwork;
-        const int type = (piece & 0x7) - 1;
-        const bool black = (piece & 0x8) == 0;
+    // Weight row for one piece feature under an explicit basis: the live
+    // perspectives use their own, the Finny cache rows hold a different one.
+    [[nodiscard]] static inline const int16_t* rowFor(int rowBase, int rowFlip, int p,
+                                                      uint8_t piece, uint8_t index) noexcept {
+        const int type = (piece & 0x7) - 1;      // P..K -> 0..5
+        const bool black = (piece & 0x8) == 0;   // Board::WHITE = 0x8
         const int lerf = index ^ 56;
-        const int feat = (p == 0) ? ((black ? 384 : 0) + type * 64 + lerf)
-                                  : ((black ? 0 : 384) + type * 64 + (lerf ^ 56));
-        return net.l0w[base[p] + (feat ^ flip[p])];
+        const int sqView = (p == 1) ? (lerf ^ 56) : lerf;
+        const bool isOpp = (p == 1) ? !black : black;
+        const int feat768 = (isOpp ? 384 : 0) + type * 64 + sqView;
+        return activeNetwork->l0w[rowBase + (feat768 ^ rowFlip)];
+    }
+
+    [[nodiscard]] inline const int16_t* featureRow(int p, uint8_t piece, uint8_t index) const noexcept {
+        return rowFor(base[p], flip[p], p, piece, index);
     }
 
     // Adds/removes one piece feature on an arbitrary accumulator row under a
@@ -108,17 +113,48 @@ struct alignas(64) Accumulator {
     template<bool Add>
     static inline void updateRow(int16_t* __restrict row, int rowBase, int rowFlip,
                                  int p, uint8_t piece, uint8_t index) noexcept {
-        const Deep::NetworkDeep& net = *activeNetwork;
-        const int type = (piece & 0x7) - 1;      // P..K -> 0..5
-        const bool black = (piece & 0x8) == 0;   // Board::WHITE = 0x8
-        const int lerf = index ^ 56;
-        const int sqView = (p == 1) ? (lerf ^ 56) : lerf;
-        const bool isOpp = (p == 1) ? !black : black;
-        const int feat768 = (isOpp ? 384 : 0) + type * 64 + sqView;
-        const int16_t* __restrict w = net.l0w[rowBase + (feat768 ^ rowFlip)];
+        const int16_t* __restrict w = rowFor(rowBase, rowFlip, p, piece, index);
         for (int i = 0; i < HIDDEN; ++i) {
             if constexpr (Add) row[i] = static_cast<int16_t>(row[i] + w[i]);
             else               row[i] = static_cast<int16_t>(row[i] - w[i]);
+        }
+    }
+
+    // Single-row counterpart of updateFused, for the Finny refresh: several
+    // feature rows summed in one traversal instead of one traversal each.
+    template<int NS, int NA>
+    static inline void fuseRows(int16_t* __restrict row, const int16_t* const* sub,
+                                const int16_t* const* add) noexcept {
+        for (int i = 0; i < HIDDEN; ++i) {
+            int x = row[i];
+            for (int k = 0; k < NS; ++k) x -= sub[k][i];
+            for (int k = 0; k < NA; ++k) x += add[k][i];
+            row[i] = static_cast<int16_t>(x);
+        }
+    }
+
+    // Applies a whole feature diff, two subs and two adds per traversal. A
+    // refresh changes 5.8 features on average, so this reads and writes the row
+    // about twice instead of six times, and the weight rows of one chunk miss
+    // in parallel rather than one after the other.
+    static inline void applyRows(int16_t* __restrict row,
+                                 const int16_t* const* sub, int ns,
+                                 const int16_t* const* add, int na) noexcept {
+        for (int si = 0, ai = 0; si < ns || ai < na; ) {
+            const int s = (ns - si > 2) ? 2 : ns - si;
+            const int a = (na - ai > 2) ? 2 : na - ai;
+            switch (s * 4 + a) {
+                case 2 * 4 + 2: fuseRows<2, 2>(row, sub + si, add + ai); break;
+                case 2 * 4 + 1: fuseRows<2, 1>(row, sub + si, add + ai); break;
+                case 1 * 4 + 2: fuseRows<1, 2>(row, sub + si, add + ai); break;
+                case 1 * 4 + 1: fuseRows<1, 1>(row, sub + si, add + ai); break;
+                case 2 * 4 + 0: fuseRows<2, 0>(row, sub + si, add + ai); break;
+                case 0 * 4 + 2: fuseRows<0, 2>(row, sub + si, add + ai); break;
+                case 1 * 4 + 0: fuseRows<1, 0>(row, sub + si, add + ai); break;
+                default:        fuseRows<0, 1>(row, sub + si, add + ai); break;
+            }
+            si += s;
+            ai += a;
         }
     }
 
