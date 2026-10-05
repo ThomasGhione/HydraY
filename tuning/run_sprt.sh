@@ -35,6 +35,8 @@
 #   NEW_OPTS    extra UCI options for the NEW engine, space-separated
 #               "Name=Value" pairs (e.g. "EvalFile=/abs/net.bin")
 #   BASE_OPTS   same, for the BASELINE engine
+#   BASE_BIN    baseline binary (default tuning/chess_baseline); point it at
+#               ./chess to play two nets against each other on one build
 #
 # Examples:
 #   ./tuning/run_sprt.sh                          # default [0,5] gain test
@@ -51,7 +53,7 @@ repo_root="$(cd -- "${script_dir}/.." && pwd)"
 cd "${script_dir}"
 
 new_bin="${repo_root}/chess"
-base_bin="${script_dir}/chess_baseline"
+base_bin="${BASE_BIN:-${script_dir}/chess_baseline}"
 
 # --- --snapshot: freeze the current ./chess as the baseline and exit ----------
 if [[ "${1:-}" == "--snapshot" ]]; then

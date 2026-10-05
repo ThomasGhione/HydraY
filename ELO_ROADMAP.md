@@ -330,11 +330,20 @@ shuffle time. Labeler: the embedded deep16 champion; at least 3B positions.
   (`head -c 640000000`). Skip the next 400 records (a game writes at most 384, as one
   block) and train on the rest (`tail -c +640012801`). Evaluate with
   `nnue/tools/holdoutloss.cpp`.
-- **Label scale.** Measure the v8/v7 slope before mixing v7 data in: the champion
-  labels 35.5% draws (v7 26.6%) and puts 24.7% in output bucket 1 (v7 17.6%).
-- **Chess324 test.** ~450M positions per pool, 15% of v7. Two deep16 nets at 160 SB:
-  v7 with that slice replaced by fresh standard data, and by Chess324 data;
-  head-to-head SPRT. The fresh-standard arm cancels the newer labeler.
+- **Label scale: consistent, no rescaling (2026-10-04).** Regressing the label on the
+  champion's static eval over 2M records each (|eval| <= 1000) gives slope 1.058 for
+  v7, 1.068 for v8 standard, 1.073 for Chess324; the label medians per 100 cp eval bin
+  agree within ~15 cp out to +-1000. What does differ is the outcome: draws 26.7% in
+  v7, 34.1% standard, 31.2% Chess324, i.e. the WDL part of the target.
+- **Chess324 test.** Two deep16 nets with the champion recipe (v7, 160 SB, slices
+  1-2-3-4-1-2-3-4) where 15% of every v7 slice is replaced by fresh standard data or
+  by Chess324 data. The fresh-standard arm cancels the newer labeler. Pools: 445.2M
+  records each, Chess324 from the whole pilot, standard from `v8_std.t1..t5` (t0 is
+  never read, it holds the holdout); built and checksummed per `nnue/data/ab/MANIFEST.txt`.
+  `datamix` does the replacement on Colab with the same seed in both arms, so the same
+  v7 records sit in the same slots and only the replaced 15% differs
+  (`nnue/trainer/colab_ab_c324.ipynb`, one notebook, `ARM` selects the pool). Verdict:
+  `tuning/run_ab_c324.sh`, 150k nodes, [0, 5], Chess324 as new. It joins v8 only on H1.
 
 No UHO or biased-opening share, by measurement (`sp-cc.de` gives no training-data mix;
 its UHO books exist to cut top-engine draw rates in testing):
