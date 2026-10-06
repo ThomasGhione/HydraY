@@ -344,6 +344,13 @@ shuffle time. Labeler: the embedded deep16 champion; at least 3B positions.
   v7 records sit in the same slots and only the replaced 15% differs
   (`nnue/trainer/colab_ab_c324.ipynb`, one notebook, `ARM` selects the pool). Verdict:
   `tuning/run_ab_c324.sh`, 150k nodes, [0, 5], Chess324 as new. It joins v8 only on H1.
+  **Result (2026-10-05): H0, Chess324 stays out of v8.** Elo **-5.67** (95%
+  [-11.27, -0.07], LOS 2.4%), LLR -2.97 after 6500 games, Ptnml
+  [164, 841, 1330, 767, 148]. Not just "no gain": the CI excludes zero on the losing
+  side. Run in two parts because the first stopped at run_sprt.sh's 4000-game cap
+  (now raised in the wrapper); the second used only book openings the first had not
+  played, since fixed-node games are deterministic and a repeat is a duplicate, and
+  the LLR was computed on the summed pentanomials (checked against fastchess on part 1).
 
 No UHO or biased-opening share, by measurement (`sp-cc.de` gives no training-data mix;
 its UHO books exist to cut top-engine draw rates in testing):

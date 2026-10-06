@@ -15,6 +15,8 @@ done
     || { echo "the two nets are the same file" >&2; exit 1; }
 
 export BASE_BIN="$repo/chess" NODES=150000 ELO0=0 ELO1=5 CONCURRENCY="${CONCURRENCY:-8}"
+# run_sprt.sh caps at 4000 games by default: the first run of this test hit it.
+export MAXGAMES="${MAXGAMES:-40000}"
 export NEW_OPTS="EvalFile=$repo/nnue/net/ab_c324.nnue"
 export BASE_OPTS="EvalFile=$repo/nnue/net/ab_std.nnue"
 exec "$repo/tuning/run_sprt.sh"
