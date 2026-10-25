@@ -14,7 +14,7 @@
 //     feature  = 768*bucket_X + (feat768 ^ flip_X)
 //   where feat768 = isOpp*384 + type*64 + sq_from_X and `^ flip` flips the
 //   file of the square component only.
-// Output: 8 material-count buckets, bucket = (popcount(occ) - 2) / 4.
+// Output: material-count buckets, see network_deep.hpp.
 //
 // The struct mirrors the leading bytes of bullet's quantised.bin (little-endian
 // i16; l0f factoriser already merged into l0w at save).

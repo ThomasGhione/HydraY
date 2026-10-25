@@ -338,7 +338,17 @@ int32_t forwardSimd(const NetworkDeep& net,
 }
 
 bool loadFromMemory(const unsigned char* data, size_t size, NetworkDeep& net) noexcept {
-    if (size < PAYLOAD_BYTES || size % 64 != 0) return false;
+    const int buckets = bucketsForFileSize(size);
+    if (buckets == 0) return false;
+
+    // The tail is "bullet" repeated: anything else means the layout has
+    // drifted, and it is better to find out here than as a net that plays badly
+    // for no apparent reason.
+    const size_t payload = payloadBytes(buckets);
+    static const char kTag[] = "bullet";
+    for (size_t i = payload; i < size; ++i) {
+        if (data[i] != static_cast<unsigned char>(kTag[(i - payload) % 6])) return false;
+    }
 
     // Fields are read in order: the struct matches the file's layout, but a
     // single bulk copy is NOT possible, because struct alignment can insert
@@ -350,18 +360,20 @@ bool loadFromMemory(const unsigned char* data, size_t size, NetworkDeep& net) no
     };
     rd(net.l0w, sizeof(net.l0w));
     rd(net.l0b, sizeof(net.l0b));
-    rd(net.l1w, sizeof(net.l1w));
-    rd(net.l1b, sizeof(net.l1b));
-    rd(net.l2w, sizeof(net.l2w));
-    rd(net.l2b, sizeof(net.l2b));
-
-    // The tail is "bullet" repeated: anything else means the layout has
-    // drifted, and it is better to find out here than as a net that plays badly
-    // for no apparent reason.
-    static const char kTag[] = "bullet";
-    for (size_t i = PAYLOAD_BYTES; i < size; ++i) {
-        if (data[i] != static_cast<unsigned char>(kTag[(i - PAYLOAD_BYTES) % 6])) return false;
-    }
+    // A legacy file's head b fills buckets [b*repeat, (b+1)*repeat).
+    const int repeat = OUTPUT_BUCKETS / buckets;
+    const auto heads = [&](auto& field) noexcept {
+        for (int b = 0; b < buckets; ++b) {
+            rd(&field[b * repeat], sizeof(field[0]));
+            for (int r = 1; r < repeat; ++r)
+                std::memcpy(&field[b * repeat + r], &field[b * repeat], sizeof(field[0]));
+        }
+    };
+    heads(net.l1w);
+    heads(net.l1b);
+    heads(net.l2w);
+    heads(net.l2b);
+    net.fileBuckets = buckets;
 
     // Derived, not read from the file.
     for (int b = 0; b < OUTPUT_BUCKETS; ++b)
@@ -397,7 +409,7 @@ bool loadFromFile(const char* path, NetworkDeep& net) noexcept {
     if (std::fseek(f, 0, SEEK_END) != 0) { std::fclose(f); return false; }
     const long size = std::ftell(f);
     std::rewind(f);
-    if (size < 0 || static_cast<size_t>(size) < PAYLOAD_BYTES || size % 64 != 0) {
+    if (size < 0 || bucketsForFileSize(static_cast<size_t>(size)) == 0) {
         std::fclose(f);
         return false;
     }

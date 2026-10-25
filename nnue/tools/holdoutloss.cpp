@@ -67,28 +67,28 @@ struct Record {
 };
 static_assert(sizeof(Record) == 32, "must match bulletformat::ChessBoard");
 
-constexpr int OUT_BUCKET_DIVISOR = (32 + OUTPUT_BUCKETS - 1) / OUTPUT_BUCKETS;
-
 // Single-layer quantised.bin: (768x4kb_hm -> 1024)x2 -> 8, SCReLU. Same l0 as
 // the deep format, so the accumulator is shared; only the output layer differs.
 // Layout and arithmetic transcribed from sanity.rs, the oracle for this format.
 //
-// The bucket count is spelled out rather than taken from network_deep.hpp: no
+// The bucket counts are spelled out rather than taken from network_deep.hpp: no
 // single-layer net will ever be trained again, so every file in this format has
-// four king buckets. Following the live constant would silently reinterpret
-// these nets on a branch that changes it.
+// four king buckets and eight output buckets. Following the live constants would
+// silently reinterpret these nets on a branch that changes them.
 constexpr int SHALLOW_INPUT_BUCKETS = 4;
+constexpr int SHALLOW_OUTPUT_BUCKETS = 8;
+static_assert(OUTPUT_BUCKETS % SHALLOW_OUTPUT_BUCKETS == 0);
 
 struct alignas(64) ShallowNet {
     int16_t featureWeights[SHALLOW_INPUT_BUCKETS * INPUTS][HIDDEN];
     int16_t featureBias[HIDDEN];
-    int16_t outputWeights[OUTPUT_BUCKETS][2][HIDDEN];
-    int16_t outputBias[OUTPUT_BUCKETS];
+    int16_t outputWeights[SHALLOW_OUTPUT_BUCKETS][2][HIDDEN];
+    int16_t outputBias[SHALLOW_OUTPUT_BUCKETS];
 };
 
 constexpr size_t SHALLOW_PAYLOAD_BYTES =
     sizeof(int16_t) * (SHALLOW_INPUT_BUCKETS * INPUTS * HIDDEN + HIDDEN
-                       + OUTPUT_BUCKETS * 2 * HIDDEN + OUTPUT_BUCKETS);
+                       + SHALLOW_OUTPUT_BUCKETS * 2 * HIDDEN + SHALLOW_OUTPUT_BUCKETS);
 static_assert(SHALLOW_PAYLOAD_BYTES == 6'326'288);
 
 int32_t shallowHalf(const int16_t* acc, const int16_t* w) noexcept {
@@ -109,10 +109,11 @@ struct Evaluator {
 
     [[nodiscard]] int32_t eval(const int16_t* us, const int16_t* them, int bucket) const noexcept {
         if (deep != nullptr) return forwardSimd(*deep, us, them, bucket);
-        int32_t out = shallowHalf(us, shallow->outputWeights[bucket][0])
-                    + shallowHalf(them, shallow->outputWeights[bucket][1]);
+        const int sb = bucket / (OUTPUT_BUCKETS / SHALLOW_OUTPUT_BUCKETS);
+        int32_t out = shallowHalf(us, shallow->outputWeights[sb][0])
+                    + shallowHalf(them, shallow->outputWeights[sb][1]);
         out /= QA;
-        out += shallow->outputBias[bucket];
+        out += shallow->outputBias[sb];
         return out * SCALE / (QA * QB);
     }
 };
@@ -149,7 +150,7 @@ int accumulateRecord(const NetworkDeep& net, const Record& r,
         addRow(accUs, net.l0w[usBase + (((isOpp ? 384 : 0) + type * 64 + sq) ^ usFlip)]);
         addRow(accThem, net.l0w[themBase + (((isOpp ? 0 : 384) + type * 64 + (sq ^ 56)) ^ themFlip)]);
     }
-    return (idx - 2) / OUT_BUCKET_DIVISOR;
+    return (idx - 2) / BUCKET_DIVISOR;
 }
 
 double sigmoid(double x) noexcept { return 1.0 / (1.0 + std::exp(-x)); }
@@ -369,14 +370,16 @@ int main(int argc, char** argv) {
         if (!nf) { std::fprintf(stderr, "cannot open net: %s\n", netPath.c_str()); return 1; }
         const auto netBytes = static_cast<size_t>(nf.tellg());
 
-        if (netBytes >= PAYLOAD_BYTES && netBytes < PAYLOAD_BYTES + 64) {
+        // The per-bucket table always has OUTPUT_BUCKETS rows: with a legacy
+        // net, consecutive rows share a head but still split the piece counts.
+        if (bucketsForFileSize(netBytes) != 0) {
             if (!loadFromFile(netPath.c_str(), net)) {
                 std::fprintf(stderr, "cannot load deep net: %s\n", netPath.c_str());
                 return 1;
             }
             ev.l0 = &net;
             ev.deep = &net;
-            std::printf("format:  deep (1024 -> 16 -> 1)\n");
+            std::printf("format:  deep (1024 -> 16 -> 1, %d output buckets)\n", net.fileBuckets);
         } else if (netBytes >= SHALLOW_PAYLOAD_BYTES && netBytes < SHALLOW_PAYLOAD_BYTES + 64) {
             // The king-bucket map is compiled in, so a build whose map has a
             // different number of buckets cannot read these nets at all: it
@@ -401,8 +404,9 @@ int main(int argc, char** argv) {
             ev.shallow = &shallow;
             std::printf("format:  single layer (1024 -> 1)\n");
         } else {
-            std::fprintf(stderr, "%s: %zu bytes is neither format (%zu deep, %zu single)\n",
-                         netPath.c_str(), netBytes, PAYLOAD_BYTES, SHALLOW_PAYLOAD_BYTES);
+            std::fprintf(stderr, "%s: %zu bytes is no known format (%zu or %zu deep, %zu single)\n",
+                         netPath.c_str(), netBytes, fileBytes(OUTPUT_BUCKETS),
+                         fileBytes(LEGACY_OUTPUT_BUCKETS), SHALLOW_PAYLOAD_BYTES);
             return 1;
         }
     }
