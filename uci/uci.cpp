@@ -55,9 +55,13 @@ namespace {
         {"HISTORY_PRUNE_D2",     &engine::HISTORY_PRUNE_THRESHOLD[2], -16384,    0},
         {"HISTORY_PRUNE_D3",     &engine::HISTORY_PRUNE_THRESHOLD[3], -16384,    0},
         {"FUTILITY_MID_STEP",    &engine::FUTILITY_MID_STEP,              80,  600, true},
-        {"LMP_SCALE_STD_PCT",    &engine::LMP_SCALE_PCT[0],               40,  250, true},
-        {"LMP_SCALE_IMP_PCT",    &engine::LMP_SCALE_PCT[1],               40,  250, true},
+        {"FUTILITY_MAX_DEPTH",   &engine::FUTILITY_MAX_DEPTH,              0, engine::FUTILITY_DEPTH_CAP},
+        {"LMP_SCALE_STD_PCT",    &engine::LMP_SCALE_PCT[0],               10,  250, true},
+        {"LMP_SCALE_IMP_PCT",    &engine::LMP_SCALE_PCT[1],               10,  250, true},
+        {"LMP_MAX_DEPTH",        &engine::LMP_MAX_DEPTH,                   0, engine::LMP_DEPTH_CAP},
         {"LMR_C_PERCENT",        &engine::LMR_C_PERCENT,                 150,  600, true},
+        {"LMR_CUT_BONUS",        &engine::LMR_CUT_BONUS,                   0,    4},
+        {"NMP_BASE_R",           &engine::NMP_BASE_R,                      1,    8},
         {"CORR_HIST_WEIGHT_PCT", &engine::CORR_HIST_WEIGHT_PCT,            0,  400},
     };
 

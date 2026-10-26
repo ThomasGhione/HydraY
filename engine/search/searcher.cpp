@@ -37,12 +37,12 @@ void rebuildSearchDerivedTables() noexcept {
             LMR_REDUCTIONS[d][m] = static_cast<int8_t>(std::max(1, static_cast<int>(raw)));
         }
     }
-    for (int d = 1; d <= 6; ++d) {
+    for (int d = 1; d <= FUTILITY_DEPTH_CAP; ++d) {
         FUTILITY_MARGINS[d] = FUTILITY_MID_STEP * d;
     }
     for (int improving = 0; improving < 2; ++improving) {
-        for (int d = 1; d <= 4; ++d) {
-            LMP_THRESHOLDS[improving][d] = LMP_BASE_THRESHOLDS[improving][d] * LMP_SCALE_PCT[improving] / 100;
+        for (int d = 1; d <= LMP_DEPTH_CAP; ++d) {
+            LMP_THRESHOLDS[improving][d] = lmpBaseThreshold(improving, d) * LMP_SCALE_PCT[improving] / 100;
         }
     }
 }
@@ -356,9 +356,9 @@ SearchMoveResult searchMoves(Board& b, MovePicker& movePicker, const SearchConte
 
     // Interior non-PV node past the root: the gate for futility, LMP, history and SEE pruning.
     const bool interiorNonPv = !ctx.isPVNode && !ctx.inCheck && ctx.ply > 0;
-    const bool canFutilityPrune = interiorNonPv && ctx.depth >= 1 && ctx.depth <= 6;
+    const bool canFutilityPrune = interiorNonPv && ctx.depth >= 1 && ctx.depth <= FUTILITY_MAX_DEPTH;
     const int32_t futilityMargin = canFutilityPrune ? FUTILITY_MARGINS[ctx.depth] : 0;
-    const bool canLMP = interiorNonPv && ctx.depth >= 1 && ctx.depth <= 4;
+    const bool canLMP = interiorNonPv && ctx.depth >= 1 && ctx.depth <= LMP_MAX_DEPTH;
     const int lmpThreshold = canLMP ? LMP_THRESHOLDS[ctx.improving][ctx.depth] : 999;
 
     const int usSide = Board::colorToIndex(ctx.activeColor);
@@ -437,7 +437,7 @@ SearchMoveResult searchMoves(Board& b, MovePicker& movePicker, const SearchConte
             if (ctx.isPVNode) reduction = std::max(1, reduction - 1);
             if (ctx.iirActive) reduction = std::min(reduction + 1, childDepth - 1);
             // More when the eval is falling, and at an expected cut node.
-            reduction += !ctx.improving + ctx.cutNode;
+            reduction += !ctx.improving + (ctx.cutNode ? LMR_CUT_BONUS : 0);
             reduction = std::clamp(reduction, 1, childDepth - 1);
             const int reducedDepth = std::max(1, childDepth - reduction);
             if constexpr (kSearchStats) {
@@ -645,7 +645,7 @@ int32_t searchPosition(Board& b, SearchRuntime& runtime, int depth, int32_t alph
             | b.bb[Board::ROOK][side] | b.bb[Board::QUEEN][side]) != 0ULL) {
         // The further the eval sits above beta, the deeper the reduction.
         if constexpr (kSearchStats) ++gSearchStats.nmpTries;
-        const int reduction = 3 + depth / 3 + std::clamp((staticEval - beta) / NMP_EVAL_DIV, 0, NMP_EVAL_MAX);
+        const int reduction = NMP_BASE_R + depth / 3 + std::clamp((staticEval - beta) / NMP_EVAL_DIV, 0, NMP_EVAL_MAX);
         Board::MoveState nullState;
         b.doNullMove(nullState);
         const int32_t nullScore = -searchPosition(b, runtime, depth - reduction, -beta, -alpha, ply + 1,

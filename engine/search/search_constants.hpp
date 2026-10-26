@@ -38,22 +38,26 @@ static_assert(MATE_VALUE + MAX_PLY <= std::numeric_limits<int16_t>::max(),
 // UCI layer stops any search before writing one. The derived tables
 // (FUTILITY_MARGINS, LMP_THRESHOLDS, the LMR table in searcher.cpp) are built
 // at startup and rebuilt by rebuildSearchDerivedTables() after a write.
-// Null-move reduction eval scaling: deeper reduction the further eval beats beta.
+// Null-move reduction: NMP_BASE_R + depth / 3, deeper the further eval beats beta.
+inline int32_t NMP_BASE_R = 3;
 inline int32_t NMP_EVAL_DIV = 265;
 inline int32_t NMP_EVAL_MAX = 4;
 // Reverse futility pruning margin per remaining ply.
 inline int32_t RFP_MARGIN_PER_DEPTH = 70;
-// FUTILITY_MARGINS[depth] = FUTILITY_MID_STEP * depth, depth 1..6.
+// FUTILITY_MARGINS[depth] = FUTILITY_MID_STEP * depth, depth 1..FUTILITY_MAX_DEPTH.
+inline constexpr int FUTILITY_DEPTH_CAP = 10;
+inline int32_t FUTILITY_MAX_DEPTH = 6;
 inline int32_t FUTILITY_MID_STEP = 176;
-inline int32_t FUTILITY_MARGINS[7] = {};
-// LMP_THRESHOLDS[improving][depth], depth 1..4: the base table scaled by
-// LMP_SCALE_PCT[improving]. Higher = more permissive.
-inline constexpr int LMP_BASE_THRESHOLDS[2][5] = {
-    {0, 12, 20, 30, 42},
-    {0, 16, 26, 38, 52},
-};
+inline int32_t FUTILITY_MARGINS[FUTILITY_DEPTH_CAP + 1] = {};
+// LMP_THRESHOLDS[improving][depth], depth 1..LMP_MAX_DEPTH: the base curve
+// scaled by LMP_SCALE_PCT[improving]. Higher = more permissive.
+inline constexpr int LMP_DEPTH_CAP = 10;
+constexpr int lmpBaseThreshold(int improving, int depth) noexcept {
+    return improving ? depth * depth + 7 * depth + 8 : (depth + 2) * (depth + 3);
+}
+inline int32_t LMP_MAX_DEPTH = 4;
 inline int32_t LMP_SCALE_PCT[2] = {100, 100};
-inline int LMP_THRESHOLDS[2][5] = {};
+inline int LMP_THRESHOLDS[2][LMP_DEPTH_CAP + 1] = {};
 // History-based quiet pruning: skip quiet moves with very negative history.
 // Indexed by depth (0..3); depth 0 unused.
 inline int32_t HISTORY_PRUNE_THRESHOLD[4] = {0, -4096, -6144, -8192};
@@ -75,6 +79,8 @@ void rebuildSearchDerivedTables() noexcept;
 // --- Late move reductions ---
 // LMR_C == LMR_C_PERCENT / 100.0 (int spin for the tuner).
 inline int32_t LMR_C_PERCENT = 300;
+// Extra plies of reduction at an expected cut node.
+inline int32_t LMR_CUT_BONUS = 1;
 inline constexpr int LMR_MAX_DEPTH = 20; // deeper nodes use the last row
 
 // --- History bounds ---
