@@ -102,7 +102,7 @@ inline int32_t LMR_HIST_MODE = 1;
 // Quiet, continuation and capture history bonus: (depth + 1)^2 * HIST_BONUS_PCT / 100.
 inline int32_t HIST_BONUS_PCT = 100;
 // 0: no hash move adds an LMR ply; 1: at PV and cut nodes it takes a ply of depth.
-inline int32_t IIR_MODE = 0;
+inline int32_t IIR_MODE = 1;
 inline constexpr int LMR_MAX_DEPTH = 20; // deeper nodes use the last row
 
 // --- History bounds ---
