@@ -94,8 +94,8 @@ inline int32_t LMR_MIN_INDEX_ALL = 4;
 inline int32_t LMR_EARLY_QUIET_ONLY = 0;
 // Reduction change for a quiet by its butterfly history sign: -LMR_GOOD_HIST
 // above zero, +LMR_BAD_HIST otherwise.
-inline int32_t LMR_GOOD_HIST = 0;
-inline int32_t LMR_BAD_HIST = 0;
+inline int32_t LMR_GOOD_HIST = 1;
+inline int32_t LMR_BAD_HIST = 1;
 inline constexpr int LMR_MAX_DEPTH = 20; // deeper nodes use the last row
 
 // --- History bounds ---
