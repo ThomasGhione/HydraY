@@ -457,7 +457,15 @@ SearchMoveResult searchMoves(Board& b, MovePicker& movePicker, const SearchConte
             reduction += !ctx.improving + (ctx.cutNode ? LMR_CUT_BONUS : 0);
             // History sign: the few quiets above zero fail high several times as often.
             if (isQuietMove) {
-                reduction += (runtime.history[usSide][m.from][m.to] > 0) ? -LMR_GOOD_HIST : LMR_BAD_HIST;
+                const bool goodBf = runtime.history[usSide][m.from][m.to] > 0;
+                if (LMR_HIST_MODE == 0) {
+                    reduction += goodBf ? -LMR_GOOD_HIST : LMR_BAD_HIST;
+                } else {
+                    const int n = goodBf + (ctx.contHistEntry != nullptr
+                                            && ctx.contHistEntry[contHistIndex(t.fromType, m.to)] > 0);
+                    reduction += (LMR_HIST_MODE == 1) ? LMR_BAD_HIST - LMR_GOOD_HIST * n
+                                                      : (n > 0 ? -LMR_GOOD_HIST : LMR_BAD_HIST);
+                }
             }
             reduction = std::clamp(reduction, 1, childDepth - 1);
             const int reducedDepth = std::max(1, childDepth - reduction);
@@ -501,7 +509,7 @@ SearchMoveResult searchMoves(Board& b, MovePicker& movePicker, const SearchConte
         }
 
         if (allowHeuristicUpdates) {
-            const int32_t bonus = (ctx.depth + 1) * (ctx.depth + 1);
+            const int32_t bonus = (ctx.depth + 1) * (ctx.depth + 1) * HIST_BONUS_PCT / 100;
             if (t.isCapture) {
                 int16_t* cell = runtime.captureHistory[usSide][m.to][t.victimType];
                 applyHistoryGravity(cell[0], bonus, MAX_CAPTURE_HISTORY);
@@ -728,11 +736,15 @@ int32_t searchPosition(Board& b, SearchRuntime& runtime, int depth, int32_t alph
     bool hasHashMove = false;
     MovePicker movePicker = Sorter::sortLegalMoves(std::move(moves), ply, b, runtime, tte.move,
                                                    previousMove, &hasHashMove, contHistEntry);
-    // Without a verified hash move: no singular extension, and IIR reduces.
+    // Without a verified hash move: no singular extension, and IIR reduces:
+    // one ply of depth at PV and cut nodes in IIR_MODE 1, else one more LMR ply.
+    const bool iirNode = !hasHashMove && depth >= 6 && ply > 0;
+    const bool iirDepth = IIR_MODE == 1 && iirNode && (isPVNode || cutNode);
+    if (iirDepth) --depth;
     const SearchContext ctx{
         previousMove, contHistEntry, depth, ply, staticEval,
         hasHashMove ? singularExtension : 0, excludedMove, activeColor, inCheck, isPVNode,
-        !hasHashMove && depth >= 6 && ply > 0, improving, cutNode && !isPVNode
+        iirNode && !iirDepth, improving, cutNode && !isPVNode
     };
 
     const SearchMoveResult result = searchMoves(b, movePicker, ctx, alpha, beta, runtime, allowHeuristicUpdates);

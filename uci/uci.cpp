@@ -68,6 +68,9 @@ namespace {
         {"LMR_EARLY_QUIET_ONLY", &engine::LMR_EARLY_QUIET_ONLY,            0,    1},
         {"LMR_GOOD_HIST",        &engine::LMR_GOOD_HIST,                   0,    3},
         {"LMR_BAD_HIST",         &engine::LMR_BAD_HIST,                    0,    3},
+        {"LMR_HIST_MODE",        &engine::LMR_HIST_MODE,                   0,    2},
+        {"HIST_BONUS_PCT",       &engine::HIST_BONUS_PCT,                 25, 1000},
+        {"IIR_MODE",             &engine::IIR_MODE,                        0,    1},
         {"NMP_BASE_R",           &engine::NMP_BASE_R,                      1,    8},
         {"CORR_HIST_WEIGHT_PCT", &engine::CORR_HIST_WEIGHT_PCT,            0,  400},
     };

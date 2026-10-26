@@ -96,6 +96,13 @@ inline int32_t LMR_EARLY_QUIET_ONLY = 0;
 // above zero, +LMR_BAD_HIST otherwise.
 inline int32_t LMR_GOOD_HIST = 1;
 inline int32_t LMR_BAD_HIST = 1;
+// 0: butterfly sign only; 1: LMR_BAD_HIST - LMR_GOOD_HIST * n, n = positive
+// signals among butterfly and continuation history; 2: -LMR_GOOD_HIST if any.
+inline int32_t LMR_HIST_MODE = 0;
+// Quiet, continuation and capture history bonus: (depth + 1)^2 * HIST_BONUS_PCT / 100.
+inline int32_t HIST_BONUS_PCT = 100;
+// 0: no hash move adds an LMR ply; 1: at PV and cut nodes it takes a ply of depth.
+inline int32_t IIR_MODE = 0;
 inline constexpr int LMR_MAX_DEPTH = 20; // deeper nodes use the last row
 
 // --- History bounds ---
