@@ -62,8 +62,14 @@ inline int LMP_THRESHOLDS[2][LMP_DEPTH_CAP + 1] = {};
 // Indexed by depth (0..3); depth 0 unused.
 inline int32_t HISTORY_PRUNE_THRESHOLD[4] = {0, -4096, -6144, -8192};
 
-// SEE capture pruning: skip captures with SEE < -SEE_CAPTURE_MARGIN * depth.
+// SEE capture pruning: skip captures with SEE < -SEE_CAPTURE_MARGIN * depth,
+// depth 1..SEE_PRUNE_MAX_DEPTH.
 inline int32_t SEE_CAPTURE_MARGIN = 70;
+inline int32_t SEE_PRUNE_MAX_DEPTH = 3;
+// SEE quiet pruning: skip quiets with SEE < -QUIET_SEE_MARGIN * depth^2,
+// depth 1..QUIET_SEE_MAX_DEPTH (0 = off).
+inline int32_t QUIET_SEE_MARGIN = 12;
+inline int32_t QUIET_SEE_MAX_DEPTH = 0;
 // Singular extension.
 inline constexpr int SE_MIN_DEPTH     = 6;
 inline constexpr int SE_DEPTH_MARGIN  = 3;
@@ -81,6 +87,15 @@ void rebuildSearchDerivedTables() noexcept;
 inline int32_t LMR_C_PERCENT = 300;
 // Extra plies of reduction at an expected cut node.
 inline int32_t LMR_CUT_BONUS = 1;
+// First reduced move index: LMR_MIN_INDEX_ALL at an expected all node
+// (non-PV, not cut), 4 elsewhere.
+inline int32_t LMR_MIN_INDEX_ALL = 4;
+// 1: below index 4 only quiets that are neither killer nor countermove.
+inline int32_t LMR_EARLY_QUIET_ONLY = 0;
+// Reduction change for a quiet by its butterfly history sign: -LMR_GOOD_HIST
+// above zero, +LMR_BAD_HIST otherwise.
+inline int32_t LMR_GOOD_HIST = 0;
+inline int32_t LMR_BAD_HIST = 0;
 inline constexpr int LMR_MAX_DEPTH = 20; // deeper nodes use the last row
 
 // --- History bounds ---

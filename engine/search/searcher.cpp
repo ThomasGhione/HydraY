@@ -408,8 +408,17 @@ SearchMoveResult searchMoves(Board& b, MovePicker& movePicker, const SearchConte
             continue;
         }
         // Clearly losing captures at shallow non-PV nodes; move 0 is always searched.
-        if (t.isCapture && !t.isPromotion && moveIndex > 0 && interiorNonPv && ctx.depth <= 3
+        if (t.isCapture && !t.isPromotion && moveIndex > 0 && interiorNonPv && ctx.depth <= SEE_PRUNE_MAX_DEPTH
             && Sorter::staticExchangeEvaluation(b, m) < -SEE_CAPTURE_MARGIN * ctx.depth) {
+            if constexpr (kSearchStats) ++gSearchStats.prunedSee;
+            prunedAny = true;
+            continue;
+        }
+        // Quiets that lose material, checks excepted as in futility.
+        if (isQuietMove && moveIndex > 0 && interiorNonPv && ctx.depth <= QUIET_SEE_MAX_DEPTH
+            && Sorter::staticExchangeEvaluation(b, m) < -QUIET_SEE_MARGIN * ctx.depth * ctx.depth
+            && (t.fromType == Board::KING
+                || !Sorter::givesCheckAfterQuietMoveFast(b, m, t.fromType, oppKingSq, b.getPiecesBitMap()))) {
             if constexpr (kSearchStats) ++gSearchStats.prunedSee;
             prunedAny = true;
             continue;
@@ -432,12 +441,24 @@ SearchMoveResult searchMoves(Board& b, MovePicker& movePicker, const SearchConte
 
         int32_t score;
         // Late captures are reduced too: ordering puts the good ones early.
-        if (ctx.depth >= 3 && moveIndex >= 4 && !t.isPromotion) {
+        const int lmrMinIndex = (!ctx.isPVNode && !ctx.cutNode) ? LMR_MIN_INDEX_ALL : 4;
+        // Below index 4 only plain quiets may be reduced: captures, killers and
+        // the countermove fail high there several times as often.
+        const bool earlyReducible = moveIndex >= 4 || !LMR_EARLY_QUIET_ONLY
+            || (isQuietMove && !m.sameFromTo(runtime.killerMoves[ctx.ply][0])
+                && !m.sameFromTo(runtime.killerMoves[ctx.ply][1])
+                && !(ctx.previousMove != nullptr
+                     && runtime.counterMoves[ctx.previousMove->from][ctx.previousMove->to] == TT::Entry::encodeMove(m)));
+        if (ctx.depth >= 3 && moveIndex >= lmrMinIndex && earlyReducible && !t.isPromotion) {
             int reduction = LMR_REDUCTIONS[std::min(ctx.depth, LMR_MAX_DEPTH - 1)][moveIndex];
             if (ctx.isPVNode) reduction = std::max(1, reduction - 1);
             if (ctx.iirActive) reduction = std::min(reduction + 1, childDepth - 1);
             // More when the eval is falling, and at an expected cut node.
             reduction += !ctx.improving + (ctx.cutNode ? LMR_CUT_BONUS : 0);
+            // History sign: the few quiets above zero fail high several times as often.
+            if (isQuietMove) {
+                reduction += (runtime.history[usSide][m.from][m.to] > 0) ? -LMR_GOOD_HIST : LMR_BAD_HIST;
+            }
             reduction = std::clamp(reduction, 1, childDepth - 1);
             const int reducedDepth = std::max(1, childDepth - reduction);
             if constexpr (kSearchStats) {
