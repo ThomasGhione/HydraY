@@ -39,7 +39,7 @@ static_assert(MATE_VALUE + MAX_PLY <= std::numeric_limits<int16_t>::max(),
 // (FUTILITY_MARGINS, LMP_THRESHOLDS, the LMR table in searcher.cpp) are built
 // at startup and rebuilt by rebuildSearchDerivedTables() after a write.
 // Null-move reduction: NMP_BASE_R + depth / 3, deeper the further eval beats beta.
-inline int32_t NMP_BASE_R = 3;
+inline int32_t NMP_BASE_R = 4;
 inline int32_t NMP_EVAL_DIV = 265;
 inline int32_t NMP_EVAL_MAX = 4;
 // Reverse futility pruning margin per remaining ply.
