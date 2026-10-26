@@ -56,7 +56,7 @@ constexpr int lmpBaseThreshold(int improving, int depth) noexcept {
     return improving ? depth * depth + 7 * depth + 8 : (depth + 2) * (depth + 3);
 }
 inline int32_t LMP_MAX_DEPTH = 4;
-inline int32_t LMP_SCALE_PCT[2] = {100, 100};
+inline int32_t LMP_SCALE_PCT[2] = {50, 50};
 inline int LMP_THRESHOLDS[2][LMP_DEPTH_CAP + 1] = {};
 // History-based quiet pruning: skip quiet moves with very negative history.
 // Indexed by depth (0..3); depth 0 unused.
