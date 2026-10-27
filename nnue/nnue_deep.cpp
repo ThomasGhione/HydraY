@@ -82,8 +82,8 @@ int32_t forwardScalar(const NetworkDeep& net,
 
 namespace {
 
-// 32 accumulatori i16 -> 32 valori pairwise in [0, QA], su corsie i16.
-inline __m256i pairwiseBlock(const int16_t* acc, int j) noexcept {
+// 32 i16 accumulators -> 32 pairwise values in [0, QA], in i16 lanes.
+[[maybe_unused]] inline __m256i pairwiseBlock(const int16_t* acc, int j) noexcept {
     const __m256i zero = _mm256_setzero_si256();
     const __m256i qa   = _mm256_set1_epi16(static_cast<int16_t>(QA));
     const __m256i lo = _mm256_loadu_si256(reinterpret_cast<const __m256i*>(acc + j));
@@ -177,18 +177,22 @@ int32_t forwardSimd(const NetworkDeep& net,
     //
     // The indices of the NON-zero groups are collected HERE, not in a second
     // pass: the 32-byte block is already in a register, whereas a separate pass
-    // had to re-read all of h8 and pay for its own loop.
+    // had to re-read the whole buffer and pay for its own loop.
     //
     // WARNING: the index store writes EIGHT at a time even when the block holds
     // fewer. It is in bounds because before the k-th emission count <= 8k, so
-    // the last one ends exactly at HIDDEN/4. Changing the block size without
-    // redoing that arithmetic overruns the array.
-    alignas(32) uint8_t  h8[HIDDEN];
-    alignas(32) uint16_t nnz[HIDDEN / 4];
+    // the last one ends exactly at HIDDEN/4; the padding below writes three
+    // more. Changing the block size without redoing that arithmetic overruns
+    // the array.
+    // The pairwise bytes are kept as four-byte groups: the dot product
+    // broadcasts one group at a time, and indexing a uint32_t array lets that
+    // be a single scaled load. Slot HIDDEN / 4 is a zero group used as padding.
+    alignas(32) uint32_t h32[HIDDEN / 4 + 1];
+    alignas(32) uint16_t nnz[HIDDEN / 4 + 4];
     int count = 0;
     {
         const __m256i zero  = _mm256_setzero_si256();
-        const __m256i magic = _mm256_set1_epi16(static_cast<int16_t>(32897));
+        const __m256i ones  = _mm256_set1_epi8(1);
         const __m128i eight = _mm_set1_epi16(8);
 
         const auto block = [&](const int16_t* acc, int j) noexcept {
@@ -202,17 +206,20 @@ int32_t forwardSimd(const NetworkDeep& net,
             const __m256i a = _mm256_packus_epi16(ld(acc + j), ld(acc + j + 16));
             const __m256i b = _mm256_packus_epi16(ld(acc + j + PAIRWISE_OUT),
                                                  ld(acc + j + PAIRWISE_OUT + 16));
-            // unpack per lane: lo covers outputs j..j+15, hi covers j+16..j+31
+            // unpack per lane: lo covers outputs j..j+15, hi covers j+16..j+31.
+            // With a, b in [0, 255], a*b/255 (truncating) equals
+            // (257a * (256b + 1)) >> 24, checked for all 65,536 pairs. Both
+            // factors are byte interleavings, so one mulhi replaces the
+            // mullo + mulhi of the direct form.
             const auto half = [&](__m256i x, __m256i y, bool low) noexcept {
-                const __m256i xa = low ? _mm256_unpacklo_epi8(x, zero) : _mm256_unpackhi_epi8(x, zero);
-                const __m256i yb = low ? _mm256_unpacklo_epi8(y, zero) : _mm256_unpackhi_epi8(y, zero);
-                const __m256i p  = _mm256_mullo_epi16(xa, yb);      // <= 65025, exact in u16
-                return _mm256_srli_epi16(_mm256_mulhi_epu16(p, magic), 7);   // == p / 255
+                const __m256i xa = low ? _mm256_unpacklo_epi8(x, x) : _mm256_unpackhi_epi8(x, x);
+                const __m256i yb = low ? _mm256_unpacklo_epi8(ones, y) : _mm256_unpackhi_epi8(ones, y);
+                return _mm256_srli_epi16(_mm256_mulhi_epu16(xa, yb), 8);
             };
             return _mm256_packus_epi16(half(a, b, true), half(a, b, false));
         };
 
-        const auto emit = [&](__m256i v, uint8_t* dst, __m128i base) noexcept {
+        const auto emit = [&](__m256i v, uint32_t* dst, __m128i base) noexcept {
             _mm256_store_si256(reinterpret_cast<__m256i*>(dst), v);
             const unsigned mask =
                 static_cast<unsigned>(_mm256_movemask_ps(_mm256_castsi256_ps(
@@ -228,9 +235,13 @@ int32_t forwardSimd(const NetworkDeep& net,
         // from j would cost two.
         __m128i baseStm = _mm_setzero_si128();
         __m128i baseNtm = _mm_set1_epi16(static_cast<int16_t>(PAIRWISE_OUT / 4));
+        uint32_t* dstStm = h32;
+        uint32_t* dstNtm = h32 + PAIRWISE_OUT / 4;
         for (int j = 0; j < PAIRWISE_OUT; j += 32) {
-            emit(block(accStm, j), h8 + j, baseStm);
-            emit(block(accNtm, j), h8 + PAIRWISE_OUT + j, baseNtm);
+            emit(block(accStm, j), dstStm, baseStm);
+            emit(block(accNtm, j), dstNtm, baseNtm);
+            dstStm += 8;
+            dstNtm += 8;
             baseStm = _mm_add_epi16(baseStm, eight);
             baseNtm = _mm_add_epi16(baseNtm, eight);
         }
@@ -239,35 +250,40 @@ int32_t forwardSimd(const NetworkDeep& net,
     // Input-driven dot product. By broadcasting the four bytes across every
     // lane, vpdpbusd's lane `o` already accumulates output `o`'s dot product:
     // no horizontal reductions at the end.
-    // Four groups per iteration because with only two accumulators the
-    // dependent chain would be as long as the whole loop.
+    // The list is padded to a multiple of four with the zero group, whose
+    // weight row is zero too, so one loop shape covers every count. A separate
+    // remainder loop made GCC shuffle six accumulators through copies on every
+    // iteration of the main one.
     {
-        const int32_t* dw = reinterpret_cast<const int32_t*>(h8);
-        const auto (&wT)[HIDDEN / 4][L1_SIZE * 4] = net.l1wT[outputBucket];
-        const auto ldw = [](const int8_t* p) noexcept {
-            return _mm256_loadu_si256(reinterpret_cast<const __m256i*>(p));
+        h32[HIDDEN / 4] = 0;
+        // Branchless: a data-dependent remainder costs a mispredict per call.
+        nnz[count] = nnz[count + 1] = nnz[count + 2] = static_cast<uint16_t>(HIDDEN / 4);
+        count = (count + 3) & ~3;
+        const int8_t* wT = &net.l1wT[outputBucket][0][0];
+        const auto group = [&h32](uint32_t j) noexcept {
+            return _mm256_set1_epi32(static_cast<int32_t>(h32[j]));
+        };
+        // vpdpbusd accumulates in place. Through the intrinsic GCC 14 kept six
+        // of the eight accumulators in other registers and copied them in and
+        // out on every iteration (12 vmovdqa per 8 vpdpbusd); the asm operand
+        // ties each accumulator to its register.
+        const auto dp = [](__m256i& acc, __m256i v, const int8_t* w) noexcept {
+            asm("%{vex%} vpdpbusd %2, %1, %0" : "+x"(acc) : "x"(v), "m"(*reinterpret_cast<const __m256i*>(w)));
         };
         __m256i a0 = _mm256_setzero_si256(), a1 = a0, a2 = a0, a3 = a0;
         __m256i a4 = a0, a5 = a0, a6 = a0, a7 = a0;
-        int n = 0;
-        for (; n + 4 <= count; n += 4) {
-            const int j0 = nnz[n], j1 = nnz[n + 1], j2 = nnz[n + 2], j3 = nnz[n + 3];
-            const __m256i v0 = _mm256_set1_epi32(dw[j0]), v1 = _mm256_set1_epi32(dw[j1]);
-            const __m256i v2 = _mm256_set1_epi32(dw[j2]), v3 = _mm256_set1_epi32(dw[j3]);
-            a0 = _mm256_dpbusd_avx_epi32(a0, v0, ldw(wT[j0]));
-            a1 = _mm256_dpbusd_avx_epi32(a1, v0, ldw(wT[j0] + 32));
-            a2 = _mm256_dpbusd_avx_epi32(a2, v1, ldw(wT[j1]));
-            a3 = _mm256_dpbusd_avx_epi32(a3, v1, ldw(wT[j1] + 32));
-            a4 = _mm256_dpbusd_avx_epi32(a4, v2, ldw(wT[j2]));
-            a5 = _mm256_dpbusd_avx_epi32(a5, v2, ldw(wT[j2] + 32));
-            a6 = _mm256_dpbusd_avx_epi32(a6, v3, ldw(wT[j3]));
-            a7 = _mm256_dpbusd_avx_epi32(a7, v3, ldw(wT[j3] + 32));
-        }
-        for (; n < count; ++n) {
-            const int j = nnz[n];
-            const __m256i v = _mm256_set1_epi32(dw[j]);
-            a0 = _mm256_dpbusd_avx_epi32(a0, v, ldw(wT[j]));
-            a1 = _mm256_dpbusd_avx_epi32(a1, v, ldw(wT[j] + 32));
+        for (int n = 0; n < count; n += 4) {
+            const uint32_t j0 = nnz[n], j1 = nnz[n + 1], j2 = nnz[n + 2], j3 = nnz[n + 3];
+            const int8_t* w0 = wT + static_cast<size_t>(j0) * (L1_SIZE * 4);
+            const int8_t* w1 = wT + static_cast<size_t>(j1) * (L1_SIZE * 4);
+            const int8_t* w2 = wT + static_cast<size_t>(j2) * (L1_SIZE * 4);
+            const int8_t* w3 = wT + static_cast<size_t>(j3) * (L1_SIZE * 4);
+            const __m256i v0 = group(j0), v1 = group(j1);
+            const __m256i v2 = group(j2), v3 = group(j3);
+            dp(a0, v0, w0); dp(a1, v0, w0 + 32);
+            dp(a2, v1, w1); dp(a3, v1, w1 + 32);
+            dp(a4, v2, w2); dp(a5, v2, w2 + 32);
+            dp(a6, v3, w3); dp(a7, v3, w3 + 32);
         }
         const __m256i lo = _mm256_add_epi32(_mm256_add_epi32(a0, a2), _mm256_add_epi32(a4, a6));
         const __m256i hi = _mm256_add_epi32(_mm256_add_epi32(a1, a3), _mm256_add_epi32(a5, a7));
@@ -288,7 +304,7 @@ int32_t forwardSimd(const NetworkDeep& net,
     // is the useful maximum: at sixteen, the accumulators plus `h` no longer fit
     // in the sixteen ymm registers.
     constexpr int GROUP = 8;
-    static_assert(L1_SIZE % GROUP == 0, "il ciclo elabora GROUP uscite per volta");
+    static_assert(L1_SIZE % GROUP == 0, "the loop handles GROUP outputs at a time");
     alignas(32) int16_t h16[HIDDEN];
     for (int j = 0; j < PAIRWISE_OUT; j += 16) {
         _mm256_store_si256(reinterpret_cast<__m256i*>(h16 + j), pairwiseBlock(accStm, j));
@@ -362,10 +378,12 @@ bool loadFromMemory(const unsigned char* data, size_t size, NetworkDeep& net) no
     // pass writes to the originating neuron. Absorbing packus's lane swap here
     // is free and removes one vpermq per 32 outputs from the hot loop.
     for (int b = 0; b < OUTPUT_BUCKETS; ++b)
+        std::memset(net.l1wT[b][HIDDEN / 4], 0, sizeof(net.l1wT[b][HIDDEN / 4]));
+    for (int b = 0; b < OUTPUT_BUCKETS; ++b)
         for (int g = 0; g < HIDDEN / 4; ++g)
             for (int o = 0; o < L1_SIZE; ++o)
                 for (int k = 0; k < 4; ++k) {
-                    const int pos   = 4 * g + k;                       // position in h8
+                    const int pos   = 4 * g + k;                       // position in the pairwise output
                     const int block = pos & ~31;                       // 32-wide block
                     const int src   = block + PACKUS_MAP[pos - block]; // source neuron
                     net.l1wT[b][g][(o & 7) * 4 + k + (o < 8 ? 0 : 32)] = net.l1w[b][o][src];

@@ -315,6 +315,53 @@ L2=32 or a third layer is the natural next step. ⚠️ The *first* deep16 attem
 lost outright (H0, LLR −2.29); only the reordered/sparse variants won - depth
 alone is not sufficient, weight layout matters.
 
+**4.4 v8 dataset recipe (2026-09-15) [M]**
+
+Standard starts (random 8-9 plies) are the backbone, plus the dedicated endgame batch
+(`CHESS_DATAGEN_EG_EVERY=1`, ~7% as in v7). Chess324 (`CHESS_DATAGEN_START=chess324`)
+joins only if its test wins. Each regime gets its own prefix and the mix is chosen at
+shuffle time. Labeler: the embedded deep16 champion; at least 3B positions.
+
+- **Frozen labeler.** Generate from a copy (`cp chess nnue/data/datagen_v8`) whose
+  embedded net matches `nnue/net/hydray.nnue`. A binary built on another branch keeps
+  that branch's net and datagen does not say so: on 2026-09-15 `./chess` still carried
+  the L2=32 net.
+- **Holdout.** The first 20M records of the standard run's `t0` file
+  (`head -c 640000000`). Skip the next 400 records (a game writes at most 384, as one
+  block) and train on the rest (`tail -c +640012801`). Evaluate with
+  `nnue/tools/holdoutloss.cpp`.
+- **Label scale: consistent, no rescaling (2026-10-04).** Regressing the label on the
+  champion's static eval over 2M records each (|eval| <= 1000) gives slope 1.058 for
+  v7, 1.068 for v8 standard, 1.073 for Chess324; the label medians per 100 cp eval bin
+  agree within ~15 cp out to +-1000. What does differ is the outcome: draws 26.7% in
+  v7, 34.1% standard, 31.2% Chess324, i.e. the WDL part of the target.
+- **Chess324 test.** Two deep16 nets with the champion recipe (v7, 160 SB, slices
+  1-2-3-4-1-2-3-4) where 15% of every v7 slice is replaced by fresh standard data or
+  by Chess324 data. The fresh-standard arm cancels the newer labeler. Pools: 445.2M
+  records each, Chess324 from the whole pilot, standard from `v8_std.t1..t5` (t0 is
+  never read, it holds the holdout); built and checksummed per `nnue/data/ab/MANIFEST.txt`.
+  `datamix` does the replacement on Colab with the same seed in both arms, so the same
+  v7 records sit in the same slots and only the replaced 15% differs
+  (`nnue/trainer/colab_ab_c324.ipynb`, one notebook, `ARM` selects the pool). Verdict:
+  `tuning/run_ab_c324.sh`, 150k nodes, [0, 5], Chess324 as new. It joins v8 only on H1.
+  **Result (2026-10-05): H0, Chess324 stays out of v8.** Elo **-5.67** (95%
+  [-11.27, -0.07], LOS 2.4%), LLR -2.97 after 6500 games, Ptnml
+  [164, 841, 1330, 767, 148]. Not just "no gain": the CI excludes zero on the losing
+  side. Run in two parts because the first stopped at run_sprt.sh's 4000-game cap
+  (now raised in the wrapper); the second used only book openings the first had not
+  played, since fixed-node games are deterministic and a repeat is a duplicate, and
+  the LLR was computed on the summed pentanomials (checked against fastchess on part 1).
+
+No UHO or biased-opening share, by measurement (`sp-cc.de` gives no training-data mix;
+its UHO books exist to cut top-engine draw rates in testing):
+- Random-walk starts: median |score| 158, 52% at 150 or more. UHO 2024 end positions:
+  median 153 (HydraY reads them at ~1.4x Dragon cp). Our draw rate is 27-36%, not 90%.
+- Two random plies after a UHO line undo its selection (median 222, 31% fail the 400
+  filter); without them, 25% of 40M games over its 92k positions repeats each ~100x.
+- HydraY has no Chess960 castling. Chess324 perft matches python-chess on 284
+  positions (32.4M nodes, 27,164 castling moves).
+- Throughput: ~2,030 pos/s on 16 threads, 72 records per game, so 3B is ~17 days here.
+
 ---
 
 ## 5. Verified sound - no action
@@ -415,6 +462,39 @@ nothing.
 | `fullMoveClock` uint8 saturation | **provably 0 Elo** - see §9 |
 | `MAX_QSEARCH_DEPTH` vs absolute ply | **0 firings in 36.5M qsearch calls** - see §9 |
 | contHist dead row removed (7→6) | node-identical, NPS-neutral - see §9 |
+| 8 king buckets on v7, 160 SB | TC **−4.65 ±5.30 @7700 (H0)**; fixed 150k nodes −2.59 ±4.97 @8576 - see §8.1 |
+
+### 8.1 Eight king buckets (2026-09-14)
+
+Branch `halfka8-v3`: a strict refinement of the 4-bucket map (splits rank 1
+corner/b-g, rank 2 centre/wings, ranks 3-4 from 5-8), deep16, v7, 160 SB, the
+same recipe as the champion. Net kept at `nnue/data/hydray-h8-v7-160sb.nnue`.
+
+Ruled out, each by direct measurement:
+
+- **Undertraining / bad fit.** Train loss on v7 is 0.6-1.4% better than the
+  champion's at every bucket.
+- **Eval scale drift** (the `MATERIAL_TO_EVAL_PCT` question). Slope 0.9991 over
+  1.5M positions; the per-net sigmoid K is identical.
+- **Dead buckets.** Ablating each bucket's delta moves its positions' evals; none
+  is a copy of the factoriser.
+- **Node inflation.** At fixed nodes the searched depth is the same (−0.006 ply).
+  The TC depth loss (−0.095 ply) is the −7.1% NPS, larger in the endgame.
+- **Worse move ranking.** 29,703 parents, quiet siblings scored by Stockfish
+  MultiPV, bootstrapped by game. The positive control (8b@80 vs 8b@160) resolves
+  clearly: top1 −2.5pp, regret +15.3cp. Champion vs 8b@160: top1 +0.25pp
+  [−0.19, +0.66], regret −0.69cp [−2.84, +1.36], rho5 +0.007 [+0.003, +0.011].
+  A tie, with the champion marginally ahead on top-5 order, uniformly across
+  king regions (including the ranks the new map splits).
+
+Not measurable at our scale: out-of-sample WDL. The positive control had 24-34%
+power; separating nets this close needs ~190-280k games.
+
+Open: overfitting vs a better fit the search cannot use. Both predict a lower
+train loss and no ranking gain, and without a real validation split they cannot
+be told apart. The decision does not depend on it: with v7 and this budget the
+extra buckets buy nothing and cost 7% NPS. Revisit only with a different dataset,
+not with more epochs or a retuned eval scale.
 
 ---
 

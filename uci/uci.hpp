@@ -1,9 +1,10 @@
 #pragma once
 
 #include <mutex>
+#include <sstream>
 #include <string>
-#include <thread>
 #include <string_view>
+#include <thread>
 
 namespace engine {
     class Engine;
@@ -12,30 +13,15 @@ namespace engine {
 namespace uci {
 
 class UCI {
-
 public:
-
-    UCI(engine::Engine& engine);
+    explicit UCI(engine::Engine& engine);
     ~UCI() noexcept;
 
-    engine::Engine& engine;
-
     [[noreturn]] void mainLoop() noexcept;
-
-    // Parser
-    void parseCommand(std::string_view command) noexcept;
-
-    // Standard UCI commands
-    void uci() noexcept;
-    void setOption(std::string_view args) noexcept;
-    void position(std::string_view command) noexcept;
-    void ucinewgame() noexcept;
-    void isready() noexcept;
-    void go(std::string_view args) noexcept;
-    void ponderhit() noexcept;
+    void parseCommand(const std::string& command) noexcept;
 
 private:
-
+    engine::Engine& engine;
     std::thread searchThread;
     std::mutex searchMutex;
     std::string searchBestMove = "0000";
@@ -43,11 +29,13 @@ private:
     bool searchDone = false;
     bool searchPrinted = true;
 
+    void uci() noexcept;
+    void setOption(std::istringstream& is) noexcept;
+    void position(std::istringstream& is) noexcept;
+    void go(std::istringstream& is) noexcept;
+    void ponderhit() noexcept;
     void stopSearch(bool printBestMove) noexcept;
     void emitBestMove(std::string_view move) noexcept; // caller must hold searchMutex
-    void parseMoves(std::string_view moves) noexcept;
-    void parseFEN(std::string_view fen) noexcept;
-
-}; // class UCI
+};
 
 }

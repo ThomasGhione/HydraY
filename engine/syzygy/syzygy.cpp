@@ -4,17 +4,54 @@ extern "C" {
 #include "tbprobe.h"
 }
 
-#include <vector>
+#include <bit>
 
 #include "../search/search_constants.hpp"
 
+// Pyrrhic's attacks (tbconfig.h) from the engine's tables. Its squares run from
+// a1 and ours from a8: square s is s ^ 56, and a bitboard is byteswapped.
+extern "C" {
+uint64_t hydray_tb_pawn_attacks(int sq, int white) {
+    return std::byteswap(pieces::PAWN_ATTACKS[white ? 0 : 1][sq ^ 56]);
+}
+uint64_t hydray_tb_knight_attacks(int sq) {
+    return std::byteswap(pieces::KNIGHT_ATTACKS[sq ^ 56]);
+}
+uint64_t hydray_tb_bishop_attacks(int sq, uint64_t occ) {
+    return std::byteswap(pieces::getBishopAttacks(static_cast<uint8_t>(sq ^ 56), std::byteswap(occ)));
+}
+uint64_t hydray_tb_rook_attacks(int sq, uint64_t occ) {
+    return std::byteswap(pieces::getRookAttacks(static_cast<uint8_t>(sq ^ 56), std::byteswap(occ)));
+}
+uint64_t hydray_tb_king_attacks(int sq) {
+    return std::byteswap(pieces::KING_ATTACKS[sq ^ 56]);
+}
+}
+
 namespace syzygy {
 
-// TB win/loss scores sit just inside MATE_BOUND so they're treated as
-// decisive but ranked below actual checkmates. Blessed/cursed results
-// (50-move rule) are scored as 0 (draw).
-static constexpr int32_t TB_WIN_SCORE  = engine::MATE_BOUND - 500;
-static constexpr int32_t TB_LOSS_SCORE = -TB_WIN_SCORE;
+namespace {
+
+// Pyrrhic takes LERF bitboards (a1 = 0); ours put a8 at 0, a vertical mirror.
+struct PyrrhicPosition {
+    uint64_t white, black, kings, queens, rooks, bishops, knights, pawns;
+    unsigned ep;
+    bool whiteToMove;
+
+    explicit PyrrhicPosition(const chess::Board& b) noexcept
+        : white(std::byteswap(b.sideOcc(0))), black(std::byteswap(b.sideOcc(1))),
+          kings(both(b, chess::Board::KING)), queens(both(b, chess::Board::QUEEN)),
+          rooks(both(b, chess::Board::ROOK)), bishops(both(b, chess::Board::BISHOP)),
+          knights(both(b, chess::Board::KNIGHT)), pawns(both(b, chess::Board::PAWN)),
+          ep(chess::isValidSquare(b.getEnPassant()) ? 56u ^ b.getEnPassant() : 0u),
+          whiteToMove(b.getActiveColor() == chess::Board::WHITE) {}
+
+    static uint64_t both(const chess::Board& b, int type) noexcept {
+        return std::byteswap(b.bb[type][0] | b.bb[type][1]);
+    }
+};
+
+} // namespace
 
 bool SyzygyProber::load(const std::string& path) {
     loaded_ = tb_init(path.c_str());
@@ -25,137 +62,53 @@ int SyzygyProber::maxPieces() const noexcept {
     return TB_LARGEST;
 }
 
-uint64_t SyzygyProber::sideOccupancy(const chess::Board& b, int side) noexcept {
-    return b.pawns_bb[side] | b.knights_bb[side] | b.bishops_bb[side]
-         | b.rooks_bb[side] | b.queens_bb[side] | b.kings_bb[side];
-}
-
 bool SyzygyProber::inTBRange(const chess::Board& board) const noexcept {
-    if (!loaded_) return false;
-    // All pieces regardless of color - popcount of the full occupancy.
-    const int pieces = __builtin_popcountll(sideOccupancy(board, 0) | sideOccupancy(board, 1));
-    return pieces <= TB_LARGEST;
+    return loaded_ && std::popcount(board.getPiecesBitMap()) <= TB_LARGEST;
 }
 
 int32_t SyzygyProber::wdlToScore(WDL wdl, int ply) noexcept {
     switch (wdl) {
-        case WDL::Win:         return TB_WIN_SCORE  - ply;
-        case WDL::Loss:        return TB_LOSS_SCORE + ply;
-        case WDL::BlessedLoss: return 0;
-        case WDL::CursedWin:   return 0;
-        case WDL::Draw:        return 0;
+        case WDL::Win:  return engine::TB_WIN_SCORE - ply;
+        case WDL::Loss: return -engine::TB_WIN_SCORE + ply;
+        default:        return 0; // the fifty-move rule makes cursed wins and blessed losses draws
     }
-    return 0;
 }
 
-uint64_t SyzygyProber::toPyrrhicBB(uint64_t bb) noexcept {
-    return __builtin_bswap64(bb);
-}
-
-unsigned SyzygyProber::toPyrrhicEP(chess::Square ep) noexcept {
-    if (!chess::isValidSquare(ep)) return 0;
-    return static_cast<unsigned>(56 ^ ep);
-}
-
-// HydraY convention: bb[0] = White, bb[1] = Black (colorToIndex(WHITE) == 0).
 std::optional<WDL> SyzygyProber::probeWDL(const chess::Board& board) const {
-    if (!loaded_) return std::nullopt;
-
-    const uint64_t allW = toPyrrhicBB(sideOccupancy(board, 0));
-    const uint64_t allB = toPyrrhicBB(sideOccupancy(board, 1));
-
-    if (__builtin_popcountll(allW | allB) > TB_LARGEST) return std::nullopt;
-
-    const bool turn = (board.getActiveColor() == chess::Board::WHITE);
-
-    const unsigned result = tb_probe_wdl(
-        allW, allB,
-        toPyrrhicBB(board.kings_bb[0]   | board.kings_bb[1]),
-        toPyrrhicBB(board.queens_bb[0]  | board.queens_bb[1]),
-        toPyrrhicBB(board.rooks_bb[0]   | board.rooks_bb[1]),
-        toPyrrhicBB(board.bishops_bb[0] | board.bishops_bb[1]),
-        toPyrrhicBB(board.knights_bb[0] | board.knights_bb[1]),
-        toPyrrhicBB(board.pawns_bb[0]   | board.pawns_bb[1]),
-        toPyrrhicEP(board.getEnPassant()),
-        turn);
-
+    if (!inTBRange(board)) return std::nullopt;
+    const PyrrhicPosition p(board);
+    const unsigned result = tb_probe_wdl(p.white, p.black, p.kings, p.queens, p.rooks,
+                                         p.bishops, p.knights, p.pawns, p.ep, p.whiteToMove);
     if (result == TB_RESULT_FAILED) return std::nullopt;
     return static_cast<WDL>(static_cast<int>(result) - 2);
 }
 
 std::vector<RootMove> SyzygyProber::probeRoot(const chess::Board& board) const {
-    if (!loaded_) return {};
+    if (!inTBRange(board)) return {};
+    const PyrrhicPosition p(board);
 
-    const uint64_t allW = toPyrrhicBB(sideOccupancy(board, 0));
-    const uint64_t allB = toPyrrhicBB(sideOccupancy(board, 1));
-
-    if (__builtin_popcountll(allW | allB) > TB_LARGEST) return {};
-
-    const bool turn = (board.getActiveColor() == chess::Board::WHITE);
-
-    // Use tb_probe_root (not tb_probe_root_dtz) because we need per-move DTZ.
-    // tb_probe_root_dtz collapses every "guaranteed win" to TB_MAX_DTZ when
-    // cnt50 + dtz <= 99, which is the common case - that erases the
-    // distinction between "promote in 1" and "shuffle the king for 30 plies".
-    // The probe_root results[] array carries the actual DTZ per move, which
-    // lets the search pick the fastest conversion.
+    // tb_probe_root, not tb_probe_root_dtz: the latter collapses every win with
+    // cnt50 + dtz <= 99 to TB_MAX_DTZ, so "promote in 1" and "shuffle for 30
+    // plies" would rank the same. results[] carries each move's own DTZ.
     unsigned results[TB_MAX_MOVES + 1] = {0};
-    const unsigned r = tb_probe_root(
-        allW, allB,
-        toPyrrhicBB(board.kings_bb[0]   | board.kings_bb[1]),
-        toPyrrhicBB(board.queens_bb[0]  | board.queens_bb[1]),
-        toPyrrhicBB(board.rooks_bb[0]   | board.rooks_bb[1]),
-        toPyrrhicBB(board.bishops_bb[0] | board.bishops_bb[1]),
-        toPyrrhicBB(board.knights_bb[0] | board.knights_bb[1]),
-        toPyrrhicBB(board.pawns_bb[0]   | board.pawns_bb[1]),
-        static_cast<unsigned>(board.getHalfMoveClock()),
-        toPyrrhicEP(board.getEnPassant()),
-        turn,
-        results);
+    const unsigned r = tb_probe_root(p.white, p.black, p.kings, p.queens, p.rooks, p.bishops,
+                                     p.knights, p.pawns, static_cast<unsigned>(board.getHalfMoveClock()),
+                                     p.ep, p.whiteToMove, results);
+    if (r == TB_RESULT_FAILED || r == TB_RESULT_CHECKMATE || r == TB_RESULT_STALEMATE) return {};
 
-    if (r == TB_RESULT_FAILED) return {};
-    if (r == TB_RESULT_CHECKMATE || r == TB_RESULT_STALEMATE) return {};
-
-    // Rank scale: large enough that Win > 0 > Loss with room for DTZ
-    // tiebreaks. INT32 headroom is comfortable.
-    constexpr int32_t WIN_BASE  =  1'000'000'000;
-    constexpr int32_t LOSS_BASE = -1'000'000'000;
-
+    static constexpr uint8_t PROMOTION[8] = {0, chess::Board::QUEEN, chess::Board::ROOK,
+                                             chess::Board::BISHOP, chess::Board::KNIGHT, 0, 0, 0};
     std::vector<RootMove> out;
-    out.reserve(TB_MAX_MOVES);
     for (unsigned i = 0; i < TB_MAX_MOVES + 1 && results[i] != TB_RESULT_FAILED; ++i) {
-        const unsigned res  = results[i];
-        const unsigned wdl  = TB_GET_WDL(res);
-        const unsigned dtz  = TB_GET_DTZ(res);
-        const unsigned from = TB_GET_FROM(res);
-        const unsigned to   = TB_GET_TO(res);
-        const unsigned promotes = TB_GET_PROMOTES(res);
-
-        uint8_t promo = 0;
-        switch (promotes) {
-            case PYRRHIC_FLAG_QPROMO: promo = chess::Board::QUEEN;  break;
-            case PYRRHIC_FLAG_RPROMO: promo = chess::Board::ROOK;   break;
-            case PYRRHIC_FLAG_BPROMO: promo = chess::Board::BISHOP; break;
-            case PYRRHIC_FLAG_NPROMO: promo = chess::Board::KNIGHT; break;
-            default: break;
-        }
-
-        // tbRank: higher is better. Smaller DTZ beats larger DTZ on the
-        // winning side; larger DTZ (slower loss) beats smaller DTZ on the
-        // losing side. Cursed Win (WDL=3) and Blessed Loss (WDL=1) are
-        // 50-move-rule draws - score them as draws to avoid trading a
-        // real win for one.
-        int32_t rank = 0;
-        if (wdl == TB_WIN)        rank = WIN_BASE  - static_cast<int32_t>(dtz);
-        else if (wdl == TB_LOSS)  rank = LOSS_BASE + static_cast<int32_t>(dtz);
-        // TB_DRAW, TB_CURSED_WIN, TB_BLESSED_LOSS → rank 0.
-
-        out.push_back({
-            chess::Move{
-                static_cast<uint8_t>(56 ^ from),
-                static_cast<uint8_t>(56 ^ to),
-                promo},
-            rank});
+        const unsigned res = results[i];
+        // A faster win and a slower loss rank higher; every draw ranks 0.
+        const int32_t dtz = static_cast<int32_t>(TB_GET_DTZ(res));
+        const int32_t rank = TB_GET_WDL(res) == TB_WIN  ?  1'000'000'000 - dtz
+                           : TB_GET_WDL(res) == TB_LOSS ? -1'000'000'000 + dtz : 0;
+        out.push_back({chess::Move{static_cast<uint8_t>(56 ^ TB_GET_FROM(res)),
+                                   static_cast<uint8_t>(56 ^ TB_GET_TO(res)),
+                                   PROMOTION[TB_GET_PROMOTES(res)]},
+                       rank});
     }
     return out;
 }

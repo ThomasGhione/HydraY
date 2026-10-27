@@ -1,13 +1,9 @@
 #pragma once
 
-// Costruzione dell'accumulatore da una FEN, per gli strumenti fuori dal motore
-// (deepcheck, reorder). E' una TRADUZIONE LETTERALE di sanity_deep.rs: nel
-// motore quel lavoro lo fa Board tramite accumulator.hpp, che non cambia perche'
-// l0 e' identico alla rete a un layer.
-//
-// Sta in un'intestazione condivisa e non copiata in ogni strumento: erano due
-// copie e stavano per diventare tre. Se sbaglia, i confronti con l'oracolo
-// falliscono e lo si scopre subito.
+// The accumulator of a FEN, for the tools outside the engine (deepcheck,
+// reorder, holdoutloss): a literal translation of sanity_deep.rs. In the
+// engine, Board does this work through accumulator.hpp. If it is wrong, the
+// comparisons with the oracle fail at once.
 
 #include "../network_deep.hpp"
 
@@ -37,7 +33,7 @@ int kingBucket(int ksq) {
 
 struct Piece { int type; bool black; int sq; };
 
-// Ritorna false su FEN malformata (re mancante).
+// False on a malformed FEN (a missing king).
 bool accumulate(const NetworkDeep& net, const std::string& fen,
                 std::vector<int16_t>& accUs, std::vector<int16_t>& accThem,
                 int& outBucket) {

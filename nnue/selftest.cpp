@@ -17,14 +17,16 @@ namespace NNUE {
 
 namespace {
 
-bool accumulatorMatchesScratch(chess::Board& b, const char* context, int game, int ply) {
-    // HalfKA laziness: a perspective whose king crossed bucket/flip is dirty
-    // until the next evaluate(); settle it before comparing (this is exactly
-    // the state evaluate() would see).
+bool accumulatorMatchesScratch(const chess::Board& b, const char* context, int game, int ply) {
     b.ensureNnueAccumulatorClean();
-    const Accumulator incremental = b.nnueAccumulator;
-    b.refreshNnueAccumulator(); // overwrites with the from-scratch values
-    if (std::memcmp(&incremental, &b.nnueAccumulator, sizeof(Accumulator)) != 0) {
+    const chess::Board scratch(b.boardToFen());   // its frame is a from-scratch rebuild
+    const Accumulator& inc = b.accumulator();
+    const Accumulator& ref = scratch.accumulator();
+    const bool same = std::memcmp(inc.v, ref.v, sizeof(inc.v)) == 0
+                   && inc.base[0] == ref.base[0] && inc.base[1] == ref.base[1]
+                   && inc.flip[0] == ref.flip[0] && inc.flip[1] == ref.flip[1]
+                   && !inc.dirty[0] && !inc.dirty[1];
+    if (!same) {
         std::cout << "MISMATCH (" << context << ") game " << game << " ply " << ply
                   << "\n  fen: " << b.boardToFen() << "\n";
         return false;
@@ -39,7 +41,6 @@ int runSelfTest(int argc, char* argv[]) {
         std::cerr << "usage: ./chess nnue-selftest <net.bin> [games]\n";
         return 1;
     }
-    pieces::initMagicBitboards();
     if (!loadNetwork(argv[2])) return 1;
     const int games = (argc >= 4) ? std::max(1, std::atoi(argv[3])) : 200;
 
@@ -78,9 +79,11 @@ int runSelfTest(int argc, char* argv[]) {
         return 1;
     }
 
-    // Random walks: after every doMove (and a doMove+undoMove probe of a
-    // different random move) the incremental accumulator must be byte-equal
-    // to a from-scratch rebuild. Covers captures/EP/castling/promotions.
+    // Random walks. At every ply a probe move is played and evaluated one ply
+    // deeper, then unwound, and the main line is checked only every few plies,
+    // so frames are computed from ancestors several moves back, as in a search.
+    // Covers captures/EP/castling/promotions and king bucket crossings; every
+    // check compares with a board built from scratch.
     std::mt19937_64 rng(0xC0FFEE);
     uint64_t positions = 0;
     for (int game = 0; game < games; ++game) {
@@ -92,12 +95,21 @@ int runSelfTest(int argc, char* argv[]) {
             chess::Board::MoveState st{};
             const chess::Move& probe = legal[rng() % static_cast<uint64_t>(legal.size)];
             b.doMove(probe, st);
+            const MoveList replies = engine::MoveGenerator::generateLegalMoves(b);
+            if (!replies.is_empty()) {
+                chess::Board::MoveState replyState{};
+                const chess::Move& reply = replies[static_cast<size_t>(ply) % static_cast<size_t>(replies.size)];
+                b.doMove(reply, replyState);
+                if (!accumulatorMatchesScratch(b, "probe reply", game, ply)) return 1;
+                b.undoMove(reply, replyState);
+            }
+            if (ply % 2 == 0 && !accumulatorMatchesScratch(b, "probe", game, ply)) return 1;
             b.undoMove(probe, st);
-            if (!accumulatorMatchesScratch(b, "do+undo", game, ply)) return 1;
+            if (ply % 3 == 0 && !accumulatorMatchesScratch(b, "do+undo", game, ply)) return 1;
 
             const chess::Move& m = legal[rng() % static_cast<uint64_t>(legal.size)];
             b.doMove(m, st);
-            if (!accumulatorMatchesScratch(b, "doMove", game, ply)) return 1;
+            if (ply % 4 == 3 && !accumulatorMatchesScratch(b, "doMove", game, ply)) return 1;
             ++positions;
         }
     }

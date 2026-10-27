@@ -6,6 +6,10 @@
 
 namespace chess {
 
+namespace {
+constexpr std::string_view PIECE_CHARS = "PNBRQKpnbrqk";
+}
+
 uint8_t Board::safeParseInt(const std::string& section, int min, int max, int defaultValue) {
     if (section.empty()) return defaultValue;
     int v = 0;
@@ -16,19 +20,21 @@ uint8_t Board::safeParseInt(const std::string& section, int min, int max, int de
 void Board::fenToBoard(const std::string& fen) {
     std::istringstream fenStream(fen);
     std::string board, active, castling, ep, half, full;
-    if (!(fenStream >> board >> active >> castling >> ep >> half >> full)) return;
+    if (!(fenStream >> board >> active)) return;
+    // Trailing fields are optional, as in Stockfish: an EPD line stops after the
+    // en passant square, and missing fields read as "- - 0 1".
+    fenStream >> castling >> ep >> half >> full;
 
-    std::array<uint32_t, 8> parsedBoard{};
+    std::array<uint8_t, 64> parsedBoard{};
     {
         int rank = 7, file = 0;
         for (char c : board) {
             if (c == '/') { --rank; file = 0; }
             else if (ascii::isDigit(c)) file += c - '0';
             else {
-                if (rank < 0 || file > 7) return;
-                const uint8_t p = CHAR_TO_PIECE_TYPE[static_cast<uint8_t>(c)];
-                if (p == EMPTY) return;
-                parsedBoard[rank] |= static_cast<uint32_t>(p) << (file++ * 4);
+                const size_t i = PIECE_CHARS.find(c);
+                if (rank < 0 || file > 7 || i == std::string_view::npos) return;
+                parsedBoard[(7 - rank) * 8 + file++] = static_cast<uint8_t>((i % 6 + 1) | (i < 6 ? WHITE : BLACK));
             }
         }
         if (rank != 0 || file != 8) return;
@@ -50,21 +56,24 @@ void Board::fenToBoard(const std::string& fen) {
     rebuildRepetitionHistory();
 }
 
-std::string Board::boardToFen() const {
-    constexpr std::array<char, 8> pieceChar = {'.', 'P', 'N', 'B', 'R', 'Q', 'K', '?'};
+std::string placementFen(const std::array<char, 64>& squares) {
     std::string fen;
-    for (int rank = 7; rank >= 0; --rank) {
-        int emptySq = 0;
-        for (int file = 0; file < 8; ++file) {
-            const uint8_t p = (chessboard[rank] >> (file * 4)) & MASK_PIECE;
-            if (p == EMPTY) { ++emptySq; continue; }
-            if (emptySq) { fen += char('0' + emptySq); emptySq = 0; }
-            const char sym = pieceChar[p & MASK_PIECE_TYPE];
-            fen += (p & MASK_COLOR) == BLACK ? char(sym | 0x20) : sym;
-        }
-        if (emptySq) fen += char('0' + emptySq);
-        if (rank > 0) fen += '/';
+    for (int sq = 0; sq < 64; ++sq) {
+        if (sq > 0 && sq % 8 == 0) fen += '/';
+        if (squares[sq] != '.') fen += squares[sq];
+        else if (!fen.empty() && ascii::isDigit(fen.back())) ++fen.back();
+        else fen += '1';
     }
+    return fen;
+}
+
+std::string Board::boardToFen() const {
+    std::array<char, 64> squares;
+    for (int sq = 0; sq < 64; ++sq) {
+        const uint8_t p = chessboard[sq];
+        squares[sq] = (p == EMPTY) ? '.' : PIECE_CHARS[(p & MASK_PIECE_TYPE) - 1 + ((p & MASK_COLOR) == BLACK ? 6 : 0)];
+    }
+    std::string fen = placementFen(squares);
     fen += activeColor == WHITE ? " w " : " b ";
     const size_t castleStart = fen.size();
     for (int i = 0; i < 4; ++i)

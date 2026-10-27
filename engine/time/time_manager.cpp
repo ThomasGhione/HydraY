@@ -20,27 +20,29 @@ void TimeManager::init(const Limits& limits, bool sideIsWhite, int movesPlayed,
     stop(); // ensure no stale watchdog from a previous search
 
     stopFlag_        = stopFlag;
+    pondering_.store(false, std::memory_order_relaxed);
     stabilityFactor_ = 1.0;
+    fixedTime_       = false;
     baseMs_          = 0;
     softCapMs_       = 0;
     softMs_          = 0;
     hardMs_          = 0;
 
-    // Modes that bypass time management entirely: the search runs until an
-    // external stop, a node cap, or a depth cap. No clock and no movetime =>
-    // no budget. This also covers pure depth/node-bound `go` commands, since
-    // those carry neither a clock nor a movetime.
-    if (limits.infinite || limits.ponder ||
-        (!limits.hasClock && limits.movetime <= 0)) {
+    // No clock and no movetime (depth, nodes, infinite): no budget, the search
+    // runs until it is stopped or capped. A `go ponder` with a clock gets its
+    // budget now and spends it from ponderhit.
+    if (limits.infinite || (!limits.hasClock && limits.movetime <= 0)) {
         useTm_ = false;
         return;
     }
+    pondering_.store(limits.ponder, std::memory_order_relaxed);
 
     // Fixed time per move: soft == hard, only the overhead is shaved off.
     if (limits.movetime > 0) {
         const int64_t t = std::max<int64_t>(
             MIN_THINK_MS, limits.movetime - MOVE_OVERHEAD_MS);
         useTm_     = true;
+        fixedTime_ = true;
         baseMs_    = t;
         softCapMs_ = t;
         softMs_    = t;
@@ -64,10 +66,8 @@ void TimeManager::init(const Limits& limits, bool sideIsWhite, int movesPlayed,
     double base = static_cast<double>(timeLeft) / static_cast<double>(mtg)
                 + static_cast<double>(myInc) * INC_FRACTION;
 
-    // Opening ramp: spend less on the first moves. Only applied WITHOUT an
-    // increment: with an increment the clock is replenished every move, so
-    // there is no reason to under-think the opening. No increment => the
-    // clock only ever shrinks, so the early-game discount still protects it.
+    // Opening ramp, only without an increment: with one the clock refills
+    // every move, so there is no reason to under-think the opening.
     if (myInc <= 0 && movesPlayed < OPENING_MOVES) {
         const double r = OPENING_MIN_SCALE +
             (1.0 - OPENING_MIN_SCALE) * (static_cast<double>(movesPlayed) /
@@ -106,7 +106,7 @@ void TimeManager::recomputeSoft() noexcept {
 void TimeManager::updateStability(bool bestMoveChanged, int32_t score,
                                    int32_t prevScore,
                                    bool hasPrevScore) noexcept {
-    if (!useTm_) return;
+    if (!useTm_ || fixedTime_) return;
 
     double f = stabilityFactor_;
 
@@ -137,33 +137,57 @@ void TimeManager::updateStability(bool bestMoveChanged, int32_t score,
 }
 
 void TimeManager::start() noexcept {
-    startTp_ = Clock::now();
+    startTicks_.store(Clock::now().time_since_epoch().count(),
+                      std::memory_order_release);
+    const std::lock_guard<std::mutex> lock(mtx_);
+    cancel_ = false;
+    armed_  = useTm_;
     if (!useTm_ || hardMs_ <= 0) return;
-
-    {
-        std::lock_guard<std::mutex> lock(mtx_);
-        cancel_  = false;
-        running_ = true;
+    if (pondering_.load(std::memory_order_relaxed)) {
+        if (!ponderhitSeen_) return;
+        // The ponderhit beat the search thread here: the clock started then.
+        startTicks_.store(ponderhitTicks_, std::memory_order_release);
+        pondering_.store(false, std::memory_order_release);
     }
     watchdog_ = std::thread([this] { watchdogLoop(); });
 }
 
+void TimeManager::clearPonderhit() noexcept {
+    const std::lock_guard<std::mutex> lock(mtx_);
+    ponderhitSeen_ = false;
+}
+
+void TimeManager::ponderhit() noexcept {
+    const std::lock_guard<std::mutex> lock(mtx_);
+    ponderhitSeen_  = true;
+    ponderhitTicks_ = Clock::now().time_since_epoch().count();
+    if (!armed_ || !pondering_.load(std::memory_order_relaxed)) return;
+    // The opponent's thinking time was free; our own clock runs from here.
+    startTicks_.store(ponderhitTicks_, std::memory_order_release);
+    pondering_.store(false, std::memory_order_release);
+    if (hardMs_ <= 0) return;
+    watchdog_ = std::thread([this] { watchdogLoop(); });
+}
+
 void TimeManager::stop() noexcept {
+    // The thread object is taken under the lock: ponderhit() may be assigning
+    // it from the command thread.
+    std::thread watchdog;
     {
-        std::lock_guard<std::mutex> lock(mtx_);
-        if (!running_ && !watchdog_.joinable()) return;
+        const std::lock_guard<std::mutex> lock(mtx_);
+        armed_  = false;
         cancel_ = true;
+        watchdog = std::move(watchdog_);
     }
     cv_.notify_all();
-    if (watchdog_.joinable()) watchdog_.join();
-    std::lock_guard<std::mutex> lock(mtx_);
-    running_ = false;
+    if (watchdog.joinable()) watchdog.join();
 }
 
 void TimeManager::watchdogLoop() noexcept {
     std::unique_lock<std::mutex> lock(mtx_);
     const auto deadline =
-        startTp_ + std::chrono::milliseconds(hardMs_);
+        Clock::time_point(Clock::duration(startTicks_.load(std::memory_order_acquire)))
+        + std::chrono::milliseconds(hardMs_);
     // Wake either at the hard deadline or when stop() cancels us.
     cv_.wait_until(lock, deadline, [this] { return cancel_; });
     if (!cancel_ && stopFlag_ != nullptr) {
@@ -172,13 +196,14 @@ void TimeManager::watchdogLoop() noexcept {
 }
 
 int64_t TimeManager::elapsedMs() const noexcept {
-    const auto now = Clock::now();
+    const auto start = Clock::time_point(
+        Clock::duration(startTicks_.load(std::memory_order_acquire)));
     return std::chrono::duration_cast<std::chrono::milliseconds>(
-               now - startTp_).count();
+               Clock::now() - start).count();
 }
 
 bool TimeManager::shouldStartNextDepth() const noexcept {
-    if (!useTm_) return true;
+    if (!useTm_ || pondering_.load(std::memory_order_acquire)) return true;
     const int64_t threshold = static_cast<int64_t>(
         static_cast<double>(softMs_) * START_NEXT_FRACTION);
     return elapsedMs() < std::max<int64_t>(MIN_THINK_MS, threshold);

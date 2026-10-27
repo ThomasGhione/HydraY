@@ -21,6 +21,10 @@
 # ---------------------------------------------------------------------------
 # TUNABLE KNOBS (env vars; sensible defaults below)
 #   TC          time control "moves/sec+inc" or "sec+inc"   (default 4+0.04)
+#   NODES       fixed nodes per move INSTEAD of TC (fastchess only). Sends a bare
+#               `go nodes N`: no clock, so the engine's time manager is off and
+#               the result is independent of NPS. For isolating eval quality
+#               from eval cost; it is a diagnostic, not a merge gate.
 #   ELO0 ELO1   SPRT hypotheses, ELO                          (default 0 and 5)
 #   ALPHA BETA  SPRT error rates                              (default 0.05 0.05)
 #   CONCURRENCY parallel games                                (default: nproc/2)
@@ -31,12 +35,15 @@
 #   NEW_OPTS    extra UCI options for the NEW engine, space-separated
 #               "Name=Value" pairs (e.g. "EvalFile=/abs/net.bin")
 #   BASE_OPTS   same, for the BASELINE engine
+#   BASE_BIN    baseline binary (default tuning/chess_baseline); point it at
+#               ./chess to play two nets against each other on one build
 #
 # Examples:
 #   ./tuning/run_sprt.sh                          # default [0,5] gain test
 #   ELO0=-3 ELO1=3 ./tuning/run_sprt.sh           # non-regression test (for cleanups)
 #   TC=10+0.1 CONCURRENCY=4 ./tuning/run_sprt.sh
 #   NEW_OPTS="EvalFile=/abs/new.nnue" ./tuning/run_sprt.sh  # test a candidate net
+#   NODES=150000 ./tuning/run_sprt.sh             # equal work per move, speed removed
 # ---------------------------------------------------------------------------
 
 set -euo pipefail
@@ -46,7 +53,7 @@ repo_root="$(cd -- "${script_dir}/.." && pwd)"
 cd "${script_dir}"
 
 new_bin="${repo_root}/chess"
-base_bin="${script_dir}/chess_baseline"
+base_bin="${BASE_BIN:-${script_dir}/chess_baseline}"
 
 # --- --snapshot: freeze the current ./chess as the baseline and exit ----------
 if [[ "${1:-}" == "--snapshot" ]]; then
@@ -97,6 +104,15 @@ THREADS="${THREADS:-1}"
 export OMP_NUM_THREADS="${THREADS}"
 BOOK="${BOOK:-books/openings.pgn}"
 MAXGAMES="${MAXGAMES:-4000}"
+NODES="${NODES:-}"
+if [[ -n "${NODES}" ]]; then
+    [[ "${NODES}" =~ ^[0-9]+$ && "${NODES}" -gt 0 ]] || { echo "error: NODES must be a positive integer." >&2; exit 1; }
+    limit_arg="nodes=${NODES}"
+    limit_desc="NODES=${NODES} (fixed per move, no clock)"
+else
+    limit_arg="tc=${TC}"
+    limit_desc="TC=${TC}"
+fi
 # Per-engine UCI options ("Name=Value" pairs) -> backend option.Name=Value args.
 NEW_OPTS="${NEW_OPTS:-}"
 BASE_OPTS="${BASE_OPTS:-}"
@@ -122,7 +138,7 @@ echo "=============================================================="
 echo " HydraY SPRT"
 echo "   new      : ${new_bin}"
 echo "   baseline : ${base_bin}"
-echo "   TC=${TC}  H0=${ELO0} H1=${ELO1}  alpha=${ALPHA} beta=${BETA}"
+echo "   ${limit_desc}  H0=${ELO0} H1=${ELO1}  alpha=${ALPHA} beta=${BETA}"
 echo "   threads=${THREADS} hash=${HASH}MiB concurrency=${CONCURRENCY}"
 echo "   book=${BOOK}  pgn=${pgn_out}  cap=${MAXGAMES} games"
 echo "=============================================================="
@@ -144,7 +160,7 @@ if [[ "${SPRT_BACKEND}" == "fastchess" ]]; then
     exec "${fastchess_bin}" \
         -engine name=new  cmd="${new_bin}"  args="-uci" proto=uci option.Threads="${THREADS}" ${new_opt_args[@]+"${new_opt_args[@]}"} \
         -engine name=base cmd="${base_bin}" args="-uci" proto=uci option.Threads="${THREADS}" ${base_opt_args[@]+"${base_opt_args[@]}"} \
-        -each tc="${TC}" \
+        -each "${limit_arg}" \
         -openings file="${BOOK}" format=pgn order=random plies=16 \
         -repeat -games 2 -rounds "$(( MAXGAMES / 2 ))" \
         -sprt elo0="${ELO0}" elo1="${ELO1}" alpha="${ALPHA}" beta="${BETA}" model=normalized \
@@ -156,6 +172,9 @@ if [[ "${SPRT_BACKEND}" == "fastchess" ]]; then
         -pgnout file="${pgn_out}"
 fi
 
+# cutechess-cli would need a clock alongside the node limit, which puts the time
+# manager back in play; refuse rather than silently run a different experiment.
+[[ -z "${NODES}" ]] || { echo "error: NODES requires the fastchess backend." >&2; exit 1; }
 echo " backend: cutechess-cli"
 echo "=============================================================="
 # -repeat: each opening played from both sides for fairness.

@@ -51,18 +51,11 @@ inline constexpr uint8_t KING_BUCKET_MAP[64] = {
     return (lerfKsq & 0x7) > 3 ? 7 : 0;
 }
 
-// Only the accumulator reads this, and it only ever needs l0. The active net is
-// a NetworkDeep; `activeNetwork` points at its identical leading bytes (the
-// static_asserts in nnue.cpp pin that overlay).
-struct alignas(64) Network {
-    int16_t featureWeights[INPUT_BUCKETS * INPUTS][HIDDEN]; // l0w (QA=255, factoriser merged)
-    int16_t featureBias[HIDDEN];                            // l0b (QA)
-};
-
-static_assert(offsetof(Network, featureBias) == sizeof(int16_t) * INPUT_BUCKETS * INPUTS * HIDDEN);
+namespace Deep { struct NetworkDeep; }
 
 // Non-null once a network is loaded (see NNUE::loadNetwork in nnue.hpp). Read
-// in Board's piece-update hot path; written only with no search running.
-extern const Network* activeNetwork;
+// in Board's piece-update hot path; written only with no search running. The
+// accumulator reads its l0 arrays straight out of it.
+extern const Deep::NetworkDeep* activeNetwork;
 
 } // namespace NNUE

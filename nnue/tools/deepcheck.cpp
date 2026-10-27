@@ -1,13 +1,11 @@
-// Confronto fra il forward C++ della rete profonda e l'oracolo Rust
-// (nnue/trainer/src/bin/sanity_deep.rs). Programma a se' stante: non fa parte
-// del motore e non viene linkato in ./chess.
+// Checks the C++ forward of the deep net against the Rust oracle
+// (nnue/trainer/src/bin/sanity_deep.rs), and the scalar forward against the
+// SIMD one. A standalone program, not linked into ./chess.
 //
 //   g++ -std=c++23 -O2 -march=native nnue/tools/deepcheck.cpp nnue/nnue_deep.cpp -o /tmp/deepcheck
 //   /tmp/deepcheck <net.bin> [fen]...
 //
-// La costruzione dell'accumulatore da FEN sta in fen_accumulator.hpp, condivisa
-// con gli altri strumenti: e' una traduzione letterale di sanity_deep.rs, e nel
-// motore quel lavoro lo fa Board tramite accumulator.hpp.
+// The accumulator comes from fen_accumulator.hpp, shared with the other tools.
 
 #include "fen_accumulator.hpp"
 
@@ -44,17 +42,14 @@ constexpr Case DEFAULT_CASES[] = {
 } // namespace
 
 
-// --- misura: costo del forward profondo contro quello a un layer ---------
-// Il secondo e' una copia locale dell'aritmetica di nnue.cpp (SCReLU su
-// 2*HIDDEN i16), non il codice del motore: serve un confronto fra due cicli
-// sugli stessi dati, non un profilo del binario di produzione.
+// --- benchmark (DEEPCHECK_BENCH=1): the deep forward against a single-layer one,
+// a local copy of the old single-layer arithmetic (SCReLU over 2*HIDDEN i16).
 #include <chrono>
 #include <immintrin.h>
 namespace {
 
-// Copia dell'aritmetica AVX2 di nnue.cpp::forwardHalf (mullo + madd), NON una
-// versione scalare: confrontare il forward profondo vettoriale con un
-// riferimento scalare gonfierebbe il risultato di parecchio.
+// The old AVX2 arithmetic (mullo + madd), not a scalar version: against a
+// scalar reference the deep SIMD forward would look far better than it is.
 int32_t singleLayerForward(const int16_t* accStm, const int16_t* accNtm,
                            const int16_t* w) noexcept {
     const __m256i zero = _mm256_setzero_si256();
@@ -88,10 +83,8 @@ void bench(const NetworkDeep& net, const std::vector<int16_t>& us,
     std::vector<int16_t> w(2 * HIDDEN);
     for (int i = 0; i < 2 * HIDDEN; ++i) w[i] = static_cast<int16_t>((i * 37) % 127 - 63);
 
-    // MINIMO su piu' giri, non media: su una macchina non quieta il rumore puo'
-    // solo RALLENTARE una misura, mai accelerarla, quindi il minimo e' la stima
-    // meno contaminata. I due percorsi si alternano dentro lo stesso giro cosi'
-    // un rallentamento transitorio li colpisce entrambi.
+    // The minimum over rounds, not the mean: noise only ever slows a run down.
+    // The two paths alternate within a round, so a transient slowdown hits both.
     volatile int32_t sink = 0;
     double a = 1e18, b = 1e18;
     for (int r = 0; r < ROUNDS; ++r) {
@@ -104,21 +97,21 @@ void bench(const NetworkDeep& net, const std::vector<int16_t>& us,
         b = std::min(b, std::chrono::duration<double, std::nano>(t2 - t1).count() / N);
     }
     (void)sink;
-    std::printf("\nforward a un layer (riferimento locale): %6.1f ns/eval\n", a);
-    std::printf("forward profondo (SIMD):                %6.1f ns/eval   = %.2fx\n", b, b / a);
-    std::printf("percorso VNNI: %s\n", hasVnniPath() ? "attivo" : "NON attivo (fallback i16)");
+    std::printf("\nsingle-layer forward (local reference): %6.1f ns/eval\n", a);
+    std::printf("deep forward (SIMD):                    %6.1f ns/eval   = %.2fx\n", b, b / a);
+    std::printf("VNNI path: %s\n", hasVnniPath() ? "on" : "OFF (i16 fallback)");
 }
 
 } // namespace
 
 int main(int argc, char** argv) {
     if (argc < 2) {
-        std::fprintf(stderr, "uso: deepcheck <net.bin> [fen]...\n");
+        std::fprintf(stderr, "usage: deepcheck <net.bin> [fen]...\n");
         return 2;
     }
     static NetworkDeep net;
     if (!loadFromFile(argv[1], net)) {
-        std::fprintf(stderr, "caricamento fallito: %s\n", argv[1]);
+        std::fprintf(stderr, "cannot load %s\n", argv[1]);
         return 1;
     }
     std::printf("%s: layout OK (%zu B payload)\n", argv[1], PAYLOAD_BYTES);
@@ -136,13 +129,13 @@ int main(int argc, char** argv) {
     for (const auto& c : cases) {
         int bucket = 0;
         if (!accumulate(net, c.fen, accUs, accThem, bucket)) {
-            std::fprintf(stderr, "FEN non valida: %s\n", c.fen);
+            std::fprintf(stderr, "invalid FEN: %s\n", c.fen);
             return 1;
         }
         const int32_t sc = forwardScalar(net, accUs.data(), accThem.data(), bucket);
         const int32_t sd = forwardSimd(net, accUs.data(), accThem.data(), bucket);
         if (sc != sd) {
-            std::fprintf(stderr, "DIVERGENZA scalare/SIMD su '%s': %d vs %d\n", c.label, sc, sd);
+            std::fprintf(stderr, "scalar/SIMD MISMATCH on '%s': %d vs %d\n", c.label, sc, sd);
             return 1;
         }
         std::printf("%s: %d cp (stm)\n", c.label, sc);

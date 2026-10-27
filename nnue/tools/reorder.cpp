@@ -1,40 +1,28 @@
-// Riordina i neuroni di una rete profonda per rendere piu' efficace la
-// sparsita' del layer l1. Programma a se' stante: non fa parte del motore.
+// Reorders the neurons of a deep net so the sparse l1 product skips more
+// work. A standalone program, not part of the engine.
 //
 //   g++ -std=c++23 -O2 -march=native nnue/tools/reorder.cpp nnue/nnue_deep.cpp -o /tmp/reorder
-//   /tmp/reorder <in.nnue> <posizioni.fen> <out.nnue>
+//   /tmp/reorder <in.nnue> <positions.fen> <out.nnue>
 //
-// Il file di posizioni e' un elenco di FEN, una per riga, da partite VERE - si
-// ricava da un PGN con python-chess. Servono alcune migliaia di posizioni; il
-// guadagno regge su posizioni mai viste (misurato: 67,3% in calibrazione contro
-// 66,6% su un insieme separato).
+// The positions file holds one FEN per line from real games (python-chess
+// extracts them from a PGN). A few thousand are enough, and the gain holds on
+// unseen positions (67.3% on the calibration set, 66.6% on a held-out one).
 //
-// PERCHE' FUNZIONA
+// Why it works: the l1 dot product skips groups of four consecutive inputs
+// that are all zero. Out of training the neurons sit in random order, so the
+// zero-group rate is what independent neurons give: with 85.6% zero bytes,
+// 0.856^4 = 53.7%. But some neurons go quiet together, and grouping them by
+// co-occurrence reaches 67%, a fifth less work in the layer.
 //
-// Il prodotto scalare di l1 salta i gruppi di quattro ingressi consecutivi che
-// sono TUTTI nulli. Nell'ordine in cui la rete esce dall'addestramento i
-// neuroni sono disposti a caso, e la quota di gruppi nulli e' esattamente
-// quella che ci si aspetta da neuroni indipendenti: con l'85,6% di byte nulli,
-// 0,856^4 = 53,7%. Ma i neuroni NON sono indipendenti - alcuni tacciono
-// insieme. Raggruppandoli per co-occorrenza si arriva al 67%, cioe' un quinto
-// di lavoro in meno nel layer.
+// Why the engine does not change: permuting l0's outputs (weights and biases)
+// and the matching columns of l1w computes exactly the same function, in the
+// same file format; a permutation computed on another net only helps less.
+// The pairwise product couples neuron j with j + 512, so the 512 PAIRS are
+// permuted, never the 1024 neurons, and one permutation serves both
+// perspectives because l0 is shared.
 //
-// PERCHE' NON TOCCA IL MOTORE
-//
-// L'ordine dei neuroni e' una convenzione interna: permutando le uscite di l0
-// (pesi e bias) e le colonne corrispondenti di l1w, la rete calcola ESATTAMENTE
-// la stessa funzione. Il file resta nel formato di sempre e il motore non sa
-// nulla di tutto questo. Per la stessa ragione una permutazione calcolata su
-// una rete diversa non e' un errore: rende solo meno.
-//
-// Il vincolo da rispettare: il pairwise accoppia il neurone j con j+512, quindi
-// si permutano le 512 COPPIE, mai i 1024 singoli, e la stessa permutazione vale
-// per entrambe le prospettive perche' l0 e' condiviso.
-//
-// La verifica finale e' il vero collaudo: la rete riordinata deve dare
-// valutazioni IDENTICHE BIT PER BIT all'originale. Se non lo fa, la
-// permutazione e' stata applicata male da qualche parte e il file non viene
-// scritto.
+// The final check is the real test: the reordered net must evaluate
+// bit-identically to the original, or the tool fails and flags the file.
 
 #include "fen_accumulator.hpp"
 
@@ -53,9 +41,8 @@ using NNUE::Deep::tools::accumulate;
 
 namespace {
 
-// Un bit per campione: acceso se quella coppia e' nulla in quel campione.
-// Un campione e' una (posizione, prospettiva), perche' le due prospettive
-// condividono la permutazione e vanno quindi contate entrambe.
+// One bit per sample, set when the pair is zero in it. A sample is a
+// (position, perspective): both perspectives share the permutation.
 using Bits = std::vector<uint64_t>;
 
 size_t words = 0;
@@ -73,8 +60,8 @@ size_t words = 0;
     return n;
 }
 
-// Greedy: si parte dalla coppia che tace piu' spesso e le si affiancano le tre
-// che tacciono insieme a lei. E' il punto di partenza, non il risultato.
+// Greedy start: the pair that is zero most often, then the three most often
+// zero together with it.
 [[nodiscard]] std::vector<int> greedy(const std::vector<Bits>& zero) {
     std::vector<char> used(PAIRWISE_OUT, 0);
     std::vector<int> perm;
@@ -107,8 +94,8 @@ size_t words = 0;
     return perm;
 }
 
-// Scambi fra gruppi finche' migliorano. Il greedy consuma presto le coppie piu'
-// silenziose e lascia un residuo scadente; questo lo rimette a posto.
+// Swaps between groups while they help: the greedy pass uses up the quietest
+// pairs early and leaves a poor remainder.
 long localSearch(const std::vector<Bits>& zero, std::vector<int>& perm) {
     std::vector<long> val(PAIRWISE_OUT / 4);
     for (int g = 0; g < PAIRWISE_OUT / 4; ++g) val[g] = zeroGroups(zero, &perm[4 * g]);
@@ -133,18 +120,18 @@ long localSearch(const std::vector<Bits>& zero, std::vector<int>& perm) {
 
 int main(int argc, char** argv) {
     if (argc < 4) {
-        std::fprintf(stderr, "uso: reorder <in.nnue> <posizioni.fen> <out.nnue>\n");
+        std::fprintf(stderr, "usage: reorder <in.nnue> <positions.fen> <out.nnue>\n");
         return 2;
     }
     static NetworkDeep net;
     if (!loadFromFile(argv[1], net)) {
-        std::fprintf(stderr, "caricamento fallito: %s\n", argv[1]);
+        std::fprintf(stderr, "cannot load %s\n", argv[1]);
         return 1;
     }
 
-    // --- statistiche di attivazione ---
+    // --- activation statistics ---
     std::ifstream in(argv[2]);
-    if (!in) { std::fprintf(stderr, "posizioni non leggibili: %s\n", argv[2]); return 1; }
+    if (!in) { std::fprintf(stderr, "cannot read positions: %s\n", argv[2]); return 1; }
     std::vector<std::vector<uint8_t>> samples;
     std::vector<int16_t> us, them;
     std::string fen;
@@ -163,7 +150,7 @@ int main(int argc, char** argv) {
         samples.push_back(std::move(h));
     }
     if (samples.size() < 500) {
-        std::fprintf(stderr, "solo %zu posizioni valide: troppo poche, ne servono migliaia\n",
+        std::fprintf(stderr, "only %zu valid positions: thousands are needed\n",
                      samples.size());
         return 1;
     }
@@ -185,15 +172,15 @@ int main(int argc, char** argv) {
         return 100.0 * static_cast<double>(t) / static_cast<double>(total * (PAIRWISE_OUT / 4));
     };
 
-    std::printf("%zu posizioni (%zu campioni con le due prospettive)\n", samples.size(), total);
-    std::printf("gruppi da quattro tutti nulli, ordine attuale : %.1f%%\n", rate(identity));
+    std::printf("%zu positions (%zu samples, both perspectives)\n", samples.size(), total);
+    std::printf("all-zero groups of four, current order: %.1f%%\n", rate(identity));
 
     std::vector<int> perm = greedy(zero);
     localSearch(zero, perm);
-    std::printf("gruppi da quattro tutti nulli, riordinati     : %.1f%%\n", rate(perm));
-    std::printf("lavoro nel layer l1: %.1f%% -> %.1f%%\n", 100 - rate(identity), 100 - rate(perm));
+    std::printf("all-zero groups of four, reordered    : %.1f%%\n", rate(perm));
+    std::printf("l1 work: %.1f%% -> %.1f%%\n", 100 - rate(identity), 100 - rate(perm));
 
-    // --- applicazione: perm[q] = coppia che finisce in posizione q ---
+    // --- apply: perm[q] is the pair that lands at position q ---
     static NetworkDeep out;
     out = net;
     for (int q = 0; q < PAIRWISE_OUT; ++q) {
@@ -211,9 +198,9 @@ int main(int argc, char** argv) {
             }
     }
 
-    // --- scrittura, stesso layout del file di origine ---
+    // --- write, in the layout of the source file ---
     std::FILE* f = std::fopen(argv[3], "wb");
-    if (f == nullptr) { std::fprintf(stderr, "non posso scrivere %s\n", argv[3]); return 1; }
+    if (f == nullptr) { std::fprintf(stderr, "cannot write %s\n", argv[3]); return 1; }
     const auto wr = [&](const void* p, size_t n) { return std::fwrite(p, 1, n, f) == n; };
     bool ok = wr(out.l0w, sizeof(out.l0w)) && wr(out.l0b, sizeof(out.l0b))
            && wr(out.l1w, sizeof(out.l1w)) && wr(out.l1b, sizeof(out.l1b))
@@ -222,13 +209,12 @@ int main(int argc, char** argv) {
     static const char kTag[] = "bullet";
     for (size_t i = 0; i < padBytes && ok; ++i) ok = std::fputc(kTag[i % 6], f) != EOF;
     std::fclose(f);
-    if (!ok) { std::fprintf(stderr, "scrittura incompleta\n"); return 1; }
+    if (!ok) { std::fprintf(stderr, "incomplete write\n"); return 1; }
 
-    // --- collaudo: la rete riordinata calcola la STESSA funzione ---
-    // Non e' una formalita': e' l'unica cosa che distingue un riordino corretto
-    // da uno che ha scambiato pesi e bias in modo incoerente.
+    // --- check: the reordered net computes the SAME function. It is what tells
+    // a correct reorder from one that moved weights and biases inconsistently.
     static NetworkDeep back;
-    if (!loadFromFile(argv[3], back)) { std::fprintf(stderr, "il file scritto non si rilegge\n"); return 1; }
+    if (!loadFromFile(argv[3], back)) { std::fprintf(stderr, "the written file does not load back\n"); return 1; }
     uint32_t rs = 20260824;
     const auto rnd = [&] { rs = rs * 1664525u + 1013904223u; return static_cast<int32_t>(rs >> 15); };
     std::vector<int16_t> a(HIDDEN), b(HIDDEN), pa(HIDDEN), pb(HIDDEN);
@@ -239,8 +225,8 @@ int main(int argc, char** argv) {
             a[i] = static_cast<int16_t>(rnd() % span - span / 3);
             b[i] = static_cast<int16_t>(rnd() % span - span / 3);
         }
-        // gli accumulatori vanno permutati come i neuroni, altrimenti si sta
-        // confrontando la stessa rete su ingressi diversi
+        // The accumulators are permuted like the neurons, or the same net would
+        // be compared on different inputs.
         for (int q = 0; q < PAIRWISE_OUT; ++q) {
             pa[q] = a[perm[q]]; pa[q + PAIRWISE_OUT] = a[perm[q] + PAIRWISE_OUT];
             pb[q] = b[perm[q]]; pb[q + PAIRWISE_OUT] = b[perm[q] + PAIRWISE_OUT];
@@ -250,10 +236,10 @@ int main(int argc, char** argv) {
                 != forwardSimd(back, pa.data(), pb.data(), bk)) ++bad;
     }
     if (bad != 0) {
-        std::fprintf(stderr, "\nCOLLAUDO FALLITO: %ld divergenze su %ld - file NON valido\n", bad, checks);
+        std::fprintf(stderr, "\nCHECK FAILED: %ld mismatches in %ld - the file is NOT valid\n", bad, checks);
         return 1;
     }
-    std::printf("collaudo: %ld confronti, valutazioni identiche\n", checks);
-    std::printf("scritto %s\n", argv[3]);
+    std::printf("check: %ld comparisons, identical evaluations\n", checks);
+    std::printf("wrote %s\n", argv[3]);
     return 0;
 }

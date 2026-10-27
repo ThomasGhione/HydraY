@@ -1,10 +1,8 @@
 #pragma once
 
-// NNUE evaluation - the engine's only evaluator since the HCE removal in
-// 2.0.0. A network must be active before any evaluate():
-// main() activates the embedded net at startup; EvalFile can override it;
-// datagen/selftest load theirs explicitly. The accumulator maintenance on
-// Board activates as soon as a network is loaded.
+// NNUE evaluation. A network must be active before any evaluate(): main()
+// activates the embedded one, EvalFile replaces it, datagen and the selftest
+// load their own.
 
 #include <cstdint>
 #include <string>
@@ -12,8 +10,6 @@
 namespace chess { class Board; }
 
 namespace NNUE {
-
-struct Network;
 
 // Loads a bullet quantised.bin (validates size and padding signature). Not for
 // use mid-search.
@@ -23,10 +19,8 @@ struct Network;
 // nnue/embedded.cpp); false if the blob fails validation.
 [[nodiscard]] bool activateEmbedded() noexcept;
 
-[[nodiscard]] bool networkLoaded() noexcept;
-
 // stm-relative centipawns from the board's incrementally-maintained
-// accumulator. Requires networkLoaded().
+// accumulator. Requires an active network.
 [[nodiscard]] int32_t evaluate(const chess::Board& board) noexcept;
 
 } // namespace NNUE

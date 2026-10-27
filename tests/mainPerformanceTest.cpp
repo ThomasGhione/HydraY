@@ -1,7 +1,9 @@
 #include "ut.hpp"
-#include "../board/piece.hpp"
+#include "../nnue/nnue.hpp"
+
+void registerPerformanceEngineSuite();
 
 int main(){
-    // Initialize magic bitboards before running performance tests
-    pieces::initMagicBitboards();
+    if (!NNUE::activateEmbedded()) return 1;
+    registerPerformanceEngineSuite();
 }

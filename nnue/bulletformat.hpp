@@ -16,7 +16,7 @@
 //   ksq    : stm king square; oppKsq: opponent king square ^ 56 (its own view)
 // Castling/en-passant/clocks are not part of the format.
 
-#include <bit>
+#include <array>
 #include <cstdint>
 #include <string>
 #include <type_traits>
@@ -45,104 +45,38 @@ struct PendingRecord {
     bool blackToMove = false;
 };
 
-// Engine bitboards put bit i on engine square i (0 = a8, 63 = h1); bulletformat
-// wants LERF (0 = a1). The square map is i ^ 56, which on a whole bitboard is a
-// byteswap (vertical mirror).
-[[nodiscard]] inline uint64_t toLerf(uint64_t engineBB) noexcept {
-    return std::byteswap(engineBB);
-}
-
-// whiteScoreCp is white-relative; result is filled in later by finalizeResult.
-[[nodiscard]] inline PendingRecord packPosition(const chess::Board& b,
-                                                int16_t whiteScoreCp) noexcept {
+// whiteScoreCp is white-relative; the result is filled in at game end.
+[[nodiscard]] inline PendingRecord packPosition(const chess::Board& b, int16_t whiteScoreCp) noexcept {
     using chess::Board;
-
-    // from_raw contract: bitboards in order White, Black, P, N, B, R, Q, K.
-    uint64_t bbs[8];
-    bbs[0] = toLerf(b.pawns_bb[0] | b.knights_bb[0] | b.bishops_bb[0]
-                  | b.rooks_bb[0] | b.queens_bb[0]  | b.kings_bb[0]);
-    bbs[1] = toLerf(b.pawns_bb[1] | b.knights_bb[1] | b.bishops_bb[1]
-                  | b.rooks_bb[1] | b.queens_bb[1]  | b.kings_bb[1]);
-    bbs[2] = toLerf(b.pawns_bb[0]   | b.pawns_bb[1]);
-    bbs[3] = toLerf(b.knights_bb[0] | b.knights_bb[1]);
-    bbs[4] = toLerf(b.bishops_bb[0] | b.bishops_bb[1]);
-    bbs[5] = toLerf(b.rooks_bb[0]   | b.rooks_bb[1]);
-    bbs[6] = toLerf(b.queens_bb[0]  | b.queens_bb[1]);
-    bbs[7] = toLerf(b.kings_bb[0]   | b.kings_bb[1]);
-
-    int16_t score = whiteScoreCp;
-    const bool blackToMove = (b.getActiveColor() == Board::BLACK);
-    if (blackToMove) {
-        for (uint64_t& bb : bbs) bb = std::byteswap(bb);
-        std::swap(bbs[0], bbs[1]);
-        score = static_cast<int16_t>(-score);
-    }
-
     PendingRecord out;
-    out.blackToMove = blackToMove;
+    out.blackToMove = (b.getActiveColor() == Board::BLACK);
     BulletRecord& r = out.record;
-    r.occ = bbs[0] | bbs[1];
-    r.score = score;
-
-    uint64_t occ = r.occ;
-    int idx = 0;
-    while (occ != 0) {
-        const uint64_t bit = occ & (0 - occ);
-        occ &= occ - 1;
-        const uint8_t colour = ((bit & bbs[1]) != 0) ? 8 : 0;
-        uint8_t piece = 0;
-        for (int p = 2; p < 8; ++p) {
-            if ((bbs[p] & bit) != 0) { piece = static_cast<uint8_t>(p - 2); break; }
-        }
-        r.pcs[idx / 2] |= static_cast<uint8_t>((colour | piece) << (4 * (idx & 1)));
+    r.score = out.blackToMove ? static_cast<int16_t>(-whiteScoreCp) : whiteScoreCp;
+    // LERF square l of the stm frame is engine square l ^ 56, or l itself when
+    // black moves: that frame is the board mirrored vertically.
+    for (int l = 0, idx = 0; l < 64; ++l) {
+        const uint8_t piece = b.get(static_cast<uint8_t>(out.blackToMove ? l : l ^ 56));
+        if (piece == Board::EMPTY) continue;
+        const bool opp = (piece & Board::MASK_COLOR) != b.getActiveColor();
+        const int type = (piece & Board::MASK_PIECE_TYPE) - 1;
+        r.occ |= 1ULL << l;
+        r.pcs[idx / 2] |= static_cast<uint8_t>(((opp ? 8 : 0) | type) << (4 * (idx & 1)));
         ++idx;
+        if (type == 5) (opp ? r.oppKsq : r.ksq) = static_cast<uint8_t>(opp ? l ^ 56 : l);
     }
-
-    r.ksq    = static_cast<uint8_t>(std::countr_zero(bbs[0] & bbs[7]));
-    r.oppKsq = static_cast<uint8_t>(std::countr_zero(bbs[1] & bbs[7]) ^ 56);
     return out;
-}
-
-// whiteResultX2: 0 = black win, 1 = draw, 2 = white win.
-inline void finalizeResult(PendingRecord& p, int whiteResultX2) noexcept {
-    p.record.result = static_cast<uint8_t>(
-        p.blackToMove ? 2 - whiteResultX2 : whiteResultX2);
 }
 
 // FEN of the stored (stm-frame) position, for eyeball checks in datagen-dump.
 // The stm is printed as White; castling/ep are not stored, so "w - -".
 [[nodiscard]] inline std::string recordToFen(const BulletRecord& r) {
-    static constexpr char PIECE_CHARS[16] = {
-        'P', 'N', 'B', 'R', 'Q', 'K', '?', '?',
-        'p', 'n', 'b', 'r', 'q', 'k', '?', '?'
-    };
-
-    char squares[64];
-    for (char& c : squares) c = '\0';
+    std::array<char, 64> squares;
+    squares.fill('.');
     uint64_t occ = r.occ;
-    int idx = 0;
-    while (occ != 0) {
-        const int sq = std::countr_zero(occ);
-        occ &= occ - 1;
-        const uint8_t nibble = (r.pcs[idx / 2] >> (4 * (idx & 1))) & 0xF;
-        squares[sq] = PIECE_CHARS[nibble];
-        ++idx;
+    for (int idx = 0; occ != 0; ++idx) {
+        squares[pieces::popLSB(occ) ^ 56] = "PNBRQK??pnbrqk??"[(r.pcs[idx / 2] >> (4 * (idx & 1))) & 0xF];
     }
-
-    std::string fen;
-    for (int rank = 7; rank >= 0; --rank) {
-        int emptyRun = 0;
-        for (int file = 0; file < 8; ++file) {
-            const char c = squares[rank * 8 + file];
-            if (c == '\0') { ++emptyRun; continue; }
-            if (emptyRun > 0) { fen += static_cast<char>('0' + emptyRun); emptyRun = 0; }
-            fen += c;
-        }
-        if (emptyRun > 0) fen += static_cast<char>('0' + emptyRun);
-        if (rank > 0) fen += '/';
-    }
-    fen += " w - - 0 1";
-    return fen;
+    return chess::placementFen(squares) + " w - - 0 1";
 }
 
 } // namespace NNUE

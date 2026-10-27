@@ -25,16 +25,9 @@ struct Limits {
     bool     hasClock  = false; // true once any of wtime/btime is supplied
 };
 
-// Computes a soft/hard time budget for a single move and runs a watchdog
-// thread that trips the engine stop flag when the hard limit is reached.
-//
-// Soft limit  -> checked between iterative-deepening iterations: "do not
-//                start a depth I cannot finish".
-// Hard limit  -> enforced by the watchdog: aborts the search in progress.
-//
-// The clock-comparison / "play for flag" machinery from the original design
-// is intentionally dropped: the opponent clock barely affects our optimal
-// move, and deliberately playing fast trash only raises our own blunder rate.
+// Soft and hard time budget for one move. The soft limit is checked between
+// iterations (do not start a depth that cannot finish); a watchdog thread sets
+// the stop flag at the hard one.
 class TimeManager final {
 public:
     using Clock = std::chrono::steady_clock;
@@ -69,13 +62,7 @@ public:
     static constexpr double  STABILITY_MIN      = 0.50;
     static constexpr double  STABILITY_MAX      = 2.00;
 
-    TimeManager() noexcept = default;
     ~TimeManager() noexcept;
-
-    TimeManager(const TimeManager&)            = delete;
-    TimeManager& operator=(const TimeManager&) = delete;
-    TimeManager(TimeManager&&)                 = delete;
-    TimeManager& operator=(TimeManager&&)      = delete;
 
     // Compute the budget. `sideIsWhite` selects which clock/increment to use,
     // `movesPlayed` is the number of full moves already played (for the
@@ -85,9 +72,18 @@ public:
               std::atomic<bool>* stopFlag) noexcept;
 
     // Start the clock and (if time-managed) the hard-deadline watchdog.
+    // A `go ponder` search starts paused: no deadline until ponderhit().
     void start() noexcept;
     // Cancel the watchdog and join it. Idempotent.
     void stop() noexcept;
+    // UCI `ponderhit`, called from the command thread: our clock starts now,
+    // so restart the budget from this instant and arm the watchdog. No-op
+    // once the search has ended or when it was not a timed ponder search.
+    // A ponderhit that lands before start() is remembered and applied there.
+    void ponderhit() noexcept;
+    // Forget a ponderhit meant for an earlier search. Called on the command
+    // thread before the next search thread is launched.
+    void clearPonderhit() noexcept;
 
     bool    useTimeManagement() const noexcept { return useTm_; }
     int64_t elapsedMs()         const noexcept;
@@ -113,16 +109,22 @@ private:
     int64_t softMs_   = 0;   // current soft budget (base * stability, clamped)
     int64_t hardMs_   = 0;   // hard ceiling (fixed at init)
     bool    useTm_    = false;
+    bool    fixedTime_ = false;  // go movetime: the budget is the user's, not ours to rescale
     double  stabilityFactor_ = 1.0;
 
     std::atomic<bool>* stopFlag_ = nullptr;
-    Clock::time_point  startTp_{};
+    // Search start, or the ponderhit instant; written by the command thread
+    // on ponderhit while the search thread reads it.
+    std::atomic<Clock::rep> startTicks_{0};
+    std::atomic<bool>       pondering_{false};
 
     std::thread             watchdog_;
     std::mutex              mtx_;
     std::condition_variable cv_;
     bool                    cancel_  = false;
-    bool                    running_ = false;
+    bool                    armed_   = false; // a search is live (ponderhit may arm)
+    bool                    ponderhitSeen_ = false;
+    Clock::rep              ponderhitTicks_ = 0;
 };
 
 } // namespace engine::time

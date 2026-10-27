@@ -38,12 +38,16 @@
 /tuning/chess_baseline
 /tuning/chess_halfka_a3
 /tuning/sprt_*.pgn
-# Gauntlet artifacts: on-demand reference binaries and per-run outputs
+# Gauntlet and calibration (runfastchess.sh, elo_watch.sh): run state, tag
+# builds and the ordo report written next to each pgn
+/tuning/.elo_*
+/tuning/.refs/
+/tuning/*_ratings.txt
+/tuning/*_h2h.txt
+/tuning/*_anchors.txt
+# left over by the old run_gauntlet.sh and run_sf_calibration.sh
 /tuning/chess_ref_*
-/tuning/gauntlet_*.pgn
 /tuning/gauntlet_*.txt
-
-# Stockfish-calibration artifacts (run_sf_calibration.sh)
 /tuning/sfcal_*
 
 # NNUE training data (datagen output, GB-sized)

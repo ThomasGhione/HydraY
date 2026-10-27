@@ -40,3 +40,7 @@ path = "src/bin/datastats.rs"
 [[bin]]
 name = "datashuffle"
 path = "src/bin/datashuffle.rs"
+
+[[bin]]
+name = "datamix"
+path = "src/bin/datamix.rs"

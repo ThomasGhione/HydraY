@@ -3,8 +3,6 @@ ROOT_DIR := $(patsubst %/,%,$(dir $(abspath $(lastword $(MAKEFILE_LIST)))))
 OUTPUT_DIR := $(ROOT_DIR)/output
 TESTS_DIR := $(ROOT_DIR)/tests
 SCRIPT_DIR := $(ROOT_DIR)/script
-DOC_DIR := $(ROOT_DIR)/doc
-ANALYSIS_DIR := $(DOC_DIR)/analysis-output
 SCAN_BUILD_DIR := $(ROOT_DIR)/scan-build-report
 ANALYSIS_LOG := $(ROOT_DIR)/analysis.log
 COMPLEXITY_REPORT := $(ROOT_DIR)/complexity-report.csv
@@ -20,22 +18,47 @@ endif
 endif
 
 # Compiler variables
-CXX = g++
-TEST_FLAGS = -std=c++23 -Wall -Wextra -Wpedantic -O3 -DDEBUG -fopenmp -march=native -flto=8 -fext-numeric-literals -g
+# clang when installed (node-identical to g++ and faster, see PRODFLAGS);
+# CXX=g++ on the command line or in the environment forces GCC.
+ifeq ($(origin CXX),default)
+CXX := $(if $(shell command -v clang++ 2>/dev/null),clang++,g++)
+endif
+TEST_FLAGS = -std=c++23 -Wall -Wextra -Wpedantic -O3 -DDEBUG -fopenmp -march=native -flto=8 -fext-numeric-literals -g -no-pie
 
 # -O3: Aggressive inlining + vectorization (better than -O2 and safer than -Ofast)
-# -march=native: Use all CPU features (SSE4.2, AVX2, BMI2, POPCNT)
-# -mtune=native: Optimize instruction scheduling for your CPU
 # -flto=auto: Let compiler decide LTO threads (usually better than fixed number)
 # -fno-math-errno: Don't set errno on math functions (safe for chess)
 # -fno-trapping-math: Assume floating point ops don't trap (safe, we don't use FP exceptions)
 # -funroll-loops: Unroll hot loops (good for bitboard operations)
+# -fno-pie -no-pie: a global table indexed by a register is one instruction
+#   instead of a RIP-relative lea plus the load (SEE, magics, zobrist)
+# ARCH: target ISA, also used for tbprobe.c. On a hybrid CPU -march=native
+#   passes the cache sizes of the core each compile job lands on, so two builds
+#   of one tree can differ; an explicit ARCH gives the same binary every time.
+#   Here (GCC 13) native resolves to ARCH="-march=sierraforest -mtune=generic";
+#   ARCH=-march=x86-64-v3 runs on any AVX2 + BMI2 CPU (no-VNNI L1 fallback).
+ARCH ?= -march=native -mtune=native
 # Balanced production flags (safety + speed)
-PRODFLAGS = -std=c++23 -Wall -Wextra -Wpedantic -fopenmp -march=native -mtune=native \
+PRODFLAGS = -std=c++23 -Wall -Wextra -Wpedantic -fopenmp $(ARCH) \
 		-flto=auto -fno-math-errno -fno-trapping-math -funroll-loops \
-		-ffunction-sections -fdata-sections -O3 
-
-# Uncomment if codebase is exception-free
+		-ffunction-sections -fdata-sections -O3 -fno-pie -no-pie
+# clang: node-identical to g++ and faster (bench6 +3.8% on a P-core, +1.8% on
+#   an E-core, datagen +5.2%). Full LTO; no FMA contraction keeps the eval
+#   bit-identical to g++. OpenMP comes from libgomp through a one-function
+#   omp.h, so libomp is not needed.
+GCC_PRODFLAGS := $(PRODFLAGS)
+OMP_LIBS =
+ifneq (,$(findstring clang,$(CXX)))
+PRODFLAGS := $(filter-out -fopenmp -flto=auto,$(PRODFLAGS)) -fopenmp-simd \
+		-isystem $(ROOT_DIR)/script/clang -flto=full -ffp-contract=off \
+		-Wno-unused-command-line-argument
+TEST_FLAGS := $(filter-out -fopenmp -flto=8 -fext-numeric-literals,$(TEST_FLAGS)) \
+		-flto=full -Wno-unused-command-line-argument
+OMP_LIBS = -Wl,--no-as-needed -lgomp
+endif
+# Objects (LTO bitcode) from one compiler cannot be linked by the other: a
+# switch leaves no stamp for the new compiler, which then rebuilds them all.
+COMPILER_STAMP = $(OUTPUT_DIR)/.cxx-$(notdir $(CXX))
 
 # Windows cross-compiler (requires mingw-w64)
 WIN_CXX = x86_64-w64-mingw32-g++
@@ -48,7 +71,6 @@ CPPCHECK = cppcheck
 COMPILATION_DB = $(ROOT_DIR)/compile_commands.json
 LIZARD = lizard
 GPROF2DOT = $(SCRIPT_DIR)/gprof2dot.py
-LLM_ANALYSIS_PROMPT = $(DOC_DIR)/static-analysis-summary-prompt.txt
 
 # Output binaries
 NAME_APP = $(ROOT_DIR)/chess
@@ -59,30 +81,28 @@ GENERATED_BINS = $(NAME_APP) $(NAME_APP_WIN) $(TEST_APP) $(PERF_APP)
 
 # File paths by module
 MAIN_SRC = $(ROOT_DIR)/main.cpp
-ENGINE_SRCS = $(wildcard $(ROOT_DIR)/engine/*.cpp) $(wildcard $(ROOT_DIR)/engine/eval/*.cpp) $(wildcard $(ROOT_DIR)/engine/eval/*/*.cpp) $(wildcard $(ROOT_DIR)/engine/search/*.cpp) $(wildcard $(ROOT_DIR)/engine/sort/*.cpp) $(wildcard $(ROOT_DIR)/engine/time/*.cpp) $(wildcard $(ROOT_DIR)/engine/movegen/*.cpp) $(wildcard $(ROOT_DIR)/engine/opening/*.cpp) $(wildcard $(ROOT_DIR)/engine/syzygy/*.cpp)
+ENGINE_SRCS = $(wildcard $(ROOT_DIR)/engine/*.cpp) $(wildcard $(ROOT_DIR)/engine/search/*.cpp) $(wildcard $(ROOT_DIR)/engine/sort/*.cpp) $(wildcard $(ROOT_DIR)/engine/time/*.cpp) $(wildcard $(ROOT_DIR)/engine/syzygy/*.cpp)
 SYZYGY_C_SRC = $(ROOT_DIR)/engine/syzygy/tbprobe.c
 SYZYGY_C_OBJ = $(OUTPUT_DIR)/engine/syzygy/tbprobe.o
-DRIVER_SRCS = $(wildcard $(ROOT_DIR)/driver/*.cpp)
 BOARD_SRCS = $(wildcard $(ROOT_DIR)/board/*.cpp)
 UCI_SRCS = $(wildcard $(ROOT_DIR)/uci/*.cpp)
 NNUE_SRCS = $(wildcard $(ROOT_DIR)/nnue/*.cpp)
 
 # Module source paths in a single variable
-ALL_MODULE_SRCS = $(ENGINE_SRCS) $(DRIVER_SRCS) $(BOARD_SRCS) $(UCI_SRCS) $(NNUE_SRCS)
+ALL_MODULE_SRCS = $(ENGINE_SRCS) $(BOARD_SRCS) $(UCI_SRCS) $(NNUE_SRCS)
 
-# Header file paths (excluding stockfish and test utils)
-ENGINE_HDRS = $(wildcard $(ROOT_DIR)/engine/*.hpp) $(wildcard $(ROOT_DIR)/engine/eval/*.hpp) $(wildcard $(ROOT_DIR)/engine/search/*.hpp) $(wildcard $(ROOT_DIR)/engine/sort/*.hpp) $(wildcard $(ROOT_DIR)/engine/time/*.hpp) $(wildcard $(ROOT_DIR)/engine/movegen/*.hpp) $(wildcard $(ROOT_DIR)/engine/opening/*.hpp)
-DRIVER_HDRS = $(wildcard $(ROOT_DIR)/driver/*.hpp)
+# Header file paths
+ENGINE_HDRS = $(wildcard $(ROOT_DIR)/engine/*.hpp) $(wildcard $(ROOT_DIR)/engine/search/*.hpp) $(wildcard $(ROOT_DIR)/engine/sort/*.hpp) $(wildcard $(ROOT_DIR)/engine/time/*.hpp)
 BOARD_HDRS = $(wildcard $(ROOT_DIR)/board/*.hpp)
 UCI_HDRS = $(wildcard $(ROOT_DIR)/uci/*.hpp)
 NNUE_HDRS = $(wildcard $(ROOT_DIR)/nnue/*.hpp)
 
 # All header paths
-ALL_MODULE_HDRS = $(ENGINE_HDRS) $(DRIVER_HDRS) $(BOARD_HDRS) $(UCI_HDRS) $(NNUE_HDRS)
+ALL_MODULE_HDRS = $(ENGINE_HDRS) $(BOARD_HDRS) $(UCI_HDRS) $(NNUE_HDRS)
 
 # All files to analyze (.cpp and .hpp)
-ALL_ANALYSIS_FILES = $(MAIN_SRC) $(ENGINE_SRCS) $(DRIVER_SRCS) $(BOARD_SRCS) \
-			$(ENGINE_HDRS) $(DRIVER_HDRS) $(BOARD_HDRS)
+ALL_ANALYSIS_FILES = $(MAIN_SRC) $(ENGINE_SRCS) $(BOARD_SRCS) \
+			$(ENGINE_HDRS) $(BOARD_HDRS)
 
 
 # Helper to generate .o paths inside output/
@@ -93,11 +113,10 @@ ALL_OBJS = $(MAIN_OBJ) $(MODULE_OBJS) $(SYZYGY_C_OBJ)
 # Test file paths
 TEST_MAIN_SRC = $(TESTS_DIR)/mainTest.cpp
 TEST_ENGINE_SRCS = $(wildcard $(ROOT_DIR)/engine/test/*.cpp)
-TEST_DRIVER_SRCS = $(wildcard $(ROOT_DIR)/driver/test/*.cpp)
 TEST_BOARD_SRCS = $(wildcard $(ROOT_DIR)/board/test/*.cpp)
 
 # Test file paths in a single variable
-ALL_TEST_MODULE_SRCS = $(TEST_ENGINE_SRCS) $(TEST_DRIVER_SRCS) $(TEST_BOARD_SRCS)
+ALL_TEST_MODULE_SRCS = $(TEST_ENGINE_SRCS) $(TEST_BOARD_SRCS)
 
 # Test .o file paths in output/
 TEST_MAIN_OBJ = $(patsubst $(ROOT_DIR)/%.cpp,$(OUTPUT_DIR)/%.o,$(TEST_MAIN_SRC))
@@ -114,13 +133,11 @@ ALL_PERF_MODULE_SRCS = $(PERF_ENGINE_SRCS)
 PERF_MAIN_OBJ = $(patsubst $(ROOT_DIR)/%.cpp,$(OUTPUT_DIR)/%.o,$(PERF_MAIN_SRC))
 PERF_OBJS = $(patsubst $(ROOT_DIR)/%.cpp,$(OUTPUT_DIR)/%.o,$(ALL_PERF_MODULE_SRCS))
 
-# Huge-page TT benchmark
-
 # Auto-generated dependency files (header dependencies)
 DEPFILES = $(ALL_OBJS:.o=.d) $(TEST_OBJS:.o=.d) $(TEST_MAIN_OBJ:.o=.d) $(PERF_OBJS:.o=.d) $(PERF_MAIN_OBJ:.o=.d)
 
 # Main targets
-.PHONY: all prod prod_windows parallel_prod prod_sequential debug test perf tt-huge-bench all-tests analyze analyze-setup analyze-cppcheck analyze-clang-tidy analyze-iwyu analyze-scan-build analyze-gcc-analyzer analyze-cppclean analyze-lizard analyze-summary complexity test-valgrind cls cls-compile-files get-image help debug-vars
+.PHONY: all prod prod_windows parallel_prod prod_sequential debug test perf all-tests analyze analyze-setup analyze-cppcheck analyze-clang-tidy analyze-iwyu analyze-scan-build analyze-gcc-analyzer analyze-cppclean analyze-lizard analyze-summary complexity test-valgrind cls cls-compile-files get-image help debug-vars
 
 # Default target for plain `make`
 all: PRODFLAGS += -DDEBUG -fomit-frame-pointer
@@ -147,7 +164,7 @@ prod_windows:
 # Sequential production build
 # Note: no slower, but does not generate .o files
 prod_sequential:
-	$(CXX) $(PRODFLAGS) $(MAIN_SRC) $(ALL_MODULE_SRCS) -o $(NAME_APP)
+	$(CXX) $(PRODFLAGS) $(MAIN_SRC) $(ALL_MODULE_SRCS) $(OMP_LIBS) -o $(NAME_APP)
 	@printf "\nBuild completed: $(NAME_APP)\n\n"
 
 # Build command for debug executable
@@ -175,13 +192,18 @@ all-tests: test perf
 # Final executable generation: 'chess'
 $(NAME_APP): $(ALL_OBJS)
 	@printf "\nLinking $(NAME_APP)..."
-	$(CXX) $(PRODFLAGS) $(ALL_OBJS) -o $(NAME_APP)
+	$(CXX) $(PRODFLAGS) $(ALL_OBJS) $(OMP_LIBS) -o $(NAME_APP)
 
 # .o file generation
-$(OUTPUT_DIR)/%.o: $(ROOT_DIR)/%.cpp
+$(OUTPUT_DIR)/%.o: $(ROOT_DIR)/%.cpp $(COMPILER_STAMP)
 	@printf "\nCompiling $<..."
 	@mkdir -p $(dir $@)
 	$(CXX) $(PRODFLAGS) -MMD -MP -c $< -o $@
+
+$(COMPILER_STAMP):
+	@mkdir -p $(dir $@)
+	@rm -f $(OUTPUT_DIR)/.cxx-*
+	@touch $@
 
 # embedded.cpp pulls the network blob in via the assembler's .incbin, which
 # -MMD cannot track: declare the data dependency explicitly.
@@ -191,17 +213,17 @@ $(OUTPUT_DIR)/nnue/embedded.o: $(ROOT_DIR)/nnue/net/hydray.nnue
 $(SYZYGY_C_OBJ): $(SYZYGY_C_SRC)
 	@printf "\nCompiling $<..."
 	@mkdir -p $(dir $@)
-	gcc -O3 -march=native -std=c11 -Wall -MMD -MP -c $< -o $@
+	gcc -O3 $(ARCH) -std=c11 -Wall -MMD -MP -c $< -o $@
 
-# Final executable generation: 'outputTest'
+# Functional-test executable
 $(TEST_APP): $(MODULE_OBJS) $(SYZYGY_C_OBJ) $(TEST_OBJS) $(TEST_MAIN_OBJ)
 	@printf "\nLinking test $(TEST_APP)..."
-	$(CXX) $(TEST_FLAGS) $(MODULE_OBJS) $(SYZYGY_C_OBJ) $(TEST_OBJS) $(TEST_MAIN_OBJ) -o $(TEST_APP)
+	$(CXX) $(TEST_FLAGS) $(MODULE_OBJS) $(SYZYGY_C_OBJ) $(TEST_OBJS) $(TEST_MAIN_OBJ) $(OMP_LIBS) -o $(TEST_APP)
 
-# Final executable generation: 'outputPerformance'
+# Performance-test executable
 $(PERF_APP): $(MODULE_OBJS) $(SYZYGY_C_OBJ) $(PERF_OBJS) $(PERF_MAIN_OBJ)
 	@printf "\nLinking performance test $(PERF_APP)..."
-	$(CXX) $(TEST_FLAGS) $(MODULE_OBJS) $(SYZYGY_C_OBJ) $(PERF_OBJS) $(PERF_MAIN_OBJ) -o $(PERF_APP)
+	$(CXX) $(TEST_FLAGS) $(MODULE_OBJS) $(SYZYGY_C_OBJ) $(PERF_OBJS) $(PERF_MAIN_OBJ) $(OMP_LIBS) -o $(PERF_APP)
 
 # Complete static-analysis suite
 analyze: analyze-setup
@@ -218,7 +240,6 @@ analyze-setup:
 	@printf "\n=== Complete Static Analysis Suite ===\n"
 	@printf "This will take some minutes...\n"
 	@printf "Analyzing %s files (.cpp + .hpp)...\n\n" $(words $(ALL_ANALYSIS_FILES))
-	@mkdir -p $(ANALYSIS_DIR)
 	@rm -f $(ANALYSIS_LOG)
 	@rm -rf $(SCAN_BUILD_DIR)
 	@rm -f $(COMPLEXITY_REPORT)
@@ -286,7 +307,7 @@ analyze-gcc-analyzer:
 	@printf "5. GCC STATIC ANALYZER\n" >> $(ANALYSIS_LOG)
 	@printf "========================================\n\n" >> $(ANALYSIS_LOG)
 	@$(MAKE) -C $(ROOT_DIR) cls-compile-files > /dev/null
-	@$(CXX) -fanalyzer -fsyntax-only $(PRODFLAGS) $(MAIN_SRC) $(ALL_MODULE_SRCS) >> $(ANALYSIS_LOG) 2>&1 || echo "GCC analyzer exited with error code $$?" >> $(ANALYSIS_LOG)
+	@g++ -fanalyzer -fsyntax-only $(GCC_PRODFLAGS) $(MAIN_SRC) $(ALL_MODULE_SRCS) >> $(ANALYSIS_LOG) 2>&1 || echo "GCC analyzer exited with error code $$?" >> $(ANALYSIS_LOG)
 	@printf "[5/7] Running GCC analyzer terminated\n"
 
 analyze-cppclean:
@@ -322,21 +343,12 @@ analyze-summary:
 	@if [ -f $(COMPLEXITY_REPORT) ]; then \
 		printf "   3. $(COMPLEXITY_REPORT) (spreadsheet)\n"; \
 	fi
-	@printf "\n[7/7] Generating LLM prompt...\n\n"
-	@printf "=== LLM PROMPT (copy below) ===\n\n"
-	@if [ -f $(LLM_ANALYSIS_PROMPT) ]; then \
-		cat $(LLM_ANALYSIS_PROMPT); \
-	else \
-		printf "Prompt template not found: $(LLM_ANALYSIS_PROMPT)\n"; \
-	fi
-	@printf "\n\n=== END PROMPT ===\n"
 
 # Complexity-analysis alias
 complexity: analyze-lizard
 
 # Memory leak detection with report saved to file
 test-valgrind: $(TEST_APP)
-	@mkdir -p $(ANALYSIS_DIR)
 	@if ! command -v valgrind >/dev/null 2>&1; then \
 		printf "valgrind not found. Install it with: sudo apt install valgrind\n"; \
 		exit 1; \
@@ -357,9 +369,7 @@ cls-compile-files:
 # Clean temporary files
 cls: cls-compile-files
 	@printf "\nCleaning..."
-	rm -f $(DOC_DIR)/main-doc.{aux,log,pdf,toc}
 	rm -f $(COMPILATION_DB)
-	#rm -rf $(ANALYSIS_DIR)
 	rm -rf $(GPROF_OUTPUT)
 	@printf "\nClean completed\n\n"
 
@@ -397,7 +407,6 @@ help:
 	@printf "\n==================================\n"
 
 # Print variables
-.PHONY: debug-vars
 debug-vars:
 	@printf "\n"
 	@printf "SHELL = $(SHELL)"

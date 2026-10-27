@@ -62,7 +62,11 @@ std::string joinArgs(int argc, char* argv[], int first) {
 // counting a position the user never asked for. One king per side is the cheap
 // invariant that catches it.
 bool boardLooksValid(const chess::Board& b) noexcept {
-    return std::popcount(b.kings_bb[0]) == 1 && std::popcount(b.kings_bb[1]) == 1;
+    return std::popcount(b.bb[chess::Board::KING][0]) == 1 && std::popcount(b.bb[chess::Board::KING][1]) == 1;
+}
+
+int64_t msSince(std::chrono::steady_clock::time_point start) {
+    return std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now() - start).count();
 }
 
 void printUsage() {
@@ -73,47 +77,30 @@ void printUsage() {
 
 } // namespace
 
-uint64_t perft(chess::Board& b, int depth) noexcept {
+uint64_t perft(chess::Board& b, int depth, bool divide) noexcept {
     if (depth <= 0) return 1;
 
     const MoveList moves = MoveGenerator::generateLegalMoves(b);
-    if (depth == 1) return static_cast<uint64_t>(moves.size);
+    if (depth == 1 && !divide) return static_cast<uint64_t>(moves.size);
 
-    uint64_t nodes = 0;
-    chess::Board::MoveState st{};
-    for (const chess::Move& m : moves) {
-        b.doMove(m, st);
-        nodes += perft(b, depth - 1);
-        b.undoMove(m, st);
-    }
-    return nodes;
-}
-
-uint64_t perftDivide(chess::Board& b, int depth) {
-    if (depth <= 0) return 1;
-
-    const MoveList moves = MoveGenerator::generateLegalMoves(b);
     uint64_t total = 0;
     chess::Board::MoveState st{};
     for (const chess::Move& m : moves) {
         b.doMove(m, st);
         const uint64_t nodes = perft(b, depth - 1);
         b.undoMove(m, st);
-
-        std::cout << m.toUCIString() << ": " << nodes << '\n';
+        if (divide) std::cout << m.toUCIString() << ": " << nodes << '\n';
         total += nodes;
     }
-    std::cout << "\nmoves: " << moves.size << "\nnodes: " << total << '\n';
+    if (divide) std::cout << "\nmoves: " << moves.size << "\nnodes: " << total << '\n';
     return total;
 }
 
 bool runPerftSuite(int maxDepth, bool verbose) {
-    using clock = std::chrono::steady_clock;
-
     const int cappedDepth = std::min(maxDepth, static_cast<int>(STANDARD_CASES[0].counts.size()));
     bool allPassed = true;
     uint64_t totalNodes = 0;
-    const auto suiteStart = clock::now();
+    const auto suiteStart = std::chrono::steady_clock::now();
 
     for (const PerftCase& tc : STANDARD_CASES) {
         if (verbose) std::cout << tc.name << "\n  " << tc.fen << '\n';
@@ -129,10 +116,9 @@ bool runPerftSuite(int maxDepth, bool verbose) {
                 break;
             }
 
-            const auto start = clock::now();
+            const auto start = std::chrono::steady_clock::now();
             const uint64_t got = perft(b, depth);
-            const auto elapsedMs = std::chrono::duration_cast<std::chrono::milliseconds>(
-                clock::now() - start).count();
+            const int64_t elapsedMs = msSince(start);
             totalNodes += got;
 
             const bool ok = (got == expected);
@@ -148,16 +134,12 @@ bool runPerftSuite(int maxDepth, bool verbose) {
         }
     }
 
-    const auto suiteMs = std::chrono::duration_cast<std::chrono::milliseconds>(
-        clock::now() - suiteStart).count();
     std::cout << "\nperft suite " << (allPassed ? "PASSED" : "FAILED") << " - "
-              << totalNodes << " nodes in " << suiteMs << " ms\n";
+              << totalNodes << " nodes in " << msSince(suiteStart) << " ms\n";
     return allPassed;
 }
 
 int runPerftCommand(int argc, char* argv[]) {
-    pieces::initMagicBitboards();
-
     // argv is [0]=./chess [1]=perft [2]=<depth>|divide|suite ...
     if (argc < 3) {
         printUsage();
@@ -196,9 +178,8 @@ int runPerftCommand(int argc, char* argv[]) {
     }
 
     const auto start = std::chrono::steady_clock::now();
-    const uint64_t nodes = divide ? perftDivide(b, depth) : perft(b, depth);
-    const auto elapsedMs = std::chrono::duration_cast<std::chrono::milliseconds>(
-        std::chrono::steady_clock::now() - start).count();
+    const uint64_t nodes = perft(b, depth, divide);
+    const int64_t elapsedMs = msSince(start);
 
     if (!divide) std::cout << "nodes: " << nodes << '\n';
     std::cout << "time: " << elapsedMs << " ms";

@@ -1,12 +1,7 @@
-// Embeds nnue/net/hydray.nnue into the binary via the GNU assembler's .incbin
-// (works for both the Linux build and the mingw-w64 cross build), so ./chess
-// is self-contained: `setoption name UseNNUE value true` needs no EvalFile.
-//
-// The blob is the verbatim quantised.bin (payload + "bullet" padding), 64-byte
-// aligned so the Network reinterpret in nnue.cpp satisfies the AVX2 loads.
-// The .incbin path is resolved from the compiler's working directory (the
-// repo root - see the explicit makefile rule that also declares the data
-// dependency, since -MMD cannot track .incbin includes).
+// Embeds nnue/net/hydray.nnue into the binary with the assembler's .incbin, for
+// the Linux and mingw builds alike. The path is relative to the compiler's
+// working directory, the repo root; the makefile declares the dependency,
+// which -MMD cannot track.
 
 __asm__(
     ".section .rodata\n"

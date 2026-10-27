@@ -1,6 +1,3 @@
-// ==============================
-// Constructors
-// ==============================
 inline Board::Board() noexcept {
     fenToBoard(STARTING_FEN);
 }
@@ -21,12 +18,7 @@ inline Board& Board::operator=(const Board& other) noexcept {
 }
 
 inline void Board::copyFromBoard(const Board& other) noexcept {
-    pawns_bb = other.pawns_bb;
-    knights_bb = other.knights_bb;
-    bishops_bb = other.bishops_bb;
-    rooks_bb = other.rooks_bb;
-    queens_bb = other.queens_bb;
-    kings_bb = other.kings_bb;
+    bb = other.bb;
 
     chessboard = other.chessboard;
     currentHash = other.currentHash;
@@ -37,67 +29,29 @@ inline void Board::copyFromBoard(const Board& other) noexcept {
     }
 
     occupancy = other.occupancy;
-    nnueAccumulator = other.nnueAccumulator;
-    accPendingCount = other.accPendingCount;
-    if (accPendingCount > 0) {
-        std::memcpy(accPending, other.accPending,
-                    static_cast<size_t>(accPendingCount) * sizeof(NNUE::AccDelta));
-    }
+    // Only the current position's frame: this board's line starts there.
+    other.ensureNnueAccumulatorClean();
+    accTop = accFloor = other.accTop;
+    frame(accTop) = other.frame(other.accTop);
     halfMoveClock = other.halfMoveClock;
     fullMoveClock = other.fullMoveClock;
     castle = other.castle;
-    hasMoved = other.hasMoved;
     enPassant = other.enPassant;
     epHashFile = other.epHashFile;
     activeColor = other.activeColor;
+    pliesFromNull = other.pliesFromNull;
 }
-
-// ==============================
-// Public Board API
-// ==============================
-__attribute__((hot, always_inline))
-inline void Board::set(uint8_t index, piece_id value) noexcept {
-    const uint8_t internal_row = 7 - (index >> 3);
-    const uint8_t shift = (index & 7) << 2; // file * 4
-    chessboard[internal_row] = (chessboard[internal_row] & ~(MASK_PIECE << shift)) | ((value & MASK_PIECE) << shift);
-}
-
-
-// ==============================
-// Board Internals
-// ==============================
 
 inline void Board::rebuildBitboardsFromSquares() noexcept {
-    // Reset all bitboards
-    occupancy       = 0ULL;
-    pawns_bb[0]     = pawns_bb[1]     = 0ULL;
-    knights_bb[0]   = knights_bb[1]   = 0ULL;
-    bishops_bb[0]   = bishops_bb[1]   = 0ULL;
-    rooks_bb[0]     = rooks_bb[1]     = 0ULL;
-    queens_bb[0]    = queens_bb[1]    = 0ULL;
-    kings_bb[0]     = kings_bb[1]     = 0ULL;
-
-    // Single loop: iterate all 64 squares directly
-    // index = rank * 8 + file, where rank 0 = row 8, rank 7 = row 1
+    occupancy = 0ULL;
+    bb = {};
     for (uint8_t index = 0; index < 64; ++index) {
         const uint8_t piece = get(index);
-        
         if (piece == EMPTY) continue;
-        
-        const uint64_t bit = BIT_MASKS[index];
-        const uint8_t color = colorToIndex(piece);
-
-        occupancy |= bit;
-        dispatchPieceBBUpdate<true>(piece & MASK_PIECE_TYPE, color, bit);
+        occupancy |= 1ULL << index;
+        bb[piece & MASK_PIECE_TYPE][colorToIndex(piece)] |= 1ULL << index;
     }
-
     refreshNnueAccumulator();
-}
-
-__attribute__((always_inline))
-inline void Board::fastUpdateOccupancyBB(uint8_t fromIndex, uint8_t toIndex) noexcept {
-    occupancy |= BIT_MASKS[toIndex];  // Set the bit at 'to' position    
-    occupancy &= ~BIT_MASKS[fromIndex]; // Clear the bit at 'from' position
 }
 
 inline bool Board::isKingSafeAfterMove(
@@ -107,255 +61,207 @@ inline bool Board::isKingSafeAfterMove(
     uint64_t capturedMask
 ) const noexcept {
     const uint8_t side = colorToIndex(movingColor);
-    const uint64_t kingBB = kings_bb[side];
-    if (!kingBB) [[unlikely]] return false;
-
-    const uint8_t oppSide = side ^ 1;
-    const uint8_t kingSq = std::countr_zero(kingBB);
-
+    if (!bb[KING][side]) [[unlikely]] return false;
     const uint64_t occNew =
-        (occupancy & ~BIT_MASKS[fromIndex] & ~capturedMask) | BIT_MASKS[toIndex];
-    const uint64_t keep = ~capturedMask;
-
-    return !isKingAttackedCustom(kingSq, oppSide, occNew,
-                                 pawns_bb[oppSide]   & keep,
-                                 knights_bb[oppSide] & keep,
-                                 bishops_bb[oppSide] & keep,
-                                 rooks_bb[oppSide]   & keep,
-                                 queens_bb[oppSide]  & keep,
-                                 kings_bb[oppSide]   & keep);
+        (occupancy & ~(1ULL << fromIndex) & ~capturedMask) | (1ULL << toIndex);
+    return !attackedBy(std::countr_zero(bb[KING][side]), side ^ 1, occNew, ~capturedMask);
 }
 
-template<uint8_t PieceType, bool Add>
-inline void Board::updatePieceTypeBB(uint8_t color, uint64_t bit) noexcept {
-    if constexpr (PieceType == PAWN) {
-        if constexpr (Add) pawns_bb[color] |= bit;
-        else pawns_bb[color] &= ~bit;
-    } else if constexpr (PieceType == KNIGHT) {
-        if constexpr (Add) knights_bb[color] |= bit;
-        else knights_bb[color] &= ~bit;
-    } else if constexpr (PieceType == BISHOP) {
-        if constexpr (Add) bishops_bb[color] |= bit;
-        else bishops_bb[color] &= ~bit;
-    } else if constexpr (PieceType == ROOK) {
-        if constexpr (Add) rooks_bb[color] |= bit;
-        else rooks_bb[color] &= ~bit;
-    } else if constexpr (PieceType == QUEEN) {
-        if constexpr (Add) queens_bb[color] |= bit;
-        else queens_bb[color] &= ~bit;
-    } else if constexpr (PieceType == KING) {
-        if constexpr (Add) kings_bb[color] |= bit;
-        else kings_bb[color] &= ~bit;
-    }
-}
-
-template<bool Add>
-inline void Board::dispatchPieceBBUpdate(uint8_t pieceType, uint8_t color, uint64_t bit) noexcept {
-    switch (pieceType) {
-        case PAWN:   updatePieceTypeBB<PAWN, Add>(color, bit); break;
-        case KNIGHT: updatePieceTypeBB<KNIGHT, Add>(color, bit); break;
-        case BISHOP: updatePieceTypeBB<BISHOP, Add>(color, bit); break;
-        case ROOK:   updatePieceTypeBB<ROOK, Add>(color, bit); break;
-        case QUEEN:  updatePieceTypeBB<QUEEN, Add>(color, bit); break;
-        case KING:   updatePieceTypeBB<KING, Add>(color, bit); break;
-        default: break;
-    }
-}
-
-// The queue cancels a delta against the pending one it inverts. undoMove emits
-// exactly the inverse operations in reverse order, so a do/undo pair that never
-// reached an evaluate annihilates here and never touches a row.
-inline void Board::queueAccAdd(uint8_t piece, uint8_t index) const noexcept {
-    if (accPendingCount > 0) {
-        const NNUE::AccDelta& d = accPending[accPendingCount - 1];
-        if (d.kind == NNUE::AccDelta::Remove && d.piece == piece && d.from == index) {
-            --accPendingCount;
-            return;
-        }
-    }
-    if (accPendingCount == NNUE::MAX_ACC_PENDING) [[unlikely]] flushAccPending();
-    accPending[accPendingCount++] = {NNUE::AccDelta::Add, piece, index, 0};
-}
-
-inline void Board::queueAccRemove(uint8_t piece, uint8_t index) const noexcept {
-    if (accPendingCount > 0) {
-        const NNUE::AccDelta& d = accPending[accPendingCount - 1];
-        if (d.kind == NNUE::AccDelta::Add && d.piece == piece && d.from == index) {
-            --accPendingCount;
-            return;
-        }
-    }
-    if (accPendingCount == NNUE::MAX_ACC_PENDING) [[unlikely]] flushAccPending();
-    accPending[accPendingCount++] = {NNUE::AccDelta::Remove, piece, index, 0};
-}
-
-inline void Board::queueAccMove(uint8_t piece, uint8_t fromIndex, uint8_t toIndex) const noexcept {
-    if (accPendingCount > 0) {
-        const NNUE::AccDelta& d = accPending[accPendingCount - 1];
-        if (d.kind == NNUE::AccDelta::Move && d.piece == piece
-            && d.from == toIndex && d.to == fromIndex) {
-            --accPendingCount;
-            return;
-        }
-    }
-    if (accPendingCount == NNUE::MAX_ACC_PENDING) [[unlikely]] flushAccPending();
-    accPending[accPendingCount++] = {NNUE::AccDelta::Move, piece, fromIndex, toIndex};
-}
-
-inline void Board::flushAccPending() const noexcept {
-    const int n = accPendingCount;
-    accPendingCount = 0;   // set first: update<> must not re-enter the queue
-
-    // Fold a two-delta queue into a single traversal. Kings can move the
-    // perspective basis and a dirty perspective is skipped entirely by
-    // update<>, so both keep the one-at-a-time replay below.
-    if (n == 2
-        && (accPending[0].piece & MASK_PIECE_TYPE) != KING
-        && (accPending[1].piece & MASK_PIECE_TYPE) != KING
-        && !nnueAccumulator.dirty[0] && !nnueAccumulator.dirty[1]) {
-        const int16_t* sub[2][2];
-        const int16_t* add[2][2];
-        int ns = 0;
-        int na = 0;
-        for (int i = 0; i < 2; ++i) {
-            const NNUE::AccDelta& d = accPending[i];
-            if (d.kind != NNUE::AccDelta::Add) {
-                sub[0][ns] = nnueAccumulator.featureRow(0, d.piece, d.from);
-                sub[1][ns] = nnueAccumulator.featureRow(1, d.piece, d.from);
-                ++ns;
-            }
-            if (d.kind == NNUE::AccDelta::Move) {
-                add[0][na] = nnueAccumulator.featureRow(0, d.piece, d.to);
-                add[1][na] = nnueAccumulator.featureRow(1, d.piece, d.to);
-                ++na;
-            } else if (d.kind == NNUE::AccDelta::Add) {
-                add[0][na] = nnueAccumulator.featureRow(0, d.piece, d.from);
-                add[1][na] = nnueAccumulator.featureRow(1, d.piece, d.from);
-                ++na;
-            }
-        }
-        switch (ns * 4 + na) {
-            case 2 * 4 + 2: nnueAccumulator.updateFused<2, 2>(sub, add); return;
-            case 2 * 4 + 1: nnueAccumulator.updateFused<2, 1>(sub, add); return;
-            case 1 * 4 + 2: nnueAccumulator.updateFused<1, 2>(sub, add); return;
-            case 1 * 4 + 1: nnueAccumulator.updateFused<1, 1>(sub, add); return;
-            case 2 * 4 + 0: nnueAccumulator.updateFused<2, 0>(sub, add); return;
-            case 0 * 4 + 2: nnueAccumulator.updateFused<0, 2>(sub, add); return;
-            default: break;
-        }
-    }
-
-    for (int i = 0; i < n; ++i) {
-        const NNUE::AccDelta& d = accPending[i];
-        switch (d.kind) {
-            case NNUE::AccDelta::Add:    nnueAccumulator.update<true>(d.piece, d.from); break;
-            case NNUE::AccDelta::Remove: nnueAccumulator.update<false>(d.piece, d.from); break;
-            default:                     nnueAccumulator.updateMove(d.piece, d.from, d.to); break;
-        }
-    }
-}
-
-__attribute__((always_inline))
-inline void Board::addPieceToBB(uint8_t piece, uint8_t index) noexcept {
-    dispatchPieceBBUpdate<true>(piece & MASK_PIECE_TYPE, colorToIndex(piece), BIT_MASKS[index]);
-    if (NNUE::activeNetwork != nullptr) [[likely]] {
-        queueAccAdd(piece, index);
-    }
-}
-
-__attribute__((always_inline))
-inline void Board::removePieceFromBB(uint8_t piece, uint8_t index) noexcept {
-    dispatchPieceBBUpdate<false>(piece & MASK_PIECE_TYPE, colorToIndex(piece), BIT_MASKS[index]);
-    if (NNUE::activeNetwork != nullptr) [[likely]] {
-        queueAccRemove(piece, index);
-    }
-}
-
-__attribute__((always_inline))
-inline void Board::movePieceOnBB(uint8_t piece, uint8_t fromIndex, uint8_t toIndex) noexcept {
-    const uint8_t type = piece & MASK_PIECE_TYPE;
-    const uint8_t color = colorToIndex(piece);
-    dispatchPieceBBUpdate<false>(type, color, BIT_MASKS[fromIndex]);
-    dispatchPieceBBUpdate<true>(type, color, BIT_MASKS[toIndex]);
-    if (NNUE::activeNetwork != nullptr) [[likely]] {
-        queueAccMove(piece, fromIndex, toIndex);
-    }
-}
-
-// From-scratch accumulator rebuild. Note rebuildBitboardsFromSquares goes
-// through dispatchPieceBBUpdate directly (NOT addPieceToBB), so bulk rebuilds
-// never double-count: they land here once at the end instead.
+// From-scratch rebuild of the current frame, which becomes the oldest one of
+// the line. rebuildBitboardsFromSquares sets the bitboards directly (NOT
+// through addPieceToBB), so bulk rebuilds land here once at the end.
 inline void Board::refreshNnueAccumulator() noexcept {
     if (NNUE::activeNetwork == nullptr) return;
-    accPendingCount = 0;   // rebuilt from the squares below; queued work is moot
-    // No kings (unit-test fragments, mid-load states): leave the accumulator
-    // as-is; evaluation is guarded upstream by the kings-missing check.
-    if (kings_bb[0] == 0 || kings_bb[1] == 0) return;
-    const int wKingLerf      = std::countr_zero(kings_bb[0]) ^ 56;
-    const int bKingLerfView  = std::countr_zero(kings_bb[1]); // lerf ^ 56
-    nnueAccumulator.resetWithKings(wKingLerf, bKingLerfView);
+    accFloor = accTop;
+    NNUE::Accumulator& acc = frame(accTop);
+    acc.ndelta = 0;
+    // No kings (unit-test fragments, mid-load states): no values; evaluation
+    // is guarded upstream by the kings-missing check.
+    acc.dirty[0] = acc.dirty[1] = true;
+    if (bb[KING][0] == 0 || bb[KING][1] == 0) return;
+    const int wKingLerf      = std::countr_zero(bb[KING][0]) ^ 56;
+    const int bKingLerfView  = std::countr_zero(bb[KING][1]); // lerf ^ 56
+    acc.resetWithKings(wKingLerf, bKingLerfView);
+    uint16_t add[64];   // piece << 8 | square
+    int na = 0;
     for (uint8_t index = 0; index < 64; ++index) {
         const uint8_t piece = get(index);
-        if (piece != EMPTY) nnueAccumulator.update<true>(piece, index);
+        if (piece != EMPTY) add[na++] = static_cast<uint16_t>(piece << 8 | index);
     }
+    NNUE::Accumulator::forEachPass(0, na, [&]<int S, int A>(int, int ai) {
+        const int16_t* subRow[2][2] = {};
+        const int16_t* addRow[2][2];
+        for (int p = 0; p < 2; ++p) {
+            for (int k = 0; k < A; ++k) {
+                addRow[p][k] = acc.featureRow(p, static_cast<uint8_t>(add[ai + k] >> 8),
+                                              static_cast<uint8_t>(add[ai + k]));
+            }
+        }
+        NNUE::Accumulator::fusePair<S, A>(acc.v[0], acc.v[1], subRow, addRow);
+    });
 }
 
-// HalfKA lazy refresh: rebuild only the perspectives whose own king crossed
-// bucket/flip since the last clean state, as a Finny-table diff against the
-// cached accumulator for the target (bucket, flip). Called from
-// consistent-board points only (NNUE::evaluate, selftest) - never mid-doMove.
+// Computes the current frame. Its nearest computed ancestor, at most
+// ACC_MAX_WALK moves back, is a valid start for a perspective whose king still
+// stands on the same basis: the changes logged since sum to the feature
+// difference whatever the king did in between. Rows that appear on both sides
+// cancel, and int16 is modular, so the rest applies in any order. A
+// perspective without such a start is rebuilt as a diff against the Finny
+// table. Called from consistent-board points only (NNUE::evaluate, a copy,
+// the selftest), never mid-doMove.
 inline void Board::ensureNnueAccumulatorClean() const noexcept {
     if (NNUE::activeNetwork == nullptr) return;
-    flushAccPending();
-    if (!(nnueAccumulator.dirty[0] || nnueAccumulator.dirty[1])) [[likely]] return;
-    if (kings_bb[0] == 0 || kings_bb[1] == 0) return;
+    NNUE::Accumulator& top = frame(accTop);
+    if (!top.dirty[0]) [[likely]] return;   // a frame is computed for both perspectives at once
+    if (bb[KING][0] == 0 || bb[KING][1] == 0) return;
+
+    int kingView[2];
+    int rowBase[2];
+    int rowFlip[2];
+    for (int p = 0; p < 2; ++p) {
+        // Own king square from this perspective's view: lerf for white,
+        // lerf ^ 56 for black - which folds back to the raw engine index.
+        const int engineKing = std::countr_zero(bb[KING][p]);
+        kingView[p] = (p == 1) ? engineKing : (engineKing ^ 56);
+        rowBase[p] = NNUE::kingFeatureBase(kingView[p]);
+        rowFlip[p] = NNUE::kingFlip(kingView[p]);
+    }
+    int from = -1;
+    for (int i = accTop - 1; i >= std::max(accFloor, accTop - NNUE::ACC_MAX_WALK); --i) {
+        if (!frame(i).dirty[0]) {
+            from = i;
+            break;
+        }
+    }
+    bool usable[2] = {false, false};
+    if (from >= 0) {
+        const NNUE::Accumulator& src = frame(from);
+        for (int p = 0; p < 2; ++p) usable[p] = src.base[p] == rowBase[p] && src.flip[p] == rowFlip[p];
+    }
+
+    // Frame `target` from frame `start` for the usable perspectives, through
+    // the changes logged in the frames between.
+    const auto incremental = [&](int start, int target) {
+        constexpr int CAP = NNUE::ACC_MAX_WALK * NNUE::ACC_MAX_DELTAS;
+        uint16_t sub[CAP];   // piece << 8 | square
+        uint16_t add[CAP];
+        int ns = 0;
+        int na = 0;
+        for (int i = start + 1; i <= target; ++i) {
+            const NNUE::Accumulator& f = frame(i);
+            for (int k = 0; k < f.ndelta; ++k) {
+                const NNUE::AccDelta& d = f.delta[k];
+                const uint16_t at = static_cast<uint16_t>(d.piece << 8 | d.from);
+                if (d.kind == NNUE::AccDelta::Add) {
+                    add[na++] = at;
+                } else {
+                    sub[ns++] = at;
+                    if (d.kind == NNUE::AccDelta::Move) add[na++] = static_cast<uint16_t>(d.piece << 8 | d.to);
+                }
+            }
+        }
+        for (int i = 0; i < ns; ) {
+            int j = 0;
+            while (j < na && add[j] != sub[i]) ++j;
+            if (j == na) { ++i; continue; }
+            sub[i] = sub[--ns];   // swap-remove: order is irrelevant
+            add[j] = add[--na];
+        }
+        const NNUE::Accumulator& src = frame(start);
+        NNUE::Accumulator& dst = frame(target);
+        const auto row = [&](int p, uint16_t c) {
+            return NNUE::Accumulator::rowFor(rowBase[p], rowFlip[p], p, static_cast<uint8_t>(c >> 8),
+                                             static_cast<uint8_t>(c));
+        };
+        if (usable[0] && usable[1]) {
+            if (ns == 0 && na == 0) {
+                std::memcpy(dst.v, src.v, sizeof(dst.v));
+            } else {
+                bool first = true;
+                NNUE::Accumulator::forEachPass(ns, na, [&]<int S, int A>(int si, int ai) {
+                    const int16_t* subRow[2][2];
+                    const int16_t* addRow[2][2];
+                    for (int p = 0; p < 2; ++p) {
+                        for (int k = 0; k < S; ++k) subRow[p][k] = row(p, sub[si + k]);
+                        for (int k = 0; k < A; ++k) addRow[p][k] = row(p, add[ai + k]);
+                    }
+                    if (first) {
+                        NNUE::Accumulator::fusePairFrom<S, A>(src.v[0], src.v[1], dst.v[0], dst.v[1], subRow, addRow);
+                        first = false;
+                    } else {
+                        NNUE::Accumulator::fusePair<S, A>(dst.v[0], dst.v[1], subRow, addRow);
+                    }
+                });
+            }
+        } else {
+            const int p = usable[0] ? 0 : 1;
+            const int16_t* subRow[CAP];
+            const int16_t* addRow[CAP];
+            for (int k = 0; k < ns; ++k) subRow[k] = row(p, sub[k]);
+            for (int k = 0; k < na; ++k) addRow[k] = row(p, add[k]);
+            NNUE::Accumulator::applyRows(dst.v[p], subRow, ns, addRow, na, src.v[p]);
+        }
+    };
+
+    if (usable[0] || usable[1]) {
+        // Every frame on the way is computed too, one move at a time, back to
+        // the last king move (an older frame stands on another basis): the
+        // siblings and cousins that follow start one move away.
+        int first = accTop;
+        if (usable[0] && usable[1]) {
+            while (first - 1 > from) {
+                bool kingMoved = false;
+                const NNUE::Accumulator& f = frame(first);
+                for (int k = 0; k < f.ndelta; ++k) kingMoved |= (f.delta[k].piece & MASK_PIECE_TYPE) == KING;
+                if (kingMoved) break;
+                --first;
+            }
+        }
+        for (int i = first; i <= accTop; ++i) {
+            incremental(from, i);
+            NNUE::Accumulator& f = frame(i);
+            for (int p = 0; p < 2; ++p) {
+                f.base[p] = rowBase[p];
+                f.flip[p] = static_cast<uint8_t>(rowFlip[p]);
+                f.dirty[p] = false;
+            }
+            from = i;
+        }
+    }
 
     // Per-thread cache (Lazy SMP: each helper searches its own Board on its
     // own thread). Stale entries from other positions are still correct diff
     // bases - no invalidation needed, ever.
     static thread_local NNUE::FinnyTable finny;
-    finny.ensureInitialised();
-
-    const uint64_t cur[2][6] = {
-        {pawns_bb[0], knights_bb[0], bishops_bb[0], rooks_bb[0], queens_bb[0], kings_bb[0]},
-        {pawns_bb[1], knights_bb[1], bishops_bb[1], rooks_bb[1], queens_bb[1], kings_bb[1]},
-    };
-
     for (int p = 0; p < 2; ++p) {
-        if (!nnueAccumulator.dirty[p]) continue;
-        // Own king square from this perspective's view: lerf for white,
-        // lerf ^ 56 for black - which folds back to the raw engine index.
-        const int engineKing = std::countr_zero(kings_bb[p]);
-        const int ownKingView = (p == 1) ? engineKing : (engineKing ^ 56);
-        const int rowBase = NNUE::kingFeatureBase(ownKingView);
-        const int rowFlip = NNUE::kingFlip(ownKingView);
-        NNUE::FinnyEntry& e =
-            finny.entry[p][NNUE::KING_BUCKET_MAP[ownKingView]][rowFlip ? 1 : 0];
+        top.base[p] = rowBase[p];
+        top.flip[p] = static_cast<uint8_t>(rowFlip[p]);
+        top.dirty[p] = false;
+        if (usable[p]) continue;
+        finny.ensureInitialised();
+        NNUE::FinnyEntry& e = finny.entry[p][NNUE::KING_BUCKET_MAP[kingView[p]]][rowFlip[p] ? 1 : 0];
 
+        // Collect the diff first and apply it in chunks: a board holds at most
+        // 64 pieces, so neither side of the diff can exceed that.
+        const int16_t* sub[64];
+        const int16_t* add[64];
+        int ns = 0;
+        int na = 0;
         for (int c = 0; c < 2; ++c) {
             for (int t = 0; t < 6; ++t) {
                 const uint8_t piece = static_cast<uint8_t>((c == 0 ? 0x8 : 0) | (t + 1));
-                uint64_t added   = cur[c][t] & ~e.bb[c][t];
-                uint64_t removed = e.bb[c][t] & ~cur[c][t];
-                while (added) {
-                    const int idx = std::countr_zero(added);
-                    added &= added - 1;
-                    NNUE::Accumulator::updateRow<true>(e.v, rowBase, rowFlip, p, piece,
-                                                       static_cast<uint8_t>(idx));
-                }
-                while (removed) {
-                    const int idx = std::countr_zero(removed);
-                    removed &= removed - 1;
-                    NNUE::Accumulator::updateRow<false>(e.v, rowBase, rowFlip, p, piece,
-                                                        static_cast<uint8_t>(idx));
-                }
-                e.bb[c][t] = cur[c][t];
+                uint64_t added   = bb[t + 1][c] & ~e.bb[c][t];
+                uint64_t removed = e.bb[c][t] & ~bb[t + 1][c];
+                while (added)
+                    add[na++] = NNUE::Accumulator::rowFor(rowBase[p], rowFlip[p], p, piece,
+                                                          static_cast<uint8_t>(pieces::popLSB(added)));
+                while (removed)
+                    sub[ns++] = NNUE::Accumulator::rowFor(rowBase[p], rowFlip[p], p, piece,
+                                                          static_cast<uint8_t>(pieces::popLSB(removed)));
+                e.bb[c][t] = bb[t + 1][c];
             }
         }
-
-        std::memcpy(nnueAccumulator.v[p], e.v, sizeof(e.v));
-        nnueAccumulator.base[p] = rowBase;
-        nnueAccumulator.flip[p] = static_cast<uint8_t>(rowFlip);
-        nnueAccumulator.dirty[p] = false;
+        NNUE::Accumulator::applyRows(e.v, sub, ns, add, na);
+        std::memcpy(top.v[p], e.v, sizeof(e.v));
     }
 }

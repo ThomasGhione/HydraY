@@ -3,8 +3,7 @@
     "LMP_SCALE_STD_PCT": "Integer(60, 170)",
     "LMP_SCALE_IMP_PCT": "Integer(60, 170)",
     "LMR_C_PERCENT": "Integer(200, 450)",
-    "SE_BETA_MARGIN": "Integer(1, 8)",
-    "SE_DOUBLE_MARGIN": "Integer(8, 32)"
+    "SE_BETA_MARGIN": "Integer(1, 8)"
   },
   "data_path": "search_shape_data.npz",
   "model_path": "search_shape_model.pkl",

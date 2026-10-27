@@ -1,122 +1,52 @@
 #pragma once
 
 #include <cstdint>
-#include <cstring>
 
 #include "../../board/board.hpp"
 #include "../../tt/tt.hpp"
-#include "../eval_constants.hpp"
 #include "../movelist.hpp"
 #include "../search/search_constants.hpp"
 #include "movepicker.hpp"
 
 namespace engine {
 
-// Full definition lives in searcher.hpp; sorter.cpp only needs the members.
 struct SearchRuntime;
 
-class Sorter final {
-public:
-    Sorter() = delete;
-    ~Sorter() = delete;
-
-    // All scoring constants live in search_constants.hpp (namespace engine).
-    // MovePicker (lazy selection-sort picker + deferred SEE) lives in movepicker.hpp.
-
-    // Move::promotionType is already the Board piece type; 0 (not a promotion /
-    // garbage sentinel) contributes no delta instead of silently acting as QUEEN.
-    static inline constexpr int32_t getPromotionValueDelta(uint8_t promotionType) noexcept {
-        return (promotionType == chess::Board::EMPTY) ? 0
-                : PIECE_VALUES[promotionType] - PIECE_VALUES[chess::Board::PAWN];
-    }
-
-    // encodedHashMove is the TT move from the caller's node probe (0 = none);
-    // the sorter itself never touches the TT.
-    static MovePicker sortLegalMoves(
-        MoveList moves,
-        int ply,
-        const chess::Board& b,
-        const SearchRuntime& runtime,
-        uint16_t encodedHashMove = 0,
-        const chess::Move* previousMove = nullptr,
-        bool* outHashMoveIsLegal = nullptr,
-        const int16_t* contHistEntry = nullptr) noexcept;
-
-    struct CaptureInfo {
-        bool isCapture;
-        int  victimType;
-    };
-
-    static CaptureInfo classifyCapture(
-        const chess::Move& m,
-        int fromPieceType,
-        int toPieceType,
-        const chess::Square& enPassant) noexcept;
-
-    static int32_t staticExchangeEvaluation(
-        const chess::Board& b, 
-        const chess::Move& m) noexcept;
-
-    static bool givesCheckAfterQuietMoveFast(
-        const chess::Board& b,
-        const chess::Move& m,
-        int fromPieceType,
-        int oppKingSq,
-        uint64_t occ) noexcept;
-
-    static MovePicker sortTacticalMoves(
-        const MoveList& tacticalMoves,
-        const chess::Board& b,
-        int32_t standPat,
-        int32_t alpha,
-        int ply) noexcept;
-
-    static MoveList sortEvasionsForcingFirst(
-        MoveList evasions,
-        const chess::Board& b) noexcept;
-
-private:
-    // Everything the per-move scorer needs, with the node-invariant parts
-    // resolved once by the caller. killerMoves[ply][0..1] and the countermove
-    // slot depend only on the node, not on the move being scored, so reading
-    // them inside the loop re-walked SearchRuntime once per move -- ~33 moves
-    // per node, tens of millions of redundant dependent loads per search.
-    struct MoveOrderingContext {
-        const chess::Move* previousMove;
-        const SearchRuntime& runtime;
-        const int16_t* contHistEntry;
-        int ply;
-        int usSide;
-        chess::Move killer0;
-        chess::Move killer1;
-        uint16_t counterMove;   // 0 = none
-    };
-
-    // square == 64 means "no attacker" (type then unspecified).
-    struct LeastValuableAttacker {
-        int square;
-        int type;
-    };
-
-    static int32_t scoreMoveOrderingPriorityInline(
-        const MoveOrderingContext& ctx,
-        const chess::Move& m,
-        bool isCapture,
-        int victimType,
-        bool isPromotionCandidate,
-        bool isHashMove,
-        int fromPieceType) noexcept;
-
-    static LeastValuableAttacker getLeastValuableAttackerTo(
-        const chess::Board& b,
-        int sq,
-        uint64_t occLocal,
-        int sideLocal) noexcept;
-
-    static bool isForcingEvasion(
-        const chess::Board& b,
-        const chess::Move& m,
-        const chess::Square& enPassant) noexcept;
+// What the search and the sorter need to know about a move before playing it.
+struct MoveTraits {
+    int  fromType;
+    int  victimType;   // PAWN for en passant, EMPTY for a non-capture
+    bool isCapture;
+    bool isPromotion;
 };
+
+inline MoveTraits moveTraits(const chess::Board& b, const chess::Move& m,
+                             chess::Square enPassant, int promotionRank) noexcept {
+    using chess::Board;
+    const int fromType = b.get(m.from) & Board::MASK_PIECE_TYPE;
+    const int toType   = b.get(m.to)   & Board::MASK_PIECE_TYPE;
+    const bool ep = m.to == enPassant && fromType == Board::PAWN && toType == Board::EMPTY
+                 && chess::file(m.from) != chess::file(m.to);
+    return {fromType, ep ? static_cast<int>(Board::PAWN) : toType, toType != Board::EMPTY || ep,
+            fromType == Board::PAWN && chess::rank(m.to) == promotionRank};
+}
+
+namespace Sorter {
+
+// encodedHashMove is the TT move from the caller's node probe (0 = none).
+MovePicker sortLegalMoves(MoveList moves, int ply, const chess::Board& b, const SearchRuntime& runtime,
+                          uint16_t encodedHashMove = 0, const chess::Move* previousMove = nullptr,
+                          bool* outHashMoveIsLegal = nullptr, const int16_t* contHistEntry = nullptr) noexcept;
+
+MovePicker sortTacticalMoves(const MoveList& tacticalMoves, const chess::Board& b,
+                             int32_t standPat, int32_t alpha, int ply) noexcept;
+
+// Captures, en passant and promotions first, both groups in generation order.
+MoveList sortEvasionsForcingFirst(MoveList evasions, const chess::Board& b) noexcept;
+
+bool givesCheckAfterQuietMoveFast(const chess::Board& b, const chess::Move& m,
+                                  int fromPieceType, int oppKingSq, uint64_t occ) noexcept;
+
+} // namespace Sorter
 
 } // namespace engine

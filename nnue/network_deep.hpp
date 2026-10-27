@@ -1,23 +1,13 @@
 #pragma once
 
-// Quantised network with a hidden layer.
+// The quantised network:
 //
 //   (768x4kb_hm -> 1024)x2 -> pairwise -> 1024 -> 16 -> 1
 //
-// ONE hidden layer only: see trainer_deep.rs for why bullet's 16->32->1 example
-// was not copied.
-//
-// The INPUTS are identical to the single-layer net (network.hpp): the same 4
-// mirrored king buckets, the same feature formula, the same i16 accumulator.
-// Only what happens AFTER the accumulator differs, so accumulator.hpp needs no
-// changes.
-//
-// This header is deliberately SEPARATE from network.hpp so the two formats can
-// coexist without #ifdefs scattered through the engine.
-//
-// The reference reader is nnue/trainer/src/bin/sanity_deep.rs. When the two
-// disagree, sanity_deep is right: it is the oracle, it is simpler, and it is
-// written against bullet's format.
+// The feature space and l0 are in network.hpp, all that board.hpp needs. One
+// hidden layer: trainer_deep.rs says why not bullet's 16->32->1 example. The
+// reference reader is nnue/trainer/src/bin/sanity_deep.rs; when the two
+// disagree, sanity_deep is right.
 //
 // FILE LAYOUT (little-endian, padded to 64 B with "bullet" repeated):
 //
@@ -45,12 +35,12 @@
 #include <cstddef>
 #include <cstdint>
 
+#include "network.hpp"
+
 namespace NNUE::Deep {
 
-inline constexpr int INPUTS        = 768;
-inline constexpr int HIDDEN        = 1024;
+using NNUE::HIDDEN, NNUE::INPUTS, NNUE::INPUT_BUCKETS; // the tools reach them through Deep
 inline constexpr int L1_SIZE       = 16;
-inline constexpr int INPUT_BUCKETS = 4;
 inline constexpr int OUTPUT_BUCKETS = 8;
 inline constexpr int32_t QA    = 255;
 inline constexpr int32_t QB    = 64;
@@ -59,7 +49,7 @@ inline constexpr int32_t SCALE = 400;
 // Pairwise output per perspective; l1's input is HIDDEN (two perspectives
 // concatenated), not 2*HIDDEN -- which is why the layer is cheap.
 inline constexpr int PAIRWISE_OUT = HIDDEN / 2;
-static_assert(2 * PAIRWISE_OUT == HIDDEN, "il pairwise richiede HIDDEN pari");
+static_assert(2 * PAIRWISE_OUT == HIDDEN, "pairwise needs an even HIDDEN");
 
 struct alignas(64) NetworkDeep {
     int16_t l0w[INPUT_BUCKETS * INPUTS][HIDDEN];
@@ -89,8 +79,9 @@ struct alignas(64) NetworkDeep {
     // (the table is built either way) and removes one vpermq per 32 outputs
     // from the hot loop.
     //
-    // Derived, not read from the file. 128 KiB.
-    alignas(64) int8_t l1wT[OUTPUT_BUCKETS][HIDDEN / 4][L1_SIZE * 4];
+    // Derived, not read from the file. 128 KiB, plus one zero row per bucket
+    // that pads the non-zero list to a multiple of four.
+    alignas(64) int8_t l1wT[OUTPUT_BUCKETS][HIDDEN / 4 + 1][L1_SIZE * 4];
 };
 
 // The order packus_epi16 leaves a block's 32 bytes in, relative to the source:
@@ -111,7 +102,7 @@ inline constexpr size_t PAYLOAD_BYTES =
     + static_cast<size_t>(OUTPUT_BUCKETS) * L1_SIZE * sizeof(float)
     + static_cast<size_t>(OUTPUT_BUCKETS) * L1_SIZE * sizeof(float)
     + static_cast<size_t>(OUTPUT_BUCKETS) * sizeof(float);
-static_assert(PAYLOAD_BYTES == 6'425'632, "layout cambiato: aggiorna sanity_deep.rs");
+static_assert(PAYLOAD_BYTES == 6'425'632, "layout changed: update sanity_deep.rs");
 
 // Scalar forward, from the two perspectives' accumulators to the evaluation in
 // centipawns. The correctness reference for the vectorised version.
@@ -127,18 +118,13 @@ static_assert(PAYLOAD_BYTES == 6'425'632, "layout cambiato: aggiorna sanity_deep
                                   const int16_t* accNtm,
                                   int outputBucket) noexcept;
 
-// true se il binario e' stato compilato con AVX-VNNI (vpdpbusd), che raddoppia
-// le moltiplicazioni per istruzione nel layer l1. Senza, forwardSimd usa un
-// percorso a corsie i16 che e' esatto ma costa il doppio delle istruzioni.
+// Whether the binary has AVX-VNNI (vpdpbusd). Without it forwardSimd takes an
+// exact i16-lane path that costs twice the instructions in l1.
 [[nodiscard]] bool hasVnniPath() noexcept;
 
-// Carica un file quantised.bin nel formato sopra. Ritorna false (senza
-// scrivere in `net`) se taglia o padding non tornano.
+// Loads a quantised.bin in the layout above, and builds the derived tables
+// (l1w16, l1wT). False if the size or the padding is wrong.
 [[nodiscard]] bool loadFromFile(const char* path, NetworkDeep& net) noexcept;
-
-// Same, from a blob already in memory: the EMBEDDED net is not a file. It also
-// builds the derived tables (l1w16, l1wT), so unlike the single-layer net the
-// deep one cannot be used as a plain overlay on the blob.
 [[nodiscard]] bool loadFromMemory(const unsigned char* data, size_t size,
                                   NetworkDeep& net) noexcept;
 
