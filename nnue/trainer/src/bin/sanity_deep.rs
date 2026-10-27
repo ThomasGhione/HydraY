@@ -1,52 +1,44 @@
-// Lettore di riferimento (pure-std, niente GPU) per il quantised.bin prodotto
-// da trainer_deep.rs - la rete con layer intermedi.
+// Reference reader (pure std, no GPU) for the quantised.bin written by
+// trainer_deep.rs: it is the ORACLE. The C++ must agree with this file, not the
+// other way round.
 //
-// Come sanity.rs sta alla rete a un layer, questo sta alla rete profonda: e'
-// l'ORACOLO. Il C++ deve concordare con questo file, non viceversa, e va
-// scritto dopo averlo letto.
+// Net: (768x4kb_hm -> 1024)x2 -> pairwise -> 1024 -> 16 -> 1, with OB
+// material-count output buckets on l1 and l2. QA=255 QB=64 SCALE=400. OB is 16
+// or 8, recognised by the file size; the inputs are those of sanity.rs.
 //
-// Rete: (768x4kb_hm -> 1024)x2 -> pairwise -> 1024 -> 16 -> 1,
-// 8 output bucket applicati sia a l1 sia a l2. QA=255 QB=64 SCALE=400.
+// LAYOUT (little-endian, save_format order, padded to 64 B with "bullet"):
 //
-// Input identici alla rete a un layer (4 king bucket specchiati, 8 output
-// bucket su popcount): quella parte e' copiata da sanity.rs apposta, cosi' un
-// eventuale disaccordo fra i due lettori isola la sola parte nuova.
+//   offset              field                  type   scale
+//   0                   l0w [4*768][1024]      i16    QA
+//   6,291,456           l0b [1024]             i16    QA
+//   6,293,504           l1w [OB][16][1024]     i8     QB
+//   + OB*16384          l1b [OB][16]           f32    real
+//   + OB*64             l2w [OB][1][16]        f32    real
+//   + OB*64             l2b [OB]               f32    real
+//   OB = 16: payload and file 6,557,760; OB = 8: payload 6,425,632, file 6,425,664
 //
-// LAYOUT (little-endian, nell'ordine di save_format, pad a 64 B con "bullet"):
+// ARITHMETIC, the delicate part:
 //
-//   offset          campo                      tipo   scala
-//   0               l0w [4*768][1024]          i16    QA
-//   6.291.456       l0b [1024]                 i16    QA
-//   6.293.504       l1w [8][16][1024]          i8     QB
-//   6.424.576       l1b [8][16]                f32    reale
-//   6.425.088       l2w [8][1][16]             f32    reale
-//   6.425.600       l2b [8]                    f32    reale
-//   6.425.632       fine payload (pad a 6.425.664)
-//
-// ARITMETICA, che e' il punto delicato:
-//
-//   acc[i]              i16, scala QA
-//   c[i]  = clamp(acc[i], 0, QA)                    scala QA, sta in u8
-//   p[j]  = c[j] * c[j + 512] / QA                  scala QA, sta in u8
-//                       ^ e' il pairwise: da 1024 valori per prospettiva a 512,
-//                         e la divisione per QA e' cio' che lo rimette in u8.
-//   hl1   = [p_stm (512), p_ntm (512)]              1024 valori, scala QA
-//   z[o]  = (SUM hl1[i]*l1w[o][i]) / (QA*QB) + l1b[o]     reale
+//   c[i]  = clamp(acc[i], 0, QA)                    QA scale, fits in u8
+//   p[j]  = c[j] * c[j + 512] / QA                  pairwise, back in u8
+//   hl1   = [p_stm (512), p_ntm (512)]              1024 values, QA scale
+//   z[o]  = (SUM hl1[i]*l1w[o][i]) / (QA*QB) + l1b[o]     real
 //   a[o]  = clamp(z[o], 0, 1)^2                     SCReLU in float
-//   y     = SUM a[o]*l2w[o] + l2b        lineare
+//   y     = SUM a[o]*l2w[o] + l2b                   linear
 //   cp    = y * SCALE
 //
-// Uso: cargo run -r --bin sanity_deep -- <quantised.bin> [fen]...
+// Usage: cargo run -r --bin sanity_deep -- <quantised.bin> [fen]...
 
 const HIDDEN: usize = 1024;
 const L1_SIZE: usize = 16;
 const INPUT_BUCKETS: usize = 4;
-const OUTPUT_BUCKETS: usize = 8;
+// The output-bucket counts a file may have, as in network_deep.hpp.
+const OUTPUT_BUCKET_COUNTS: [usize; 2] = [16, 8];
 const QA: i32 = 255;
 const QB: i32 = 64;
 const SCALE: f32 = 400.0;
 
-// Keep in sync with trainer_deep.rs BUCKET_LAYOUT e nnue/network.hpp.
+// Keep in sync with trainer_deep.rs BUCKET_LAYOUT and nnue/network.hpp.
 #[rustfmt::skip]
 const BUCKET_LAYOUT: [usize; 32] = [
     0, 0, 1, 1,
@@ -65,6 +57,7 @@ fn king_bucket(ksq: usize) -> usize {
 }
 
 pub struct Network {
+    pub ob: usize,      // output buckets
     pub l0w: Vec<i16>,  // [4*768 * HIDDEN]
     pub l0b: Vec<i16>,  // [HIDDEN]
     pub l1w: Vec<i8>,   // [OB * L1 * HIDDEN]
@@ -74,25 +67,29 @@ pub struct Network {
 }
 
 pub const L0W: usize = INPUT_BUCKETS * 768 * HIDDEN;
-pub const L1W: usize = OUTPUT_BUCKETS * L1_SIZE * HIDDEN;
-pub const PAYLOAD: usize = L0W * 2
-    + HIDDEN * 2
-    + L1W
-    + OUTPUT_BUCKETS * L1_SIZE * 4
-    + OUTPUT_BUCKETS * L1_SIZE * 4
-    + OUTPUT_BUCKETS * 4;
+
+pub const fn payload(ob: usize) -> usize {
+    L0W * 2 + HIDDEN * 2 + ob * L1_SIZE * HIDDEN + ob * L1_SIZE * 4 + ob * L1_SIZE * 4 + ob * 4
+}
 
 pub fn load(path: &str) -> Network {
     let bytes = std::fs::read(path).unwrap_or_else(|e| panic!("cannot read {path}: {e}"));
+    let ob = OUTPUT_BUCKET_COUNTS
+        .into_iter()
+        .find(|&ob| bytes.len() == payload(ob).div_ceil(64) * 64)
+        .unwrap_or_else(|| {
+            panic!(
+                "size mismatch: got {} bytes, expected {} (16 buckets) or {} (8 buckets)",
+                bytes.len(),
+                payload(16).div_ceil(64) * 64,
+                payload(8).div_ceil(64) * 64
+            )
+        });
+    let end = payload(ob);
+    // bullet fills the tail with "bullet" repeated: anything else means the
+    // layout has drifted.
     assert!(
-        bytes.len() >= PAYLOAD && bytes.len() % 64 == 0,
-        "size mismatch: got {} bytes, expected {PAYLOAD} (+pad to 64)",
-        bytes.len()
-    );
-    // bullet riempie la coda con "bullet" ripetuto: qualsiasi altra cosa
-    // significa che il layout e' andato alla deriva.
-    assert!(
-        bytes[PAYLOAD..].iter().zip(b"bullet".iter().cycle()).all(|(a, b)| a == b),
+        bytes[end..].iter().zip(b"bullet".iter().cycle()).all(|(a, b)| a == b),
         "unexpected padding tail - layout drift?"
     );
 
@@ -108,8 +105,9 @@ pub fn load(path: &str) -> Network {
     let l0w = i16s(L0W, &mut off);
     let l0b = i16s(HIDDEN, &mut off);
 
-    let l1w: Vec<i8> = bytes[off..off + L1W].iter().map(|&b| b as i8).collect();
-    off += L1W;
+    let l1w_len = ob * L1_SIZE * HIDDEN;
+    let l1w: Vec<i8> = bytes[off..off + l1w_len].iter().map(|&b| b as i8).collect();
+    off += l1w_len;
 
     let f32s = |n: usize, off: &mut usize| -> Vec<f32> {
         let v = bytes[*off..*off + n * 4]
@@ -119,12 +117,12 @@ pub fn load(path: &str) -> Network {
         *off += n * 4;
         v
     };
-    let l1b = f32s(OUTPUT_BUCKETS * L1_SIZE, &mut off);
-    let l2w = f32s(OUTPUT_BUCKETS * L1_SIZE, &mut off);
-    let l2b = f32s(OUTPUT_BUCKETS, &mut off);
-    assert_eq!(off, PAYLOAD, "il parsing non ha consumato esattamente il payload");
+    let l1b = f32s(ob * L1_SIZE, &mut off);
+    let l2w = f32s(ob * L1_SIZE, &mut off);
+    let l2b = f32s(ob, &mut off);
+    assert_eq!(off, end, "parsing did not consume exactly the payload");
 
-    Network { l0w, l0b, l1w, l1b, l2w, l2b }
+    Network { ob, l0w, l0b, l1w, l1b, l2w, l2b }
 }
 
 fn screlu_f32(x: f32) -> f32 {
@@ -132,9 +130,9 @@ fn screlu_f32(x: f32) -> f32 {
     y * y
 }
 
-/// Accumulatori delle due prospettive + bucket di uscita, dalla FEN.
-/// Identico a sanity.rs: e' la parte che le due architetture condividono.
-pub fn accumulate(net_l0w: &[i16], net_l0b: &[i16], fen: &str) -> (Vec<i16>, Vec<i16>, usize) {
+/// The two perspectives' accumulators and the output bucket (of `ob`), from the
+/// FEN. Identical to sanity.rs: the part the two architectures share.
+pub fn accumulate(net_l0w: &[i16], net_l0b: &[i16], ob: usize, fen: &str) -> (Vec<i16>, Vec<i16>, usize) {
     let mut fields = fen.split_whitespace();
     let board = fields.next().expect("empty FEN");
     let black_to_move = fields.next() == Some("b");
@@ -189,11 +187,12 @@ pub fn accumulate(net_l0w: &[i16], net_l0b: &[i16], fen: &str) -> (Vec<i16>, Vec
         }
     }
 
-    let out_bucket = (pieces.len() - 2) / 32usize.div_ceil(OUTPUT_BUCKETS);
+    // bullet MaterialCount<ob>.
+    let out_bucket = (pieces.len() - 2) / 32usize.div_ceil(ob);
     (acc_us, acc_them, out_bucket)
 }
 
-/// CReLU + prodotto a coppie: 1024 valori i16 -> 512 valori in [0, QA].
+/// CReLU + pairwise product: 1024 i16 values -> 512 values in [0, QA].
 fn pairwise(acc: &[i16], out: &mut [i32]) {
     let half = HIDDEN / 2;
     for j in 0..half {
@@ -204,14 +203,14 @@ fn pairwise(acc: &[i16], out: &mut [i32]) {
 }
 
 pub fn evaluate(net: &Network, fen: &str) -> i32 {
-    let (acc_us, acc_them, ob) = accumulate(&net.l0w, &net.l0b, fen);
+    let (acc_us, acc_them, ob) = accumulate(&net.l0w, &net.l0b, net.ob, fen);
 
     let half = HIDDEN / 2;
     let mut hl1 = vec![0i32; HIDDEN];
     pairwise(&acc_us, &mut hl1[..half]);
     pairwise(&acc_them, &mut hl1[half..]);
 
-    // l1: [L1_SIZE][HIDDEN] per bucket, gia' trasposto al salvataggio.
+    // l1: [L1_SIZE][HIDDEN] per bucket, already transposed at save time.
     let w1 = &net.l1w[ob * L1_SIZE * HIDDEN..(ob + 1) * L1_SIZE * HIDDEN];
     let b1 = &net.l1b[ob * L1_SIZE..(ob + 1) * L1_SIZE];
     let mut a1 = [0f32; L1_SIZE];
@@ -236,7 +235,7 @@ fn main() {
     let args: Vec<String> = std::env::args().collect();
     let path = args.get(1).map(String::as_str).unwrap_or("quantised.bin");
     let net = load(path);
-    println!("{path}: layout OK ({PAYLOAD} B payload)");
+    println!("{path}: layout OK ({} output buckets, {} B payload)", net.ob, payload(net.ob));
 
     let default_fens = [
         ("startpos (w)", "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w - - 0 1"),

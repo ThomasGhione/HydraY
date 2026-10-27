@@ -198,14 +198,20 @@ int main(int argc, char** argv) {
             }
     }
 
-    // --- write, in the layout of the source file ---
+    // --- write, in the layout of the source file: a legacy net keeps one head
+    // per legacy bucket, the first of the run it was expanded into ---
     std::FILE* f = std::fopen(argv[3], "wb");
     if (f == nullptr) { std::fprintf(stderr, "cannot write %s\n", argv[3]); return 1; }
     const auto wr = [&](const void* p, size_t n) { return std::fwrite(p, 1, n, f) == n; };
+    const int repeat = OUTPUT_BUCKETS / net.fileBuckets;
+    const auto heads = [&](const auto& field) {
+        bool good = true;
+        for (int b = 0; b < net.fileBuckets && good; ++b) good = wr(&field[b * repeat], sizeof(field[0]));
+        return good;
+    };
     bool ok = wr(out.l0w, sizeof(out.l0w)) && wr(out.l0b, sizeof(out.l0b))
-           && wr(out.l1w, sizeof(out.l1w)) && wr(out.l1b, sizeof(out.l1b))
-           && wr(out.l2w, sizeof(out.l2w)) && wr(out.l2b, sizeof(out.l2b));
-    const size_t padBytes = (PAYLOAD_BYTES + 63) / 64 * 64 - PAYLOAD_BYTES;
+           && heads(out.l1w) && heads(out.l1b) && heads(out.l2w) && heads(out.l2b);
+    const size_t padBytes = fileBytes(net.fileBuckets) - payloadBytes(net.fileBuckets);
     static const char kTag[] = "bullet";
     for (size_t i = 0; i < padBytes && ok; ++i) ok = std::fputc(kTag[i % 6], f) != EOF;
     std::fclose(f);
@@ -214,7 +220,10 @@ int main(int argc, char** argv) {
     // --- check: the reordered net computes the SAME function. It is what tells
     // a correct reorder from one that moved weights and biases inconsistently.
     static NetworkDeep back;
-    if (!loadFromFile(argv[3], back)) { std::fprintf(stderr, "the written file does not load back\n"); return 1; }
+    if (!loadFromFile(argv[3], back) || back.fileBuckets != net.fileBuckets) {
+        std::fprintf(stderr, "the written file does not load back in the source layout\n");
+        return 1;
+    }
     uint32_t rs = 20260824;
     const auto rnd = [&] { rs = rs * 1664525u + 1013904223u; return static_cast<int32_t>(rs >> 15); };
     std::vector<int16_t> a(HIDDEN), b(HIDDEN), pa(HIDDEN), pb(HIDDEN);

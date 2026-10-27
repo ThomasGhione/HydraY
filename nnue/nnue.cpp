@@ -28,9 +28,9 @@ std::unique_ptr<Deep::NetworkDeep> ownedDeep;
 
 // Copies a net blob into an owned NetworkDeep (l1w16 and l1wT are derived, so
 // the blob cannot be used in place) and makes it active. bullet's format has
-// no header: the exact size, padding included, is the first sanity check.
+// no header: the exact size, padding included, is the first sanity check, and
+// loadFromMemory makes it.
 bool activate(const unsigned char* data, size_t size) {
-    if (size != (Deep::PAYLOAD_BYTES + 63) / 64 * 64) return false;
     auto deep = std::make_unique<Deep::NetworkDeep>();
     if (!Deep::loadFromMemory(data, size, *deep)) return false;
     ownedDeep = std::move(deep);
@@ -47,7 +47,8 @@ bool loadNetwork(const std::string& path) {
         std::cout << "info string EvalFile error: cannot load '" << path << "'\n";
         return false;
     }
-    std::cout << "info string EvalFile: network (1024 -> " << Deep::L1_SIZE << " -> 1)"
+    std::cout << "info string EvalFile: network (1024 -> " << Deep::L1_SIZE << " -> 1, "
+              << activeNetwork->fileBuckets << " output buckets)"
               << (Deep::hasVnniPath() ? ", VNNI" : ", no VNNI") << "\n";
     return true;
 }
@@ -62,10 +63,10 @@ int32_t evaluate(const chess::Board& b) noexcept {
     const NNUE::Accumulator& acc = b.accumulator();
     const int stm = chess::Board::colorToIndex(b.getActiveColor()); // 0 = white
 
-    // Material-count output bucket; must match bullet's MaterialCount<8>
-    // (and sanity.rs): (popcount - 2) / ceil(32/8). Kings are always on the
-    // board, so popcount is in [2, 32] and the bucket in [0, 7].
-    const int bucket = (std::popcount(b.getPiecesBitMap()) - 2) / 4;
+    // Material-count output bucket; must match bullet's MaterialCount<OUTPUT_BUCKETS>
+    // (and sanity_deep.rs). Kings are always on the board, so popcount is in
+    // [2, 32] and the bucket in [0, OUTPUT_BUCKETS).
+    const int bucket = (std::popcount(b.getPiecesBitMap()) - 2) / Deep::BUCKET_DIVISOR;
 
     return Deep::forwardSimd(*activeNetwork, acc.v[stm], acc.v[stm ^ 1], bucket);
 }

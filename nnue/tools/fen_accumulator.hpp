@@ -89,8 +89,7 @@ bool accumulate(const NetworkDeep& net, const std::string& fen,
         }
     }
 
-    const int divisor = (32 + OUTPUT_BUCKETS - 1) / OUTPUT_BUCKETS; // div_ceil
-    outBucket = (static_cast<int>(pieces.size()) - 2) / divisor;
+    outBucket = (static_cast<int>(pieces.size()) - 2) / BUCKET_DIVISOR;
     return true;
 }
 

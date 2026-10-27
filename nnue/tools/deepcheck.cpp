@@ -114,7 +114,8 @@ int main(int argc, char** argv) {
         std::fprintf(stderr, "cannot load %s\n", argv[1]);
         return 1;
     }
-    std::printf("%s: layout OK (%zu B payload)\n", argv[1], PAYLOAD_BYTES);
+    std::printf("%s: layout OK (%d output buckets, %zu B payload)\n", argv[1],
+                net.fileBuckets, payloadBytes(net.fileBuckets));
 
     std::vector<Case> cases;
     std::vector<std::string> owned;

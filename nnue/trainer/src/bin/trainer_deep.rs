@@ -1,64 +1,46 @@
-// HydraY NNUE v8 - rete con layer intermedi (progetto "layer intermedio").
+// HydraY NNUE: the deep net, (768x4kb_hm -> 1024)x2 -> pairwise -> 1024 -> 16 -> 1,
+// with material-count output buckets on BOTH layers after the feature transformer.
 //
-// Architettura: (768x4kb_hm -> 1024)x2 -> pairwise -> 1024 -> 16 -> 1,
-// con 8 output bucket su ENTRAMBI i layer dopo il feature transformer.
+// One hidden layer, not bullet's 16 -> 32 -> 1 example: the second layer costs
+// little but was never validated on a net this size. Adapted from bullet
+// examples/progression/4_multi_layer.rs, the sequel of 3_input_buckets.rs that
+// trainer.rs comes from.
 //
-// UN SOLO layer intermedio, non due. L'esempio di bullet ne usa due
-// (16 -> 32 -> 1) e il secondo costa pochissimo - 544 moltiplicazioni contro le
-// 16.384 del primo - ma e' un elemento in piu' non validato su questa rete, che
-// e' un terzo di quelle per cui quella proporzione e' stata trovata. La prima
-// prova porta gia' tre cambiamenti inseparabili (layer intermedio, CReLU al
-// posto di SCReLU, init con fan-in 32): un quarto allungherebbe la lista dei
-// sospetti in caso di risultato negativo, in cambio di poco.
-// Adattato da bullet examples/progression/4_multi_layer.rs, che e' il seguito
-// diretto di 3_input_buckets.rs da cui e' adattato trainer.rs.
+// Two choices come with the architecture and are not free:
+//   1. CReLU on the feature transformer, with the pairwise product of its two
+//      halves supplying the quadratic term and halving the width (1024 -> 512 per
+//      perspective), so l1's input is 1024 and not 2048;
+//   2. init_with_effective_input_size(32): fan-in 32 (the active features per
+//      position), the right init for sparse inputs.
 //
-// Sta in un binario SEPARATO da trainer.rs di proposito: la rete a un solo
-// layer resta quella in produzione finche' questa non vince un SPRT, e le due
-// devono poter essere addestrate senza toccarsi.
+// OUTPUT BUCKETS: 16 by default, 8 for the control arm of the 16-bucket test.
+// bullet's MaterialCount takes the count as a const generic, so it is read at
+// COMPILE time from HYDRAY_OUTPUT_BUCKETS; cargo rebuilds when the variable
+// changes, so EVERY cargo command of one run must pass the same value.
 //
-// COSA CAMBIA rispetto a trainer.rs, e cosa NO
+// QUANTISED FILE LAYOUT (little-endian, save_format order), OB = output buckets:
 //
-// Cambia l'architettura, e con essa due cose che NON sono libere di restare
-// come prima perche' fanno parte del pacchetto:
-//
-//   1. CReLU al posto di SCReLU sul feature transformer. La nonlinearita'
-//      quadratica la fornisce il prodotto a coppie (pairwise): moltiplicare
-//      fra loro le due meta' CReLU-ate da un termine di secondo grado E
-//      dimezza la larghezza (1024 -> 512 per prospettiva). E' il motivo per
-//      cui il layer costa poco: l'ingresso di l1 e' 1024, non 2048.
-//   2. init_with_effective_input_size(32): inizializza i pesi con fan-in 32
-//      (le feature attive per posizione) invece della dimensione nominale
-//      dell'input. E' l'init corretto per ingressi sparsi e conta di piu' su
-//      una rete profonda, dove un init sbagliato puo' impedire l'addestramento
-//      invece di limitarsi a rallentarlo.
-//
-// NON cambia tutto il resto, deliberatamente: stessi 4 king bucket specchiati,
-// stessi 8 output bucket, stesso WDL 0.3, stesso StepLR, stesso batch. Se
-// questa rete perde, deve essere colpa dell'architettura e non di un
-// iperparametro cambiato per distrazione.
-//
-// LAYOUT DEL FILE QUANTIZZATO (little-endian, nell'ordine di save_format):
-//
-//   l0w  [4*768][1024]  i16  QA=255   (factoriser gia' sommato)
+//   l0w  [4*768][1024]  i16  QA=255   (factoriser folded in)
 //   l0b  [1024]         i16  QA=255
-//   l1w  [8][16][1024]  i8   QB=64    (trasposto: ogni bucket contiguo)
-//   l1b  [8][16]        f32
-//   l2w  [8][1][16]     f32           (trasposto)
-//   l2b  [8]            f32
+//   l1w  [OB][16][1024] i8   QB=64    (transposed: each bucket contiguous)
+//   l1b  [OB][16]       f32
+//   l2w  [OB][1][16]    f32           (transposed)
+//   l2b  [OB]           f32
 //
-//   totale 6.425.632 B (la rete a un layer: 6.326.288 B)
+//   OB = 16: 6,557,760 B (a multiple of 64: bullet adds no padding)
+//   OB = 8:  6,425,632 B, padded to 6,425,664
 //
-// Solo l0 e l1w sono quantizzati: la coda 16->1 costa una manciata di
-// operazioni per valutazione e in float evita ogni grattacapo di scala.
-// sanity.rs va aggiornato PRIMA di fidarsi di un file prodotto da qui: e' il
-// lettore di riferimento, e il C++ deve concordare con lui byte per byte.
+// Only l0 and l1w are quantised; the 16 -> 1 tail stays float. sanity_deep.rs is
+// the reference reader, and the C++ must agree with it byte for byte.
 //
-// Uso identico a trainer.rs, incluse le tappe:
-//   cargo run -r --bin trainer_deep --features cuda -- <data.bin> [superbatches]
-//                                                      [net_id] [start_sb] [resume_ckpt]
-//   STAGE_END=<n> limita la tappa corrente (vedi trainer.rs per il perche'
-//   deve stare ATTACCATA a cargo e non in testa alla riga di shell).
+// Usage, stages included:
+//   HYDRAY_OUTPUT_BUCKETS=16 cargo run -r --bin trainer_deep --features cuda --
+//       <data.bin[,data2.bin...]> [superbatches] [net_id] [start_sb] [resume_ckpt]
+//   Several data files are read as one stream, in order. A resumed run skips to
+//   the sample where the previous stage stopped (bullet counts the batches
+//   done, modulo the epoch), so stages train exactly like one uninterrupted run.
+//   STAGE_END=<n> ends the current stage; it must sit right in front of cargo
+//   (`env STAGE_END=40 cargo ...`), see trainer.rs.
 
 use bullet_lib::{
     game::{
@@ -78,16 +60,21 @@ use bullet_lib::{
 };
 
 const HIDDEN_SIZE: usize = 1024;
-// Larghezza dell'unico layer intermedio, ed e' il parametro caro: il costo del
-// forward scala lineare con L1_SIZE (1024 ingressi per uscita). 16 dice gia' se
-// il guadagno c'e'; 32 raddoppierebbe il conto.
+// Width of the hidden layer; the forward's cost scales linearly with it.
 const L1_SIZE: usize = 16;
-const OUTPUT_BUCKETS: usize = 8;
+const OUTPUT_BUCKETS: usize = match option_env!("HYDRAY_OUTPUT_BUCKETS") {
+    None => 16,
+    Some(s) => match s.as_bytes() {
+        b"16" => 16,
+        b"8" => 8,
+        _ => panic!("HYDRAY_OUTPUT_BUCKETS must be 8 or 16"),
+    },
+};
 const SCALE: i32 = 400;
 const QA: i16 = 255;
 const QB: i16 = 64;
 
-// Keep in sync with nnue/network.hpp KING_BUCKET_MAP e sanity.rs.
+// Keep in sync with nnue/network.hpp KING_BUCKET_MAP and sanity.rs.
 #[rustfmt::skip]
 const BUCKET_LAYOUT: [usize; 32] = [
     0, 0, 1, 1,
@@ -118,6 +105,8 @@ fn main() {
         .ok()
         .and_then(|s| s.parse().ok())
         .unwrap_or(superbatches);
+    // The notebook checks this line against the arm it means to train.
+    println!("trainer_deep: {HIDDEN_SIZE} -> {L1_SIZE} -> 1, {OUTPUT_BUCKETS} output buckets");
 
     let mut trainer = ValueTrainerBuilder::default()
         .dual_perspective()
@@ -133,9 +122,8 @@ fn main() {
                 .round()
                 .quantise::<i16>(QA),
             SavedFormat::id("l0b").round().quantise::<i16>(QA),
-            // i8 a QB=64: bullet ERRORE se un peso non ci sta (non tronca in
-            // silenzio), quindi una scala sbagliata si manifesta al salvataggio
-            // e non come una rete che gioca male senza motivo.
+            // i8 at QB=64: bullet FAILS on a weight that does not fit (it does
+            // not truncate silently), so a wrong scale shows up at save time.
             SavedFormat::id("l1w").transpose().round().quantise::<i8>(QB),
             SavedFormat::id("l1b"),
             SavedFormat::id("l2w").transpose(),
@@ -151,21 +139,21 @@ fn main() {
             let l1 = builder.new_affine("l1", HIDDEN_SIZE, OUTPUT_BUCKETS * L1_SIZE);
             let l2 = builder.new_affine("l2", L1_SIZE, OUTPUT_BUCKETS);
 
-            // Pairwise: CReLU sulle due meta' del feature transformer, poi
-            // prodotto. Forma veloce di `.crelu().pairwise_mul()`. L'uscita e'
-            // HIDDEN_SIZE/2 per prospettiva, quindi l'ingresso di l1 e'
-            // HIDDEN_SIZE e non 2*HIDDEN_SIZE.
+            // Pairwise: CReLU on the two halves of the feature transformer, then
+            // their product. A fast form of `.crelu().pairwise_mul()`.
             let ft = |input, start, end| l0.slice(start, end).forward(input).crelu();
             let stm_hidden = ft(stm_inputs, 0, HIDDEN_SIZE / 2) * ft(stm_inputs, HIDDEN_SIZE / 2, HIDDEN_SIZE);
             let ntm_hidden = ft(ntm_inputs, 0, HIDDEN_SIZE / 2) * ft(ntm_inputs, HIDDEN_SIZE / 2, HIDDEN_SIZE);
 
+            // l1 computes every bucket's outputs and select keeps one: its cost
+            // grows with OUTPUT_BUCKETS.
             let hl1 = stm_hidden.concat(ntm_hidden);
             let hl2 = l1.forward(hl1).select(output_buckets).screlu();
             l2.forward(hl2).select(output_buckets)
         });
 
-    // Il peso SALVATO di l0 e' l0w + l0f: clippare entrambi a ±0.99 tiene la
-    // somma dentro il ±1.98 sicuro per i16 a QA=255.
+    // The SAVED l0 weight is l0w + l0f: clipping both to ±0.99 keeps the sum in
+    // the ±1.98 that is i16-safe at QA=255.
     let stricter = AdamWParams { max_weight: 0.99, min_weight: -0.99, ..Default::default() };
     trainer.optimiser.set_params_for_weight("l0w", stricter);
     trainer.optimiser.set_params_for_weight("l0f", stricter);
@@ -190,12 +178,13 @@ fn main() {
 
     let settings = LocalSettings {
         threads: 2,
-        test_set: None, // bullet al rev pinnato non la implementa: vedi trainer.rs
+        test_set: None, // not implemented by bullet at the pinned rev: see trainer.rs
         output_directory: "checkpoints",
         batch_queue_size: 64,
     };
 
-    let data_loader = loader::DirectSequentialDataLoader::new(&[data_path.as_str()]);
+    let data_paths: Vec<&str> = data_path.split(',').collect();
+    let data_loader = loader::DirectSequentialDataLoader::new(&data_paths);
 
     if let Some(ckpt) = &resume_from {
         println!("resuming from {ckpt} at superbatch {start_superbatch}");
@@ -214,4 +203,3 @@ fn main() {
         println!("{label}: {}", trainer.eval(fen));
     }
 }
-
