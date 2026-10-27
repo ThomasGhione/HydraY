@@ -9,15 +9,20 @@
 // reference reader is nnue/trainer/src/bin/sanity_deep.rs; when the two
 // disagree, sanity_deep is right.
 //
-// FILE LAYOUT (little-endian, padded to 64 B with "bullet" repeated):
+// FILE LAYOUT (little-endian, padded to 64 B with "bullet" repeated), OB =
+// output buckets:
 //
 //   l0w [4*768][1024]  i16  QA=255   (factoriser already folded in at save)
 //   l0b [1024]         i16  QA
-//   l1w [8][16][1024]  i8   QB=64    (transposed: each bucket contiguous)
-//   l1b [8][16]        f32  real scale
-//   l2w [8][1][16]     f32
-//   l2b [8]            f32
-//   payload 6,425,632 B, file 6,425,664 B
+//   l1w [OB][16][1024] i8   QB=64    (transposed: each bucket contiguous)
+//   l1b [OB][16]       f32  real scale
+//   l2w [OB][1][16]    f32
+//   l2b [OB]           f32
+//   OB = 16: payload and file 6,557,760 B (no padding)
+//   OB = 8:  payload 6,425,632 B, file 6,425,664 B
+//
+// Both are loaded. An 8-bucket file gives each of its heads the two 16-bucket
+// slots it covers, which computes exactly the function it was trained as.
 //
 // ARITHMETIC (must match sanity_deep.rs line for line):
 //
@@ -41,7 +46,16 @@ namespace NNUE::Deep {
 
 using NNUE::HIDDEN, NNUE::INPUTS, NNUE::INPUT_BUCKETS; // the tools reach them through Deep
 inline constexpr int L1_SIZE       = 16;
-inline constexpr int OUTPUT_BUCKETS = 8;
+inline constexpr int OUTPUT_BUCKETS = 16;
+inline constexpr int LEGACY_OUTPUT_BUCKETS = 8;
+// bullet's MaterialCount<OUTPUT_BUCKETS>: bucket = (popcount(occ) - 2) / BUCKET_DIVISOR.
+inline constexpr int BUCKET_DIVISOR = (32 + OUTPUT_BUCKETS - 1) / OUTPUT_BUCKETS;
+// A legacy head covers OUTPUT_BUCKETS / LEGACY_OUTPUT_BUCKETS consecutive buckets
+// only if its divisor is that multiple of ours.
+static_assert(OUTPUT_BUCKETS % LEGACY_OUTPUT_BUCKETS == 0
+              && (32 + LEGACY_OUTPUT_BUCKETS - 1) / LEGACY_OUTPUT_BUCKETS
+                     == BUCKET_DIVISOR * (OUTPUT_BUCKETS / LEGACY_OUTPUT_BUCKETS),
+              "legacy heads must map onto whole runs of buckets");
 inline constexpr int32_t QA    = 255;
 inline constexpr int32_t QB    = 64;
 inline constexpr int32_t SCALE = 400;
@@ -62,7 +76,7 @@ struct alignas(64) NetworkDeep {
     // A copy of l1w already widened to i16, filled at load time. Only the path
     // WITHOUT AVX-VNNI needs it, where the dot product works on i16 lanes:
     // converting the weights on every evaluation cost one cvtepi8_epi16 per
-    // useful instruction. 256 KiB more for a clean inner loop.
+    // useful instruction. 512 KiB more for a clean inner loop.
     // NOT in the file: derived, and rebuilt on every load.
     alignas(64) int16_t l1w16[OUTPUT_BUCKETS][L1_SIZE][HIDDEN];
 
@@ -79,9 +93,13 @@ struct alignas(64) NetworkDeep {
     // (the table is built either way) and removes one vpermq per 32 outputs
     // from the hot loop.
     //
-    // Derived, not read from the file. 128 KiB, plus one zero row per bucket
+    // Derived, not read from the file. 256 KiB, plus one zero row per bucket
     // that pads the non-zero list to a multiple of four.
     alignas(64) int8_t l1wT[OUTPUT_BUCKETS][HIDDEN / 4 + 1][L1_SIZE * 4];
+
+    // How many output buckets the loaded file had (OUTPUT_BUCKETS or
+    // LEGACY_OUTPUT_BUCKETS). Not in the file either.
+    int fileBuckets = 0;
 };
 
 // The order packus_epi16 leaves a block's 32 bytes in, relative to the source:
@@ -95,14 +113,27 @@ inline constexpr int PACKUS_MAP[32] = {
 // Payload size on disk, independent of the struct's padding: this is what the
 // loader must read, and it has to be computed from the fields rather than from
 // sizeof(NetworkDeep), which alignas can inflate.
-inline constexpr size_t PAYLOAD_BYTES =
-      static_cast<size_t>(INPUT_BUCKETS) * INPUTS * HIDDEN * sizeof(int16_t)
-    + static_cast<size_t>(HIDDEN) * sizeof(int16_t)
-    + static_cast<size_t>(OUTPUT_BUCKETS) * L1_SIZE * HIDDEN * sizeof(int8_t)
-    + static_cast<size_t>(OUTPUT_BUCKETS) * L1_SIZE * sizeof(float)
-    + static_cast<size_t>(OUTPUT_BUCKETS) * L1_SIZE * sizeof(float)
-    + static_cast<size_t>(OUTPUT_BUCKETS) * sizeof(float);
-static_assert(PAYLOAD_BYTES == 6'425'632, "layout changed: update sanity_deep.rs");
+[[nodiscard]] constexpr size_t payloadBytes(int buckets) noexcept {
+    const auto ob = static_cast<size_t>(buckets);
+    return static_cast<size_t>(INPUT_BUCKETS) * INPUTS * HIDDEN * sizeof(int16_t)
+         + static_cast<size_t>(HIDDEN) * sizeof(int16_t)
+         + ob * L1_SIZE * HIDDEN * sizeof(int8_t)
+         + ob * L1_SIZE * sizeof(float)
+         + ob * L1_SIZE * sizeof(float)
+         + ob * sizeof(float);
+}
+// bullet pads the payload to 64 B, and adds nothing when it is already a multiple.
+[[nodiscard]] constexpr size_t fileBytes(int buckets) noexcept {
+    return (payloadBytes(buckets) + 63) / 64 * 64;
+}
+// The output-bucket count of a file of `size` bytes, 0 if it is neither layout.
+[[nodiscard]] constexpr int bucketsForFileSize(size_t size) noexcept {
+    return size == fileBytes(OUTPUT_BUCKETS)        ? OUTPUT_BUCKETS
+         : size == fileBytes(LEGACY_OUTPUT_BUCKETS) ? LEGACY_OUTPUT_BUCKETS
+                                                    : 0;
+}
+static_assert(payloadBytes(OUTPUT_BUCKETS) == 6'557'760, "layout changed: update sanity_deep.rs");
+static_assert(payloadBytes(LEGACY_OUTPUT_BUCKETS) == 6'425'632, "legacy layout changed");
 
 // Scalar forward, from the two perspectives' accumulators to the evaluation in
 // centipawns. The correctness reference for the vectorised version.
@@ -122,7 +153,7 @@ static_assert(PAYLOAD_BYTES == 6'425'632, "layout changed: update sanity_deep.rs
 // exact i16-lane path that costs twice the instructions in l1.
 [[nodiscard]] bool hasVnniPath() noexcept;
 
-// Loads a quantised.bin in the layout above, and builds the derived tables
+// Loads a quantised.bin in either layout above, and builds the derived tables
 // (l1w16, l1wT). False if the size or the padding is wrong.
 [[nodiscard]] bool loadFromFile(const char* path, NetworkDeep& net) noexcept;
 [[nodiscard]] bool loadFromMemory(const unsigned char* data, size_t size,
