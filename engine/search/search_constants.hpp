@@ -103,7 +103,7 @@ inline int32_t LMR_HIST_MODE = 1;
 inline int32_t HIST_BONUS_PCT = 100;
 // 0: no hash move adds an LMR ply; 1: at PV and cut nodes it takes a ply of depth.
 inline int32_t IIR_MODE = 1;
-inline int32_t IIR_MIN_DEPTH = 6;
+inline int32_t IIR_MIN_DEPTH = 4;
 // 1: a TT cutoff by a quiet hash move gives it the cutoff history bonus.
 inline int32_t TT_CUT_HIST = 0;
 // Plies less of reduction for a move that gives check (0 = off).
