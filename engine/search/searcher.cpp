@@ -61,6 +61,9 @@ namespace {
 // grandchild two plies down reads it. Slot 0 is the root, which never runs
 // through searchPosition, so getBestMove seeds it.
 thread_local int32_t evalStack[MAX_PLY] = {};
+// The LMR reduction of the move being searched at each ply, 0 outside a
+// reduced search (per thread, like evalStack).
+thread_local int reductionStack[MAX_PLY] = {};
 
 // A missing king (reachable only from an illegal FEN) is decisive, not an eval.
 int32_t evaluate(const Board& b) noexcept {
@@ -467,13 +470,16 @@ SearchMoveResult searchMoves(Board& b, MovePicker& movePicker, const SearchConte
                                                       : (n > 0 ? -LMR_GOOD_HIST : LMR_BAD_HIST);
                 }
             }
+            if (LMR_CHECK_LESS > 0 && b.inCheck(oppColor)) reduction -= LMR_CHECK_LESS;
             reduction = std::clamp(reduction, 1, childDepth - 1);
             const int reducedDepth = std::max(1, childDepth - reduction);
             if constexpr (kSearchStats) {
                 ++gSearchStats.lmrSearches;
                 gSearchStats.lmrReductionSum += static_cast<uint64_t>(childDepth - reducedDepth);
             }
+            reductionStack[ctx.ply] = childDepth - reducedDepth;
             score = search(reducedDepth, alpha, scoutBeta, true);
+            reductionStack[ctx.ply] = 0;
             if (score > alpha) {
                 if constexpr (kSearchStats) ++gSearchStats.lmrResearches;
                 score = search(childDepth, alpha, scoutBeta, !ctx.cutNode);
@@ -589,6 +595,18 @@ int32_t searchPosition(Board& b, SearchRuntime& runtime, int depth, int32_t alph
         const int32_t ttScore = scoreFromTT(tte.score, ply);
         if (ttBoundCutoff(tte.flag, ttScore, alpha, beta)) {
             if constexpr (kSearchStats) ++gSearchStats.ttCuts;
+            // A quiet hash move that fails high here earns the history bonus a
+            // searched cutoff would give it.
+            if (TT_CUT_HIST && allowHeuristicUpdates && ttScore >= beta && tte.move != 0) {
+                const Move ttMove = TT::Entry::decodeMove(tte.move);
+                const uint8_t piece = b.get(ttMove.from);
+                const uint8_t us = b.getActiveColor();
+                const MoveTraits tt = moveTraits(b, ttMove, b.getEnPassant(), Board::promotionRank(us == Board::WHITE));
+                if (piece != Board::EMPTY && (piece & Board::MASK_COLOR) == us && !tt.isCapture && !tt.isPromotion) {
+                    applyHistoryGravity(runtime.history[Board::colorToIndex(us)][ttMove.from][ttMove.to],
+                                        (depth + 1) * (depth + 1) * HIST_BONUS_PCT / 100, MAX_HISTORY);
+                }
+            }
             return ttScore;
         }
     }
@@ -641,6 +659,15 @@ int32_t searchPosition(Board& b, SearchRuntime& runtime, int depth, int32_t alph
     evalStack[ply] = inCheck ? NEG_INF : staticEval;
     const bool improving = !inCheck && ply >= 2
         && evalStack[ply - 2] != NEG_INF && staticEval > evalStack[ply - 2];
+
+    // Hindsight: a node reduced a lot whose opponent is not worse off gets a
+    // ply back; a reduced node where both static evals look good gives one up.
+    if (ply > 0 && !inCheck && evalStack[ply - 1] != NEG_INF) {
+        const int priorReduction = reductionStack[ply - 1];
+        if (HINDSIGHT_EXT && priorReduction >= 3 && staticEval <= -evalStack[ply - 1]) ++depth;
+        if (HINDSIGHT_MARGIN > 0 && priorReduction >= 2 && depth >= 2
+            && staticEval + evalStack[ply - 1] > HINDSIGHT_MARGIN) --depth;
+    }
 
     const int side = Board::colorToIndex(activeColor);
     int singularExtension = 0;
@@ -739,7 +766,8 @@ int32_t searchPosition(Board& b, SearchRuntime& runtime, int depth, int32_t alph
     // Without a verified hash move: no singular extension, and IIR reduces:
     // one ply of depth at PV and cut nodes in IIR_MODE 1, else one more LMR ply.
     const bool iirNode = !hasHashMove && depth >= 6 && ply > 0;
-    const bool iirDepth = IIR_MODE == 1 && iirNode && (isPVNode || cutNode);
+    const bool iirDepth = IIR_MODE == 1 && !hasHashMove && depth >= IIR_MIN_DEPTH && ply > 0
+                          && (isPVNode || cutNode);
     if (iirDepth) --depth;
     const SearchContext ctx{
         previousMove, contHistEntry, depth, ply, staticEval,

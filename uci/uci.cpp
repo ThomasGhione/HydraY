@@ -71,6 +71,11 @@ namespace {
         {"LMR_HIST_MODE",        &engine::LMR_HIST_MODE,                   0,    2},
         {"HIST_BONUS_PCT",       &engine::HIST_BONUS_PCT,                 25, 1000},
         {"IIR_MODE",             &engine::IIR_MODE,                        0,    1},
+        {"IIR_MIN_DEPTH",        &engine::IIR_MIN_DEPTH,                   2,   12},
+        {"TT_CUT_HIST",          &engine::TT_CUT_HIST,                     0,    1},
+        {"LMR_CHECK_LESS",       &engine::LMR_CHECK_LESS,                  0,    3},
+        {"HINDSIGHT_EXT",        &engine::HINDSIGHT_EXT,                   0,    1},
+        {"HINDSIGHT_MARGIN",     &engine::HINDSIGHT_MARGIN,                0, 2000},
         {"NMP_BASE_R",           &engine::NMP_BASE_R,                      1,    8},
         {"CORR_HIST_WEIGHT_PCT", &engine::CORR_HIST_WEIGHT_PCT,            0,  400},
     };

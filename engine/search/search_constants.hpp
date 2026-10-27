@@ -103,6 +103,16 @@ inline int32_t LMR_HIST_MODE = 1;
 inline int32_t HIST_BONUS_PCT = 100;
 // 0: no hash move adds an LMR ply; 1: at PV and cut nodes it takes a ply of depth.
 inline int32_t IIR_MODE = 1;
+inline int32_t IIR_MIN_DEPTH = 6;
+// 1: a TT cutoff by a quiet hash move gives it the cutoff history bonus.
+inline int32_t TT_CUT_HIST = 0;
+// Plies less of reduction for a move that gives check (0 = off).
+inline int32_t LMR_CHECK_LESS = 0;
+// Hindsight depth: +1 after a reduction of 3+ when the opponent is not worse
+// off (1 = on); -1 after a reduction of 2+ when both static evals sum above
+// HINDSIGHT_MARGIN (0 = off).
+inline int32_t HINDSIGHT_EXT = 0;
+inline int32_t HINDSIGHT_MARGIN = 0;
 inline constexpr int LMR_MAX_DEPTH = 20; // deeper nodes use the last row
 
 // --- History bounds ---
