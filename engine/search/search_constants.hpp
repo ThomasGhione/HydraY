@@ -38,28 +38,38 @@ static_assert(MATE_VALUE + MAX_PLY <= std::numeric_limits<int16_t>::max(),
 // UCI layer stops any search before writing one. The derived tables
 // (FUTILITY_MARGINS, LMP_THRESHOLDS, the LMR table in searcher.cpp) are built
 // at startup and rebuilt by rebuildSearchDerivedTables() after a write.
-// Null-move reduction eval scaling: deeper reduction the further eval beats beta.
+// Null-move reduction: NMP_BASE_R + depth / 3, deeper the further eval beats beta.
+inline int32_t NMP_BASE_R = 4;
 inline int32_t NMP_EVAL_DIV = 265;
 inline int32_t NMP_EVAL_MAX = 4;
 // Reverse futility pruning margin per remaining ply.
 inline int32_t RFP_MARGIN_PER_DEPTH = 70;
-// FUTILITY_MARGINS[depth] = FUTILITY_MID_STEP * depth, depth 1..6.
+// FUTILITY_MARGINS[depth] = FUTILITY_MID_STEP * depth, depth 1..FUTILITY_MAX_DEPTH.
+inline constexpr int FUTILITY_DEPTH_CAP = 10;
+inline int32_t FUTILITY_MAX_DEPTH = 6;
 inline int32_t FUTILITY_MID_STEP = 176;
-inline int32_t FUTILITY_MARGINS[7] = {};
-// LMP_THRESHOLDS[improving][depth], depth 1..4: the base table scaled by
-// LMP_SCALE_PCT[improving]. Higher = more permissive.
-inline constexpr int LMP_BASE_THRESHOLDS[2][5] = {
-    {0, 12, 20, 30, 42},
-    {0, 16, 26, 38, 52},
-};
-inline int32_t LMP_SCALE_PCT[2] = {100, 100};
-inline int LMP_THRESHOLDS[2][5] = {};
+inline int32_t FUTILITY_MARGINS[FUTILITY_DEPTH_CAP + 1] = {};
+// LMP_THRESHOLDS[improving][depth], depth 1..LMP_MAX_DEPTH: the base curve
+// scaled by LMP_SCALE_PCT[improving]. Higher = more permissive.
+inline constexpr int LMP_DEPTH_CAP = 10;
+constexpr int lmpBaseThreshold(int improving, int depth) noexcept {
+    return improving ? depth * depth + 7 * depth + 8 : (depth + 2) * (depth + 3);
+}
+inline int32_t LMP_MAX_DEPTH = 4;
+inline int32_t LMP_SCALE_PCT[2] = {50, 50};
+inline int LMP_THRESHOLDS[2][LMP_DEPTH_CAP + 1] = {};
 // History-based quiet pruning: skip quiet moves with very negative history.
 // Indexed by depth (0..3); depth 0 unused.
 inline int32_t HISTORY_PRUNE_THRESHOLD[4] = {0, -4096, -6144, -8192};
 
-// SEE capture pruning: skip captures with SEE < -SEE_CAPTURE_MARGIN * depth.
+// SEE capture pruning: skip captures with SEE < -SEE_CAPTURE_MARGIN * depth,
+// depth 1..SEE_PRUNE_MAX_DEPTH.
 inline int32_t SEE_CAPTURE_MARGIN = 70;
+inline int32_t SEE_PRUNE_MAX_DEPTH = 3;
+// SEE quiet pruning: skip quiets with SEE < -QUIET_SEE_MARGIN * depth^2,
+// depth 1..QUIET_SEE_MAX_DEPTH (0 = off).
+inline int32_t QUIET_SEE_MARGIN = 12;
+inline int32_t QUIET_SEE_MAX_DEPTH = 0;
 // Singular extension.
 inline constexpr int SE_MIN_DEPTH     = 6;
 inline constexpr int SE_DEPTH_MARGIN  = 3;
@@ -75,6 +85,34 @@ void rebuildSearchDerivedTables() noexcept;
 // --- Late move reductions ---
 // LMR_C == LMR_C_PERCENT / 100.0 (int spin for the tuner).
 inline int32_t LMR_C_PERCENT = 300;
+// Extra plies of reduction at an expected cut node.
+inline int32_t LMR_CUT_BONUS = 1;
+// First reduced move index: LMR_MIN_INDEX_ALL at an expected all node
+// (non-PV, not cut), 4 elsewhere.
+inline int32_t LMR_MIN_INDEX_ALL = 4;
+// 1: below index 4 only quiets that are neither killer nor countermove.
+inline int32_t LMR_EARLY_QUIET_ONLY = 0;
+// Reduction change for a quiet by its butterfly history sign: -LMR_GOOD_HIST
+// above zero, +LMR_BAD_HIST otherwise.
+inline int32_t LMR_GOOD_HIST = 1;
+inline int32_t LMR_BAD_HIST = 1;
+// 0: butterfly sign only; 1: LMR_BAD_HIST - LMR_GOOD_HIST * n, n = positive
+// signals among butterfly and continuation history; 2: -LMR_GOOD_HIST if any.
+inline int32_t LMR_HIST_MODE = 1;
+// Quiet, continuation and capture history bonus: (depth + 1)^2 * HIST_BONUS_PCT / 100.
+inline int32_t HIST_BONUS_PCT = 100;
+// 0: no hash move adds an LMR ply; 1: at PV and cut nodes it takes a ply of depth.
+inline int32_t IIR_MODE = 1;
+inline int32_t IIR_MIN_DEPTH = 4;
+// 1: a TT cutoff by a quiet hash move gives it the cutoff history bonus.
+inline int32_t TT_CUT_HIST = 0;
+// Plies less of reduction for a move that gives check (0 = off).
+inline int32_t LMR_CHECK_LESS = 0;
+// Hindsight depth: +1 after a reduction of 3+ when the opponent is not worse
+// off (1 = on); -1 after a reduction of 2+ when both static evals sum above
+// HINDSIGHT_MARGIN (0 = off).
+inline int32_t HINDSIGHT_EXT = 0;
+inline int32_t HINDSIGHT_MARGIN = 0;
 inline constexpr int LMR_MAX_DEPTH = 20; // deeper nodes use the last row
 
 // --- History bounds ---
