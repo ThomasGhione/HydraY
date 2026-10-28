@@ -10,9 +10,11 @@ edition = "2021"
 
 [dependencies]
 bullet_lib = { git = "https://github.com/jw1912/bullet", rev = "cebc78a093d92cbc87e56cfef049184c225270b0", optional = true }
+# Same rev as bullet_lib, for TValue (custom initial weights), which bullet_lib does not re-export.
+bullet_compiler = { package = "bullet-compiler", git = "https://github.com/jw1912/bullet", rev = "cebc78a093d92cbc87e56cfef049184c225270b0", optional = true }
 
 [features]
-train = ["dep:bullet_lib"]
+train = ["dep:bullet_lib", "dep:bullet_compiler"]
 cuda = ["train", "bullet_lib/cuda"]
 
 [[bin]]
