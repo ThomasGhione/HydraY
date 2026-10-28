@@ -488,7 +488,8 @@ int runDatagen(int argc, char* argv[]) {
               << "  output : " << outPrefix << ".t<0.." << (threads - 1) << ">.bin (append)\n"
               << "  resume : " << fmtCount(resumedPositions)
               << " positions already on disk for this prefix\n"
-              << "  labels : NNUE (" << (netPath != nullptr ? netPath : "embedded") << ")\n"
+              << "  labels : NNUE (" << (netPath != nullptr ? netPath : "embedded")
+              << ", eval scale x" << evalScale() << ")\n"
               << "  threads: " << threads << "  nodes/move: " << nodesPerMove << "\n"
               << "  filters: ply>=" << MIN_RECORD_PLY << ", not in check, quiet bestmove, |cp|<="
               << MAX_RECORD_SCORE_CP << "\n"

@@ -207,7 +207,7 @@ $(COMPILER_STAMP):
 
 # embedded.cpp pulls the network blob in via the assembler's .incbin, which
 # -MMD cannot track: declare the data dependency explicitly.
-$(OUTPUT_DIR)/nnue/embedded.o: $(ROOT_DIR)/nnue/net/hydray.nnue
+$(OUTPUT_DIR)/nnue/embedded.o: $(ROOT_DIR)/nnue/net/hydray.nnue $(ROOT_DIR)/nnue/scale_ref.txt
 
 # tbprobe.c compiled as C (not C++) to avoid name mangling issues
 $(SYZYGY_C_OBJ): $(SYZYGY_C_SRC)
