@@ -149,8 +149,10 @@ constexpr int32_t materialToEval(int32_t material, int32_t pct = MATERIAL_TO_EVA
 
 // The ratio grows as material comes off (a rook measures 2.2x in the middlegame,
 // 3.4x in the endgame). The qsearch delta margins pick it by non-pawn material.
-inline constexpr int32_t MATERIAL_TO_EVAL_PCT_LATE_MG = 300;  // 3000 < npm <= 5000
-inline constexpr int32_t MATERIAL_TO_EVAL_PCT_ENDGAME = 320;  // npm <= 3000
+// UCI spins.
+inline int32_t QS_EVAL_PCT_MG      = 300;  // npm > 5000
+inline int32_t QS_EVAL_PCT_LATE_MG = 345;  // 3000 < npm <= 5000
+inline int32_t QS_EVAL_PCT_ENDGAME = 350;  // npm <= 3000
 
 // --- Aspiration window ---
 inline constexpr int32_t WINDOW_HARD_CAP    = 1500;

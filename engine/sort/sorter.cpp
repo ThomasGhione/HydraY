@@ -181,9 +181,9 @@ MovePicker sortTacticalMoves(const MoveList& tacticalMoves, const Board& b,
     for (int type = Board::KNIGHT; type <= Board::QUEEN; ++type) {
         npm += std::popcount(b.bb[type][0] | b.bb[type][1]) * PIECE_VALUES[type];
     }
-    const int32_t evalPct = (npm > 5000) ? MATERIAL_TO_EVAL_PCT
-                          : (npm > 3000) ? MATERIAL_TO_EVAL_PCT_LATE_MG
-                                         : MATERIAL_TO_EVAL_PCT_ENDGAME;
+    const int32_t evalPct = (npm > 5000) ? QS_EVAL_PCT_MG
+                          : (npm > 3000) ? QS_EVAL_PCT_LATE_MG
+                                         : QS_EVAL_PCT_ENDGAME;
     int n = 0;
     for (const chess::Move& m : tacticalMoves) {
         const MoveTraits t = moveTraits(b, m, enPassant, promotionRank);
