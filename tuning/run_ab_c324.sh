@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Verdict of the Chess324 A/B (ELO_ROADMAP 4.4): the two nets trained by
+# Verdict of the Chess324 A/B: the two nets trained by
 # nnue/trainer/colab_ab_c324.ipynb, head to head on one build. Fixed nodes, so
 # the datagen running alongside changes how long it takes, not the result.
 # Chess324 joins v8 only on H1.
