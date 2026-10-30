@@ -9,9 +9,11 @@ edition = "2021"
 # specification for the engine-side C++ loader (NNUE Fase 3).
 
 [dependencies]
-bullet_lib = { git = "https://github.com/jw1912/bullet", rev = "cebc78a093d92cbc87e56cfef049184c225270b0", optional = true }
+# b24b38d (#546): the first rev whose faux_quantise has a backward pass (straight-through);
+# at cebc78a it lowered to Round, whose gradient is unimplemented, so QAT could not train.
+bullet_lib = { git = "https://github.com/jw1912/bullet", rev = "b24b38d53905273bf78548990da816d11510ca9f", optional = true }
 # Same rev as bullet_lib, for TValue (custom initial weights), which bullet_lib does not re-export.
-bullet_compiler = { package = "bullet-compiler", git = "https://github.com/jw1912/bullet", rev = "cebc78a093d92cbc87e56cfef049184c225270b0", optional = true }
+bullet_compiler = { package = "bullet-compiler", git = "https://github.com/jw1912/bullet", rev = "b24b38d53905273bf78548990da816d11510ca9f", optional = true }
 
 [features]
 train = ["dep:bullet_lib", "dep:bullet_compiler"]

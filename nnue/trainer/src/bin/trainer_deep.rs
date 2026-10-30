@@ -60,6 +60,17 @@
 //                           random weights; the run checks it evaluates the same
 //   HYDRAY_REVIVE=1         with HYDRAY_INIT_NET: re-initialise its dead l1 neurons
 //                           (bias HYDRAY_L1B_INIT, default 0.1), see sanity_deep.rs
+//   HYDRAY_QAT=1            quantisation-aware training: the forward computes what
+//                           the quantised net computes, see QAT below
+//
+// QAT: bullet's faux_quantise puts a value on the grid of step 1/q in the forward
+// and passes the gradient through unchanged (straight-through). Four places, the
+// four roundings of network_deep.hpp: l0's saved weight (l0w + l0f, which is what
+// the save rounds) and l0b to 1/QA, the pairwise product truncated to 1/QA (the
+// engine's integer division, nudged by half a step of the float error margin),
+// l1w to 1/QB. The tail stays float. Measured on antidead-160sb, 600k holdout
+// positions, float checkpoint against the engine: l1w rounding 14.8 cp rms, l0
+// 3.9, pairwise truncation 2.6 (nnue/tools/qatgap.cpp).
 
 use bullet_compiler::tensor::TValue;
 use bullet_lib::{
@@ -192,6 +203,7 @@ fn main() {
     let init_net: String = env_or("HYDRAY_INIT_NET", String::new());
     let revive = env_or("HYDRAY_REVIVE", 0) != 0;
     let l1b_init: f32 = env_or("HYDRAY_L1B_INIT", if revive { 0.1 } else { 0.0 });
+    let qat = env_or("HYDRAY_QAT", 0) != 0;
     assert!(!revive || !init_net.is_empty(), "HYDRAY_REVIVE needs HYDRAY_INIT_NET");
     let lr_scheduler = match lr_kind.as_str() {
         "step" => Lr::Step(lr::StepLR { start: lr_start, gamma: 0.1, step: (superbatches / 2).max(1) }),
@@ -206,7 +218,7 @@ fn main() {
     // One line with the whole recipe: the notebook checks it against the arm.
     println!(
         "recipe: lr {lr_kind} {lr_start} (final {lr_final}), warmup {warmup}, wdl {wdl_weight}, eval_scale {eval_scale}, \
-         loss {loss}, l1b_init {l1b_init}, float_clip {float_clip}, init_net '{init_net}', revive {revive}"
+         loss {loss}, l1b_init {l1b_init}, float_clip {float_clip}, init_net '{init_net}', revive {revive}, qat {qat}"
     );
 
     let init = (!init_net.is_empty()).then(|| {
@@ -257,6 +269,11 @@ fn main() {
                 }
             };
             l0.weights = l0.weights + l0f.repeat(INPUT_BUCKETS);
+            let (qa, qb) = (QA as f32, QB as f32);
+            if qat {
+                l0.weights = l0.weights.faux_quantise(qa, true);
+                l0.bias = l0.bias.faux_quantise(qa, true);
+            }
 
             // l1's inputs are all >= 0, so with a zero bias a neuron can fall below
             // zero for every input and never fire again: HYDRAY_L1B_INIT.
@@ -267,7 +284,10 @@ fn main() {
                     if l1b_init == 0.0 { InitSettings::Zeroed } else { custom(&[l1b_init; OUTPUT_BUCKETS * L1_SIZE]) },
                 ),
             };
-            let l1 = affine(builder, "l1", HIDDEN_SIZE, OUTPUT_BUCKETS * L1_SIZE, l1w_init, l1_bias);
+            let mut l1 = affine(builder, "l1", HIDDEN_SIZE, OUTPUT_BUCKETS * L1_SIZE, l1w_init, l1_bias);
+            if qat {
+                l1.weights = l1.weights.faux_quantise(qb, true);
+            }
             let l2 = match &init {
                 Some(n) => affine(builder, "l2", L1_SIZE, OUTPUT_BUCKETS, custom(&n.l2w), custom(&n.l2b)),
                 None => builder.new_affine("l2", L1_SIZE, OUTPUT_BUCKETS),
@@ -275,9 +295,16 @@ fn main() {
 
             // Pairwise: CReLU on the two halves of the feature transformer, then
             // their product. A fast form of `.crelu().pairwise_mul()`.
+            // Under QAT the product is truncated to 1/QA, as the engine's integer
+            // division; the nudge keeps float error from truncating a whole value
+            // one step low (sanity_deep.rs, PAIRWISE_NUDGE).
             let ft = |input, start, end| l0.slice(start, end).forward(input).crelu();
-            let stm_hidden = ft(stm_inputs, 0, HIDDEN_SIZE / 2) * ft(stm_inputs, HIDDEN_SIZE / 2, HIDDEN_SIZE);
-            let ntm_hidden = ft(ntm_inputs, 0, HIDDEN_SIZE / 2) * ft(ntm_inputs, HIDDEN_SIZE / 2, HIDDEN_SIZE);
+            let pairwise = |input| {
+                let p = ft(input, 0, HIDDEN_SIZE / 2) * ft(input, HIDDEN_SIZE / 2, HIDDEN_SIZE);
+                if qat { (p + sanity_deep::PAIRWISE_NUDGE).faux_quantise(qa, false) } else { p }
+            };
+            let stm_hidden = pairwise(stm_inputs);
+            let ntm_hidden = pairwise(ntm_inputs);
 
             // l1 computes every bucket's outputs and select keeps one: its cost
             // grows with OUTPUT_BUCKETS.
@@ -324,11 +351,12 @@ fn main() {
         println!("resuming from {ckpt} at superbatch {start_superbatch}");
         trainer.load_from_checkpoint(ckpt);
     } else if let Some(n) = &init {
-        // Against the float forward over the same weights: a wrong layout misses by
-        // hundreds of centipawns, summation order by far less than one.
+        // Against the float forward over the same weights (under QAT, the same
+        // roundings): a wrong layout misses by hundreds of centipawns, summation
+        // order by far less than one.
         for (label, fen) in SANITY_FENS {
             let ours = trainer.eval(fen) * SCALE as f32;
-            let reference = sanity_deep::evaluate_bullet(n, fen);
+            let reference = sanity_deep::evaluate_bullet(n, fen, qat);
             println!("init check {label}: bullet {ours:.1} cp, reference {reference:.1} cp");
             assert!((ours - reference).abs() < 1.0, "the starting net does not evaluate like {init_net}");
         }

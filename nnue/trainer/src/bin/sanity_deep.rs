@@ -345,20 +345,42 @@ pub fn to_bullet(net: &Network, revive_bias: Option<f32>) -> BulletInit {
     BulletInit { ob: net.ob, l0w, l0f, l0b, l1w, l1b, l2w, l2b: net.l2b.clone(), clipped, revived }
 }
 
+/// Under QAT, added to the pairwise product before it is truncated. The exact
+/// product c*c'*QA is either an integer (the engine keeps it whole) or at least
+/// 1/QA away from one, while float error moves it by about 3e-5: a saturated input
+/// (c = 1) makes it an integer often, and without the nudge truncation would land
+/// one step low. Half a step of the gap, 0.5/QA in units of QA, sits safely in it.
+pub const PAIRWISE_NUDGE: f32 = 0.5 / (QA * QA) as f32;
+
+// bullet's faux_quantise: x on the grid of step 1/q, rounded or truncated.
+fn faux(x: f32, q: i32, round: bool) -> f32 {
+    let s = x * q as f32;
+    (if round { s.round() } else { s.trunc() }) / q as f32
+}
+
 /// Float forward over the bullet layout: bullet's graph, without the rounding of
-/// the quantised net. In centipawns, stm-relative.
-pub fn evaluate_bullet(b: &BulletInit, fen: &str) -> f32 {
+/// the quantised net. In centipawns, stm-relative. With `qat`, the graph of
+/// trainer_deep.rs under HYDRAY_QAT: l0 (factoriser folded) and l0b rounded to
+/// 1/QA, the pairwise product truncated to 1/QA, l1w rounded to 1/QB, which is
+/// the quantised net's arithmetic in float.
+pub fn evaluate_bullet(b: &BulletInit, fen: &str, qat: bool) -> f32 {
     let (us, them, ob) = features(b.ob, fen);
     let half = HIDDEN / 2;
+    let q = |x: f32, scale: i32, round: bool| if qat { faux(x, scale, round) } else { x };
     let ft = |list: &[usize]| -> Vec<f32> {
-        let mut acc = b.l0b.clone();
+        let mut acc: Vec<f32> = b.l0b.iter().map(|&w| q(w, QA, true)).collect();
         for &f in list {
             let (w, fac) = (&b.l0w[f * HIDDEN..(f + 1) * HIDDEN], &b.l0f[(f % 768) * HIDDEN..(f % 768 + 1) * HIDDEN]);
             for h in 0..HIDDEN {
-                acc[h] += w[h] + fac[h];
+                acc[h] += q(w[h] + fac[h], QA, true);
             }
         }
-        (0..half).map(|j| acc[j].clamp(0.0, 1.0) * acc[j + half].clamp(0.0, 1.0)).collect()
+        (0..half)
+            .map(|j| {
+                let p = acc[j].clamp(0.0, 1.0) * acc[j + half].clamp(0.0, 1.0);
+                if qat { faux(p + PAIRWISE_NUDGE, QA, false) } else { p }
+            })
+            .collect()
     };
     let hl1: Vec<f32> = ft(&us).into_iter().chain(ft(&them)).collect();
 
@@ -366,7 +388,7 @@ pub fn evaluate_bullet(b: &BulletInit, fen: &str) -> f32 {
     let mut y = b.l2b[ob];
     for n in 0..L1_SIZE {
         let o = ob * L1_SIZE + n;
-        let z = b.l1b[o] + hl1.iter().enumerate().map(|(i, h)| h * b.l1w[i * n1 + o]).sum::<f32>();
+        let z = b.l1b[o] + hl1.iter().enumerate().map(|(i, h)| h * q(b.l1w[i * n1 + o], QB, true)).sum::<f32>();
         y += screlu_f32(z) * b.l2w[n * b.ob + ob];
     }
     y * SCALE
@@ -397,16 +419,20 @@ fn main() {
 
     if args.get(2).map(String::as_str) == Some("--init-check") {
         // What trainer_deep.rs starts from with HYDRAY_INIT_NET: the float forward
-        // must match the quantised one up to the rounding of the quantised net.
+        // must match the quantised one up to the rounding of the quantised net, and
+        // the QAT forward must match it exactly but for the l0 values past the clip.
         for revive in [None, Some(0.1)] {
             let b = to_bullet(&net, revive);
-            let worst = default_fens
-                .iter()
-                .map(|(_, fen)| (evaluate_bullet(&b, fen) - evaluate(&net, fen) as f32).abs())
-                .fold(0.0, f32::max);
+            let worst = |qat| {
+                default_fens
+                    .iter()
+                    .map(|(_, fen)| (evaluate_bullet(&b, fen, qat) - evaluate(&net, fen) as f32).abs())
+                    .fold(0.0, f32::max)
+            };
             println!(
-                "bullet layout, {} neurons revived: {} l0 values past the clip, worst |float - quantised| {worst:.2} cp",
-                b.revived, b.clipped
+                "bullet layout, {} neurons revived: {} l0 values past the clip, worst |float - quantised| {:.2} cp, \
+                 |qat - quantised| {:.2} cp",
+                b.revived, b.clipped, worst(false), worst(true)
             );
         }
         return;
