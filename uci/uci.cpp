@@ -74,6 +74,9 @@ namespace {
         {"IIR_MIN_DEPTH",        &engine::IIR_MIN_DEPTH,                   2,   12},
         {"TT_CUT_HIST",          &engine::TT_CUT_HIST,                     0,    1},
         {"LMR_CHECK_LESS",       &engine::LMR_CHECK_LESS,                  0,    3},
+        {"QS_EVAL_PCT_MG",       &engine::QS_EVAL_PCT_MG,                100,  600},
+        {"QS_EVAL_PCT_LATE_MG",  &engine::QS_EVAL_PCT_LATE_MG,           100,  600},
+        {"QS_EVAL_PCT_ENDGAME",  &engine::QS_EVAL_PCT_ENDGAME,           100,  600},
         {"HINDSIGHT_EXT",        &engine::HINDSIGHT_EXT,                   0,    1},
         {"HINDSIGHT_MARGIN",     &engine::HINDSIGHT_MARGIN,                0, 2000},
         {"NMP_BASE_R",           &engine::NMP_BASE_R,                      1,    8},
@@ -147,7 +150,7 @@ namespace uci {
     void UCI::uci() noexcept {
         const std::string threads = std::to_string(omp_get_max_threads());
         std::string out =
-            "id name HydraY 4.1.0\n"
+            "id name HydraY 4.3.0\n"
             "id author Thomas Ghione, Andrea Vaccari, Daniele Ferretti, Simone Tomasella\n"
             "option name SyzygyPath type string default <empty>\n"
             "option name SyzygyProbeDepth type spin default 1 min 1 max 100\n"

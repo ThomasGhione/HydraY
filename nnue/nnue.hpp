@@ -19,6 +19,9 @@ namespace NNUE {
 // nnue/embedded.cpp); false if the blob fails validation.
 [[nodiscard]] bool activateEmbedded() noexcept;
 
+// Factor that brings the active net to the reference eval unit (nnue.cpp).
+[[nodiscard]] double evalScale() noexcept;
+
 // stm-relative centipawns from the board's incrementally-maintained
 // accumulator. Requires an active network.
 [[nodiscard]] int32_t evaluate(const chess::Board& board) noexcept;

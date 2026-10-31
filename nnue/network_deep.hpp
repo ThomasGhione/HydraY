@@ -31,7 +31,7 @@
 //   z[o] = SUM(p[i] * l1w[o][i]) / (QA*QB) + l1b[o]   FLOAT division
 //   a[o] = clamp(z[o], 0, 1)^2                   SCReLU in float
 //   y    = SUM a[o]*l2w[o] + l2b                 linear
-//   cp   = round(y * SCALE)
+//   cp   = round(y * outputScale)              SCALE, normalised by the engine
 //
 // The division for p is integer and the one for z is floating point: that is
 // not an oversight, it is what the oracle does. Making them uniform would
@@ -100,6 +100,10 @@ struct alignas(64) NetworkDeep {
     // How many output buckets the loaded file had (OUTPUT_BUCKETS or
     // LEGACY_OUTPUT_BUCKETS). Not in the file either.
     int fileBuckets = 0;
+
+    // y -> centipawns. SCALE gives the net's own (training) units; the engine
+    // sets it per net so that every net speaks the reference unit (nnue.cpp).
+    float outputScale = static_cast<float>(SCALE);
 };
 
 // The order packus_epi16 leaves a block's 32 bytes in, relative to the source:

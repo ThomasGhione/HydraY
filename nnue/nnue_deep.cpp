@@ -51,7 +51,7 @@ int32_t forwardScalar(const NetworkDeep& net,
     for (int o = 0; o < L1_SIZE; ++o) {
         y += a1[o] * net.l2w[outputBucket][o];
     }
-    return static_cast<int32_t>(std::lround(y * static_cast<float>(SCALE)));
+    return static_cast<int32_t>(std::lround(y * net.outputScale));
 }
 
 // ---------------------------------------------------------------------------
@@ -333,7 +333,7 @@ int32_t forwardSimd(const NetworkDeep& net,
     for (int o = 0; o < L1_SIZE; ++o) {
         y += a1[o] * net.l2w[outputBucket][o];
     }
-    return static_cast<int32_t>(std::lround(y * static_cast<float>(SCALE)));
+    return static_cast<int32_t>(std::lround(y * net.outputScale));
 #endif
 }
 
