@@ -214,13 +214,14 @@ uint64_t totalNodesSearched(const SearchRuntime& runtime) noexcept {
 
 // The principal variation read back from the TT. Each move is checked against
 // the legal moves (a key collision could store an illegal one) and the walk
-// stops at a repetition, so a cycle cannot loop. The board is left as found.
+// stops at a repetition or at the fifty-move rule, where the game is over.
+// The board is left as found.
 std::string buildPvFromTT(Board& board, const TT& tt, int maxLen) noexcept {
     std::array<Move, MAX_PLY> pvMoves{};
     std::array<Board::MoveState, MAX_PLY> states{};
     int applied = 0;
     std::string pv;
-    while (applied < maxLen && applied < MAX_PLY) {
+    while (applied < maxLen && applied < MAX_PLY && !board.isFiftyMoveRule() && board.countRepetitions() < 3) {
         const Move mv = tt.probeDecodedMove(board.getHash());
         if (!chess::isValidSquare(mv.from)) break;
         const MoveList legal = MoveGenerator::generateLegalMoves(board);
@@ -229,7 +230,6 @@ std::string buildPvFromTT(Board& board, const TT& tt, int maxLen) noexcept {
         pv += mv.toUCIString();
         pvMoves[applied] = mv;
         board.doMove(mv, states[applied++]);
-        if (board.countRepetitions() >= 3) break;
     }
     while (applied > 0) {
         --applied;
@@ -238,10 +238,11 @@ std::string buildPvFromTT(Board& board, const TT& tt, int maxLen) noexcept {
     return pv;
 }
 
-// One `info` line for a completed iteration. With firstMove the PV starts with
-// that root move and follows the TT from the position after it.
+// One `info` line for a completed iteration. The PV starts with firstMove and
+// follows the TT from the position after it: the root entry itself may already
+// hold a helper's move.
 void emitUciInfoLine(int depth, int32_t score, const SearchRuntime& runtime,
-                     Board& rootBoard, const Move* firstMove = nullptr) noexcept {
+                     Board& rootBoard, const Move& firstMove) noexcept {
     const int64_t timeMs = (runtime.timeManager != nullptr) ? runtime.timeManager->elapsedMs() : 0;
     const uint64_t nodes = totalNodesSearched(runtime);
     const int64_t nps = (timeMs > 0)
@@ -258,18 +259,11 @@ void emitUciInfoLine(int depth, int32_t score, const SearchRuntime& runtime,
     line += " nodes " + std::to_string(nodes) + " nps " + std::to_string(nps)
           + " time " + std::to_string(timeMs);
 
-    std::string pv;
-    if (firstMove != nullptr) {
-        Board::MoveState state;
-        rootBoard.doMove(*firstMove, state);
-        const std::string rest = buildPvFromTT(rootBoard, *runtime.transpositionTable, 15);
-        rootBoard.undoMove(*firstMove, state);
-        pv = firstMove->toUCIString() + (rest.empty() ? "" : " " + rest);
-    } else {
-        pv = buildPvFromTT(rootBoard, *runtime.transpositionTable, 16);
-    }
-    if (!pv.empty()) line += " pv " + pv;
-    uci::emit(line + '\n');
+    Board::MoveState state;
+    rootBoard.doMove(firstMove, state);
+    const std::string rest = buildPvFromTT(rootBoard, *runtime.transpositionTable, 15);
+    rootBoard.undoMove(firstMove, state);
+    uci::emit(line + " pv " + firstMove.toUCIString() + (rest.empty() ? "" : " " + rest) + '\n');
 }
 
 } // namespace
@@ -1057,7 +1051,7 @@ IterativeSearchResult runIterativeDeepening(Board& rootBoard, SearchRuntime& run
         runtime.transpositionTable->store(rootBoard.getHash(), currentDepth, scoreToTT(runtime.eval, 0),
                                           static_cast<uint8_t>(determineFlag(runtime.eval, iterationAlpha, iterationBeta)),
                                           TT::Entry::encodeMove(bestMove));
-        if (runtime.emitUciInfo) emitUciInfoLine(currentDepth, runtime.eval, runtime, rootBoard);
+        if (runtime.emitUciInfo) emitUciInfoLine(currentDepth, runtime.eval, runtime, rootBoard, bestMove);
     }
 
     // A deadline before depth 1 completes (a few ms left, or the thread
@@ -1172,7 +1166,7 @@ Move searchBestMove(Board& board, SearchRuntime& runtime, int requestedDepth) no
         // The last info line was the main thread's: a helper's winning move
         // gets its own, or the GUI shows a PV for another move.
         if (best != &result && runtime.emitUciInfo && !(best->bestMove == result.bestMove)) {
-            emitUciInfoLine(best->completedDepth, best->bestScore, runtime, board, &best->bestMove);
+            emitUciInfoLine(best->completedDepth, best->bestScore, runtime, board, best->bestMove);
         }
         result.bestMove  = best->bestMove;
         result.bestScore = best->bestScore;
