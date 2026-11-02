@@ -91,6 +91,10 @@ public:
     bool    useTimeManagement() const noexcept { return useTm_; }
     int64_t elapsedMs()         const noexcept;
 
+    // Called by the main search thread every few nodes. The watchdog alone is
+    // not enough: on Windows its timed wait wakes up to a timer tick (15 ms) late.
+    __attribute__((noinline, cold)) void checkHardDeadline() const noexcept;
+
     // Called at the top of the ID loop: false => stop, the next depth almost
     // certainly cannot finish within the soft budget.
     bool shouldStartNextDepth() const noexcept;

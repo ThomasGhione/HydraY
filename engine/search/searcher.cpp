@@ -158,6 +158,9 @@ inline bool enterNode(Board& b, SearchRuntime& runtime, int ply, int32_t& outSco
     // helpers' ones), so a plain read and a relaxed store, no locked RMW.
     const uint64_t searched = runtime.nodesSearched + 1;
     std::atomic_ref<uint64_t>(runtime.nodesSearched).store(searched, std::memory_order_relaxed);
+    if ((searched & 1023) == 0 && runtime.timeManager != nullptr) [[unlikely]] {
+        runtime.timeManager->checkHardDeadline();
+    }
     if ((runtime.maxNodes > 0 && searched >= runtime.maxNodes) || runtime.shouldAbort()) [[unlikely]] {
         runtime.markInterrupted();
         outScore = evaluate(b);

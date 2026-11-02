@@ -202,6 +202,11 @@ int64_t TimeManager::elapsedMs() const noexcept {
                Clock::now() - start).count();
 }
 
+void TimeManager::checkHardDeadline() const noexcept {
+    if (!useTm_ || pondering_.load(std::memory_order_acquire) || elapsedMs() < hardMs_) return;
+    stopFlag_->store(true, std::memory_order_release);
+}
+
 bool TimeManager::shouldStartNextDepth() const noexcept {
     if (!useTm_ || pondering_.load(std::memory_order_acquire)) return true;
     const int64_t threshold = static_cast<int64_t>(
