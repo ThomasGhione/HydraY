@@ -3,26 +3,42 @@
 HydraY is a C++23 UCI chess engine with NNUE evaluation, for GUIs, bots, and
 automated testing.
 
-It is built around bitboards with magic sliding-piece attacks, an iterative
-deepening alpha-beta/PVS search with Lazy SMP parallelism, a cache-friendly
-transposition table, Syzygy tablebase probing, and a neural network evaluator
-(HalfKA king-bucketed, dual-perspective, embedded in the binary). The handcrafted evaluator
-was removed in 2.0.0 - evaluation strength now improves by training better
-nets, not by editing C++. Development and testing happen mainly on Linux/WSL;
-a MinGW target exists for Windows builds.
+It is built around bitboards with PEXT-indexed sliding-piece attacks, an
+iterative deepening alpha-beta/PVS search with Lazy SMP parallelism, a
+cache-friendly transposition table, Syzygy tablebase probing, and a neural
+network evaluator (HalfKA king-bucketed, dual-perspective, embedded in the
+binary). The handcrafted evaluator was removed in 2.0.0 - evaluation strength
+now improves by training better nets, not by editing C++. Development and
+testing happen mainly on Linux/WSL; `make release` also cross-compiles the
+Windows binaries.
+
+## Binaries
+
+Releases carry static binaries for Linux and Windows, with the net embedded.
+Pick the first line that describes your CPU:
+
+| Build | CPU | Speed |
+|---|---|---|
+| `x86-64-v3-vnni` | AVX-VNNI: Intel 12th gen and later, AMD Zen 5 | 1.30 |
+| `x86-64-v3` | AVX2 + BMI2: Intel Haswell and later, AMD Zen 3 and Zen 4 | 1.00 |
+| `x86-64-v3-nobmi2` | AVX2: AMD Zen 1 and Zen 2, whose PEXT is very slow | 0.88 |
+| `x86-64-v2` | SSE4.2 + POPCNT, for older CPUs | 0.35 |
+
+Speed is nodes per second relative to `x86-64-v3`, measured on one Intel core.
+All four search the same tree: a fixed-depth search visits the same nodes on
+every build.
 
 ## Requirements
 
-- `g++` with C++23 support
+- `clang++` (preferred when installed) or `g++` with C++23 support
 - GNU `make`
 - OpenMP (`-fopenmp`)
-- x86-64 CPU with **BMI2 (PEXT)** - a hard requirement: sliding-piece attacks
-  use PEXT indexing and the build fails outright without it (`-march=native` or
-  `-march=x86-64-v3` provide it). AVX2 is strongly recommended on top: the NNUE
-  forward pass has a scalar fallback, but it is much slower
+- x86-64 CPU. Without BMI2 the sliding-piece index falls back to a bit loop
+  (12% slower overall), and without AVX2 the NNUE forward pass falls back to a
+  scalar path (about 3x slower)
 - Optional analysis tools: `valgrind`, `cppcheck`, `clang-tidy`, `scan-build`,
   `include-what-you-use`, `cppclean`, `lizard` (`pip install lizard`), `perf`
-- Optional for Windows builds: `mingw-w64`
+- Optional for Windows builds: `mingw-w64`, and `wine` to run them on Linux
 - Optional for tuning/testing: `chess-tuning-tools`, `cutechess-cli`,
   `fastchess`, and `ordo`
 
@@ -67,12 +83,16 @@ Move-generation diagnostics (see Testing below):
 make prod            # optimized production build -> ./chess
 make debug           # debug build with symbols and profiling
 make prod_windows    # cross-compile -> ./chess.exe (needs mingw-w64)
+make release         # every release binary -> release/ (Linux and Windows)
 make cls             # remove binaries, object files, and temp files
 make help            # show build-system help
 ```
 
-Production builds use `-O3 -march=native`, OpenMP, and LTO. Object files go to
-`output/` so incremental builds stay fast.
+Production builds use `-O3 -march=native`, OpenMP, and LTO, and a `native`
+binary may not start on another CPU: `make prod ARCH=-march=x86-64-v3` builds a
+portable one. Object files go to `output/` so incremental builds stay fast.
+`make release` hides the tuning options (`-DHYDRAY_RELEASE`); every other build
+keeps them for the scripts in `tuning/`.
 
 ## Testing
 
@@ -235,10 +255,26 @@ with Ctrl+C is safe. Inspect a file with
 
 ### Training
 
-The trainer lives in `nnue/trainer/` (Rust, bullet-based), with a Colab
-notebook for GPU runs. `nnue/trainer/src/bin/sanity.rs` is the reference
-reader for the quantised net layout - run it on any new net before swapping it
-in.
+The trainer lives in `nnue/trainer/` (Rust, bullet-based), with Colab notebooks
+for GPU runs; `colab_recipe.ipynb` holds the recipe of the current net.
+`nnue/trainer/src/bin/sanity_deep.rs` is the reference reader for the quantised
+net layout - run it on any new net before swapping it in.
+
+### Where the net comes from
+
+The net is HydraY's own work, end to end:
+
+- **Data**: self-play games of HydraY only, generated with `./chess datagen` at
+  8,000 nodes per move from random 8-9 ply opening walks. The positions are
+  labelled with HydraY's own search score and the game result; Syzygy
+  tablebases adjudicate endings. No Stockfish, Leela or other engine's games,
+  evaluations or nets were used, as data or as labels.
+- **Lineage**: the first net (2.0.0) was trained on games of HydraY's old
+  handcrafted evaluator. Every later net was trained on games played by an
+  earlier HydraY net.
+- **Training**: [bullet](https://github.com/jw1912/bullet) with our recipe, from
+  random weights followed by a fine-tune; the 4.3.0 net saw 1.9 billion
+  positions.
 
 ## Syzygy Tablebases
 
@@ -265,16 +301,18 @@ grants when `/sys/kernel/mm/transparent_hugepage/enabled` is `always` or
 ## UCI Options
 
 ```txt
-Threads              spin,   default = hardware threads (Lazy SMP)
+Threads              spin,   default 1 (Lazy SMP)
 Hash                 spin,   default 64 (MB, 1–4096)
+Move Overhead        spin,   default 30 (ms kept in reserve for GUI and network lag)
+Ponder               check,  default false (the GUI may send `go ponder`)
 EvalFile             string, external .nnue net (default: embedded net)
 SyzygyPath           string, tablebase directory
 SyzygyProbeDepth     spin,   default 1
 ```
 
-The tunable search constants from `engine/search/search_constants.hpp` (RFP,
-NMP, ProbCut, SEE, futility, LMP, LMR margins…) are also exposed as `spin`
-options for the tuner.
+Outside release builds the tunable search constants from
+`engine/search/search_constants.hpp` (RFP, NMP, ProbCut, SEE, futility, LMP, LMR
+margins…) are also exposed as `spin` options for the tuner.
 
 ## Search-Constant Tuning
 
@@ -328,8 +366,8 @@ re-validate with SPRT or a gauntlet.
 ## How the Engine Works
 
 The board uses compact square storage plus piece bitboards, kept in sync at
-all times. Sliding attacks use magic bitboard tables built at startup. Zobrist
-hashing tracks positions for the transposition table and repetition detection.
+all times. Sliding attacks read tables built at compile time through a PEXT
+index. Zobrist hashing tracks positions for the transposition table and repetition detection.
 
 Search is iterative deepening over alpha-beta/PVS with: quiescence search,
 transposition-table probing/storing, aspiration windows, null-move pruning,
@@ -373,6 +411,19 @@ tuning/        self-play tuning, SPRT, and gauntlet scripts
 script/        benchmark and analysis helpers
 ```
 
+## Credits
+
+- The search techniques come from the
+  [Chess Programming Wiki](https://www.chessprogramming.org) and the published
+  literature on them.
+- Stockfish is a calibration opponent in `tuning/` and is neither shipped nor
+  linked. Its source was read for individual ideas: the correction-history
+  weights and gates follow Stockfish 18, and a few UCI behaviours match it.
+- `engine/syzygy/` is [Pyrrhic](https://github.com/AndyGrant/Pyrrhic), by Ronald
+  de Man, Basil, Jon Dart and Andrew Grant, under its own MIT-style license.
+- Nets are trained with [bullet](https://github.com/jw1912/bullet).
+- `tests/ut.hpp` is [boost-ext/ut](https://github.com/boost-ext/ut).
+
 ## License
 
-See `LICENSE`.
+MIT, see `LICENSE`.
