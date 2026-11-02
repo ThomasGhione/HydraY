@@ -107,7 +107,7 @@ struct NnzTable {
         }
     }
 };
-inline constexpr NnzTable NNZ{};
+[[maybe_unused]] inline constexpr NnzTable NNZ{};
 
 #if !defined(__AVXVNNI__)
 // Four accumulators -> four integers in one go. Only the i16-lane path needs

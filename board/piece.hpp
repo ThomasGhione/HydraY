@@ -6,12 +6,9 @@
 
 #include "coords.hpp"
 
-// Sliding-piece attacks use PEXT (BMI2). Every shipped build (-march=native,
-// -march=x86-64-v3) provides it; fail loudly on anything that does not.
-#if !defined(__BMI2__)
-#error "HydraY requires BMI2 (PEXT) for sliding-piece attacks; build with -march=native or -march=x86-64-v3."
-#endif
+#if defined(__BMI2__)
 #include <immintrin.h>
+#endif
 
 namespace pieces {
 
@@ -85,7 +82,17 @@ struct MagicParams {
 
 __attribute__((always_inline))
 inline uint32_t sliderIndex(uint64_t occ, const MagicParams& p) noexcept {
+#if defined(__BMI2__)
     return static_cast<uint32_t>(_pext_u64(occ, p.mask));
+#else
+    // x86-64-v2 builds have no PEXT: same index, one mask bit at a time.
+    uint32_t index = 0;
+    uint32_t out = 1;
+    for (uint64_t mask = p.mask; mask != 0; mask &= mask - 1, out <<= 1) {
+        if ((occ & mask & -mask) != 0) index |= out;
+    }
+    return index;
+#endif
 }
 
 template<typename MaskArray>
