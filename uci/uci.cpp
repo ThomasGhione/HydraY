@@ -8,6 +8,7 @@
 #include <omp.h>
 
 #include <iostream>
+#include <vector>
 
 namespace {
     // "RfpMarginPerDepth", "RFP_MARGIN_PER_DEPTH" and "rfp margin per depth"
@@ -44,7 +45,10 @@ namespace {
         bool refreshSearchTables = false;
     };
 
-    SpinOption kSpinOptions[] = {
+    // The search constants, for the tuner and the SPRT scripts. Release builds
+    // (`make release`) do not offer them.
+    const std::vector<SpinOption> kSpinOptions = {
+#ifndef HYDRAY_RELEASE
         {"RFP_MARGIN_PER_DEPTH", &engine::RFP_MARGIN_PER_DEPTH,           30,  250},
         {"NMP_EVAL_DIV",         &engine::NMP_EVAL_DIV,                   50,  400},
         {"NMP_EVAL_MAX",         &engine::NMP_EVAL_MAX,                    0,   10},
@@ -81,7 +85,13 @@ namespace {
         {"HINDSIGHT_MARGIN",     &engine::HINDSIGHT_MARGIN,                0, 2000},
         {"NMP_BASE_R",           &engine::NMP_BASE_R,                      1,    8},
         {"CORR_HIST_WEIGHT_PCT", &engine::CORR_HIST_WEIGHT_PCT,            0,  400},
+#endif
     };
+
+    // The CPUs in the affinity mask, up to what the search can start.
+    int maxThreads() noexcept {
+        return std::min(omp_get_max_threads(), engine::MAX_HELPER_THREADS + 1);
+    }
 
     std::string ponderSuffix(const engine::Engine& engine, const chess::Move& bestMove) noexcept {
         chess::Board board = engine.board;
@@ -148,16 +158,18 @@ namespace uci {
     }
 
     void UCI::uci() noexcept {
-        const std::string threads = std::to_string(omp_get_max_threads());
         std::string out =
             "id name HydraY 4.3.0\n"
             "id author Thomas Ghione, Andrea Vaccari, Daniele Ferretti, Simone Tomasella\n"
             "option name SyzygyPath type string default <empty>\n"
             "option name SyzygyProbeDepth type spin default 1 min 1 max 100\n"
             "option name EvalFile type string default <empty>\n"
-            "option name Threads type spin default " + threads + " min 1 max " + threads + "\n"
+            "option name Threads type spin default 1 min 1 max " + std::to_string(maxThreads()) + "\n"
             "option name Hash type spin default " + std::to_string(TT::DEFAULT_HASH_MB)
-            + " min " + std::to_string(TT::MIN_HASH_MB) + " max " + std::to_string(TT::MAX_HASH_MB) + "\n";
+            + " min " + std::to_string(TT::MIN_HASH_MB) + " max " + std::to_string(TT::MAX_HASH_MB) + "\n"
+            "option name Move Overhead type spin default " + std::to_string(engine::time::TimeManager::DEFAULT_MOVE_OVERHEAD_MS)
+            + " min 0 max " + std::to_string(engine::time::TimeManager::MAX_MOVE_OVERHEAD_MS) + "\n"
+            "option name Ponder type check default false\n";
         for (const auto& option : kSpinOptions) {
             out += "option name " + optionDisplayName(option.key)
                  + " type spin default " + std::to_string(*option.value)
@@ -181,7 +193,7 @@ namespace uci {
         const bool isInt = static_cast<bool>(std::istringstream(value) >> v);
         const auto invalid = [](const std::string& option) { emit("info string invalid value for " + option + "\n"); };
 
-        for (auto& option : kSpinOptions) {
+        for (const auto& option : kSpinOptions) {
             if (key != normalizedOptionName(option.key)) continue;
             if (!isInt) return invalid(name);
             if (v < option.minValue || v > option.maxValue) {
@@ -202,17 +214,17 @@ namespace uci {
                 emit("info string EvalFile loaded: " + value + "\n");
             }
         } else if (key == "syzygypath") {
-            emit(engine.syzygyProber.load(value)
-                 ? "info string SyzygyPath loaded: " + value + " (max pieces: "
-                   + std::to_string(engine.syzygyProber.maxPieces()) + ")\n"
-                 : "info string SyzygyPath error: could not load '" + value + "'\n");
+            const bool loaded = engine.syzygyProber.load(value);
+            if (value.empty() || value == "<empty>") emit("info string SyzygyPath cleared\n");
+            else if (!loaded || engine.syzygyProber.maxPieces() == 0) emit("info string SyzygyPath error: no tablebases in '" + value + "'\n");
+            else emit("info string SyzygyPath loaded: " + value + " (max pieces: " + std::to_string(engine.syzygyProber.maxPieces()) + ")\n");
         } else if (key == "syzygyprobedepth") {
             if (!isInt || v < 1 || v > 100) return invalid("SyzygyProbeDepth");
             engine.syzygyProber.probeDepth = v;
             emit("info string SyzygyProbeDepth set to " + std::to_string(v) + "\n");
         } else if (key == "threads") {
             if (!isInt || v < 1) return invalid("Threads");
-            engine.requestedThreads = engine.searchRuntime.maxThreads = std::min(v, omp_get_max_threads());
+            engine.requestedThreads = engine.searchRuntime.maxThreads = std::min(v, maxThreads());
             emit("info string Threads set to " + std::to_string(engine.requestedThreads) + "\n");
         } else if (key == "hash") {
             if (!isInt || v < 1) return invalid("Hash");
@@ -220,6 +232,12 @@ namespace uci {
             emit(engine.tt.resize(static_cast<size_t>(mb))
                  ? "info string Hash set to " + std::to_string(engine.tt.sizeMB()) + " MB\n"
                  : "info string Hash resize to " + std::to_string(mb) + " MB failed (out of memory)\n");
+        } else if (key == "moveoverhead") {
+            if (!isInt || v < 0 || v > engine::time::TimeManager::MAX_MOVE_OVERHEAD_MS) return invalid("Move Overhead");
+            engine.timeManager.moveOverheadMs = v;
+            emit("info string Move Overhead set to " + std::to_string(v) + "\n");
+        } else if (key != "ponder") { // Ponder only tells us the GUI may send `go ponder`.
+            emit("info string unknown option " + name + "\n");
         }
     }
 
@@ -264,11 +282,13 @@ namespace uci {
             else if (token == "movetime") is >> limits.movetime;
         }
 
-        const bool ponder = limits.ponder;
+        // The bestmove of these two waits for ponderhit or stop, however soon the
+        // search ends (a mated root, a depth reached).
+        const bool hold = limits.ponder || limits.infinite;
         {
             std::lock_guard<std::mutex> lock(searchMutex);
             searchBestMove = "0000";
-            searchPonder = ponder;
+            searchHold = hold;
             searchDone = false;
             searchPrinted = false;
         }
@@ -288,18 +308,18 @@ namespace uci {
                 std::lock_guard<std::mutex> lock(searchMutex);
                 searchBestMove = bestMove;
                 searchDone = true;
-                if (!searchPonder && !searchPrinted) emitBestMove(searchBestMove);
+                if (!searchHold && !searchPrinted) emitBestMove(searchBestMove);
             });
         } catch (...) {
             std::lock_guard<std::mutex> lock(searchMutex);
             searchDone = true;
-            if (!ponder) emitBestMove("0000");
+            if (!hold) emitBestMove("0000");
         }
     }
     
     void UCI::ponderhit() noexcept {
         std::lock_guard<std::mutex> lock(searchMutex);
-        searchPonder = false;
+        searchHold = false;
         if (searchDone) {
             if (!searchPrinted) emitBestMove(searchBestMove);
             return;

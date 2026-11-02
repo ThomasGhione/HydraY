@@ -25,7 +25,7 @@ private:
     std::thread searchThread;
     std::mutex searchMutex;
     std::string searchBestMove = "0000";
-    bool searchPonder = false;
+    bool searchHold = false; // go ponder, go infinite: bestmove waits for ponderhit or stop
     bool searchDone = false;
     bool searchPrinted = true;
 

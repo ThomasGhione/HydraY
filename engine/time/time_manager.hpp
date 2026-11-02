@@ -33,8 +33,9 @@ public:
     using Clock = std::chrono::steady_clock;
 
     // Communication/GUI lag buffer: never spend the last few ms, so we never
-    // flag on the wire even if the GUI reports the clock late.
-    static constexpr int64_t MOVE_OVERHEAD_MS   = 30;
+    // flag on the wire even if the GUI reports the clock late. UCI `Move Overhead`.
+    static constexpr int64_t DEFAULT_MOVE_OVERHEAD_MS = 30;
+    static constexpr int64_t MAX_MOVE_OVERHEAD_MS     = 5000;
     // Absolute floor: always think at least this long when time-managed.
     static constexpr int64_t MIN_THINK_MS       = 5;
     // Fallback horizon when movestogo is absent (sudden death / increment).
@@ -63,6 +64,8 @@ public:
     static constexpr double  STABILITY_MAX      = 2.00;
 
     ~TimeManager() noexcept;
+
+    int64_t moveOverheadMs = DEFAULT_MOVE_OVERHEAD_MS;
 
     // Compute the budget. `sideIsWhite` selects which clock/increment to use,
     // `movesPlayed` is the number of full moves already played (for the

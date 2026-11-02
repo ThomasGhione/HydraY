@@ -40,7 +40,7 @@ void TimeManager::init(const Limits& limits, bool sideIsWhite, int movesPlayed,
     // Fixed time per move: soft == hard, only the overhead is shaved off.
     if (limits.movetime > 0) {
         const int64_t t = std::max<int64_t>(
-            MIN_THINK_MS, limits.movetime - MOVE_OVERHEAD_MS);
+            MIN_THINK_MS, limits.movetime - moveOverheadMs);
         useTm_     = true;
         fixedTime_ = true;
         baseMs_    = t;
@@ -56,7 +56,7 @@ void TimeManager::init(const Limits& limits, bool sideIsWhite, int movesPlayed,
         0, sideIsWhite ? limits.winc : limits.binc);
 
     const int64_t timeLeft =
-        std::max<int64_t>(1, myTime - MOVE_OVERHEAD_MS);
+        std::max<int64_t>(1, myTime - moveOverheadMs);
 
     const int mtg = (limits.movestogo > 0)
         ? limits.movestogo

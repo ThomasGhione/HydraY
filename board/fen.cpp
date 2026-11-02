@@ -38,6 +38,8 @@ void Board::fenToBoard(const std::string& fen) {
             }
         }
         if (rank != 0 || file != 8) return;
+        // The net's output bucket is indexed by the piece count.
+        if (std::ranges::count_if(parsedBoard, [](uint8_t p) { return p != 0; }) > 32) return;
     }
 
     chessboard = parsedBoard;
