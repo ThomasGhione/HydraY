@@ -159,7 +159,7 @@ namespace uci {
 
     void UCI::uci() noexcept {
         std::string out =
-            "id name HydraY 4.3.0\n"
+            "id name HydraY 4.3.1\n"
             "id author Thomas Ghione, Andrea Vaccari, Daniele Ferretti, Simone Tomasella\n"
             "option name SyzygyPath type string default <empty>\n"
             "option name SyzygyProbeDepth type spin default 1 min 1 max 100\n"
