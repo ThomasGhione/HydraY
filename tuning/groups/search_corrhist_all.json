@@ -1,0 +1,12 @@
+{
+  "parameter_ranges": {
+    "CORR_WEIGHT_PAWN": "Integer(4000, 20000)",
+    "CORR_WEIGHT_MINOR": "Integer(3000, 18000)",
+    "CORR_WEIGHT_NON_PAWN": "Integer(4000, 22000)",
+    "CORR_UPDATE_MINOR": "Integer(64, 320)",
+    "CORR_UPDATE_NON_PAWN": "Integer(64, 320)",
+    "CORR_BONUS_RATE": "Integer(80, 320)",
+    "CORR_BONUS_RATE_RAISED": "Integer(64, 256)",
+    "CORR_BONUS_CAP": "Integer(128, 512)"
+  }
+}
