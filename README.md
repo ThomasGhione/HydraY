@@ -39,7 +39,8 @@ every build.
 - Optional analysis tools: `valgrind`, `cppcheck`, `clang-tidy`, `scan-build`,
   `include-what-you-use`, `cppclean`, `lizard` (`pip install lizard`), `perf`
 - Optional for Windows builds: `mingw-w64`, and `wine` to run them on Linux
-- Optional for tuning/testing: `fastchess`, `cutechess-cli`, and `ordo`
+- Optional for tuning/testing: `fastchess`, `cutechess-cli`, and `ordo`;
+  `matplotlib` for the live SPSA plot
 
 ## Quick Start
 
@@ -323,6 +324,7 @@ The constants are set through the engine's tuning spins, so build first with
 
 ```txt
 tuning/spsa.py             SPSA tuner
+tuning/spsa_watch.py       live plot of a running SPSA
 tuning/groups/*.json       parameter groups (search_corrhist, search_evalmargins, ...)
 tuning/run_sprt.sh         SPRT of the tuned values against a frozen baseline
 ```
@@ -357,7 +359,10 @@ of 1 changes behaviour, are decided with an SPRT each.
 `spsa_<group>.log` has one line per iteration: the score of theta+ against
 theta- and theta after the update. The score is not an Elo gain, since
 theta+ and theta- move in a random direction each time; what matters is
-where theta drifts. To apply the result, freeze the current build as the
+where theta drifts. `./spsa_watch.py <group>` plots it in a window that
+redraws every minute: one panel per parameter, the start with a band of
++-c_end/2 around it, the drift in units of `c_end`, and the expected end
+from the last 50 iterations. To apply the result, freeze the current build as the
 baseline, write the final theta, rounded, into
 `engine/search/search_constants.hpp`, rebuild and run an SPRT:
 
