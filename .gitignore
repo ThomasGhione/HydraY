@@ -60,3 +60,4 @@ config.json
 # Python bytecode (never track compiled caches)
 __pycache__/
 *.pyc
+/tuning/spsa_*_state.json
