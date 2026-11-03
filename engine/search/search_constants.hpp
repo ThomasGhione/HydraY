@@ -124,8 +124,12 @@ inline constexpr int32_t MAX_CAPTURE_HISTORY = 10000;
 inline constexpr int     CORR_HIST_BITS       = 14;
 inline constexpr int     CORR_HIST_SIZE       = 1 << CORR_HIST_BITS;
 inline constexpr int32_t CORR_HIST_LIMIT      = 1024;
-inline constexpr int32_t CORR_BONUS_CAP       = CORR_HIST_LIMIT / 4;
 inline constexpr int32_t CORR_HIST_SCALE      = 131072;
+// Update bonus: residual * depth * rate / 1280 (160 = 1/8, 128 = 1/10 after a
+// raised alpha), clamped to +-CORR_BONUS_CAP (UCI spins).
+inline int32_t CORR_BONUS_RATE        = 160;
+inline int32_t CORR_BONUS_RATE_RAISED = 128;
+inline int32_t CORR_BONUS_CAP         = CORR_HIST_LIMIT / 4;
 // Weights of each table in the applied correction (UCI spins).
 inline int32_t CORR_WEIGHT_PAWN     = 10347;
 inline int32_t CORR_WEIGHT_MINOR    = 8821;

@@ -4,8 +4,8 @@
 // static eval, keyed by sub-structures of the position and added back to the
 // eval before the pruning gates read it. A cell is a fixed-point gravity
 // statistic in [-CORR_HIST_LIMIT, CORR_HIST_LIMIT]: an update adds
-// residual * depth / 8 units (/ 10 after a raised alpha), and a full cell reads
-// as CORR_HIST_LIMIT * weight / CORR_HIST_SCALE eval units.
+// residual * depth * CORR_BONUS_RATE / 1280 units, and a full cell reads as
+// CORR_HIST_LIMIT * weight / CORR_HIST_SCALE eval units.
 
 #include <cstddef>
 #include <cstdint>

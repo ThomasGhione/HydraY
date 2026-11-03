@@ -1,0 +1,10 @@
+{
+  "parameter_ranges": {
+    "CORR_BONUS_RATE": "Integer(80, 320)",
+    "CORR_BONUS_RATE_RAISED": "Integer(64, 256)",
+    "CORR_BONUS_CAP": "Integer(128, 512)"
+  },
+  "data_path": "search_corrhist_scale_data.npz",
+  "model_path": "search_corrhist_scale_model.pkl",
+  "log_path": "log_search_corrhist_scale.txt"
+}

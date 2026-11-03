@@ -90,6 +90,9 @@ namespace {
         {"CORR_WEIGHT_NON_PAWN", &engine::CORR_WEIGHT_NON_PAWN,            0, 32768},
         {"CORR_UPDATE_MINOR",    &engine::CORR_UPDATE_MINOR,               0,  512},
         {"CORR_UPDATE_NON_PAWN", &engine::CORR_UPDATE_NON_PAWN,            0,  512},
+        {"CORR_BONUS_RATE",      &engine::CORR_BONUS_RATE,                 0,  640},
+        {"CORR_BONUS_RATE_RAISED", &engine::CORR_BONUS_RATE_RAISED,        0,  640},
+        {"CORR_BONUS_CAP",       &engine::CORR_BONUS_CAP,                  0,  512},
 #endif
     };
 

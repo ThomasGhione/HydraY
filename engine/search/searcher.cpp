@@ -779,8 +779,9 @@ int32_t searchPosition(Board& b, SearchRuntime& runtime, int depth, int32_t alph
             && moveTraits(b, result.move, b.getEnPassant(), Board::promotionRank(activeColor == Board::WHITE)).isCapture;
         const int32_t target = (!raisedAlpha && result.pruned) ? alpha : best;
         if (!bestIsCapture && (target > correctedEval) == raisedAlpha) {
-            const int32_t bonus = std::clamp((target - correctedEval) * depth / (raisedAlpha ? 10 : 8),
-                                             -CORR_BONUS_CAP, CORR_BONUS_CAP);
+            const int64_t step = int64_t{target - correctedEval} * depth
+                               * (raisedAlpha ? CORR_BONUS_RATE_RAISED : CORR_BONUS_RATE) / 1280;
+            const int32_t bonus = static_cast<int32_t>(std::clamp<int64_t>(step, -CORR_BONUS_CAP, CORR_BONUS_CAP));
             const CorrectionHistory::Cells cells = runtime.corrHist.cellsFor(b);
             applyHistoryGravity(*cells.pawn, bonus, CORR_HIST_LIMIT);
             applyHistoryGravity(*cells.minor, bonus * CORR_UPDATE_MINOR / 128, CORR_HIST_LIMIT);
