@@ -39,8 +39,7 @@ every build.
 - Optional analysis tools: `valgrind`, `cppcheck`, `clang-tidy`, `scan-build`,
   `include-what-you-use`, `cppclean`, `lizard` (`pip install lizard`), `perf`
 - Optional for Windows builds: `mingw-w64`, and `wine` to run them on Linux
-- Optional for tuning/testing: `chess-tuning-tools`, `cutechess-cli`,
-  `fastchess`, and `ordo`
+- Optional for tuning/testing: `fastchess`, `cutechess-cli`, and `ordo`
 
 ## Quick Start
 
@@ -316,52 +315,57 @@ margins…) are also exposed as `spin` options for the tuner.
 
 ## Search-Constant Tuning
 
-HydraY tunes search constants through self-play with `chess-tuning-tools` and
-`cutechess-cli`. The workflow lives in `tuning/`:
+HydraY tunes search constants with SPSA, as Fishtest and OpenBench do:
+`tuning/spsa.py` plays game pairs between theta+delta and theta-delta with
+`fastchess` and moves theta along the perturbation by the score difference.
+The constants are set through the engine's tuning spins, so build first with
+`make prod` (release builds do not offer them).
 
 ```txt
-tuning/base_config.json    shared engine, depth, rounds, and book settings
-tuning/groups/*.json       tracked parameter groups (search_pruning, search_shape)
-tuning/run_tune_local.sh   local launcher
-tuning/chess_uci.sh        starts the engine in UCI mode for the tuner
+tuning/spsa.py             SPSA tuner
+tuning/groups/*.json       parameter groups (search_corrhist, search_evalmargins, ...)
+tuning/run_sprt.sh         SPRT of the tuned values against a frozen baseline
 ```
 
-The `tune` CLI must be on your PATH (it lives in a dedicated Python
-environment, not in `tuning/.venv`). Verify your tools:
+A group lists its parameters under `parameter_ranges`, in either form:
 
-```sh
-tune --help
-cutechess-cli --version
+```json
+"CORR_WEIGHT_PAWN": "Integer(4000, 20000)",
+"CORR_WEIGHT_PAWN": {"start": 10347, "min": 4000, "max": 20000, "c_end": 800, "r_end": 0.002}
 ```
 
-Run a tracked parameter group (build first with `make prod`):
+`Integer(min, max)` starts from the engine's default, with `c_end` a
+twentieth of the range and `r_end` 0.002. Run a group:
 
 ```sh
 cd tuning
-./run_tune_local.sh search_pruning
-./run_tune_local.sh search_shape
+./spsa.py search_corrhist                       # 1500 iterations x 16 games, 8+0.08
+./spsa.py search_corrhist --iterations 3000 --pairs 8 --tc 8+0.08 --concurrency 11
 ```
 
-`run_tune_local.sh` merges the chosen group with `base_config.json`, writes the
-active `tuning_config.json`, and tracks each dataset under
-`tuning/.tuning_state/` so unchanged runs resume and changed configs start
-fresh. Keep each run focused: tune at most about 8 related parameters at once.
+Games run at 1 thread and 64 MB, from `books/openings.pgn`, with as many
+parallel games as physical cores minus one. Theta and the iteration are
+saved to `spsa_<group>_state.json` after every iteration: stop with `Ctrl+C`
+and rerun the same command to resume. To start over, move the state file
+away.
+
+SPSA suits numeric constants. Switches and small depth limits, where a step
+of 1 changes behaviour, are decided with an SPRT each.
 
 ### Reading Results
 
-Watch progress with `tail -f tuning/log.txt`. Key lines:
+`spsa_<group>.log` has one line per iteration: the score of theta+ against
+theta- and theta after the update. The score is not an Elo gain, since
+theta+ and theta- move in a random direction each time; what matters is
+where theta drifts. To apply the result, freeze the current build as the
+baseline, write the final theta, rounded, into
+`engine/search/search_constants.hpp`, rebuild and run an SPRT:
 
-```txt
-Testing {...}          parameter point being tested right now
-Current optimum: {...} best point the Bayesian model has found
-Estimated Elo: X +- Y  model estimate for that optimum
+```sh
+./tuning/run_sprt.sh --snapshot                 # before changing the constants
+make prod
+TC=8+0.08 MAXGAMES=8000 ./tuning/run_sprt.sh
 ```
-
-Apply `Current optimum`, not a single lucky `Got Elo`. If its 90% confidence
-interval includes zero, the result is still uncertain - confirm with more
-games. To apply: stop with `Ctrl+C`, copy the optimum into
-`engine/search/search_constants.hpp`, rebuild with `make prod`, then
-re-validate with SPRT or a gauntlet.
 
 ## How the Engine Works
 
