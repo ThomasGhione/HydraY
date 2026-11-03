@@ -34,6 +34,14 @@ struct SearchRuntime {
     // UCI `go nodes N` (0 = unlimited), checked at every node; each Lazy SMP
     // helper bounds itself by it too.
     uint64_t maxNodes      = 0;
+    // Each ancestor writes evalStack[ply] before its grandchild two plies down
+    // reads it. Slot 0 is the root, which never runs through searchPosition, so
+    // getBestMove seeds it. Members rather than thread_local: mingw emulates TLS
+    // with a function call per access.
+    int32_t  evalStack[MAX_PLY] {};
+    // The LMR reduction of the move being searched at each ply, 0 outside a
+    // reduced search.
+    int      reductionStack[MAX_PLY] {};
 
     // --- Heuristics ---
     // [ply][slot]: both killers of a ply share a cache line.
@@ -45,7 +53,6 @@ struct SearchRuntime {
     int16_t  contHist[2][CONT_HIST_PIECE_TYPES][64][CONT_HIST_PIECE_TYPES][64] {};
     // Static-eval correction; never decayed between searches, only cleared.
     CorrectionHistory corrHist {};
-    // evalStack is thread_local in searcher.cpp.
 
     // --- External coordination ---
     TT*       transpositionTable     = nullptr;

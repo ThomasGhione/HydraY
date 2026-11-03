@@ -228,6 +228,8 @@ inline void Board::ensureNnueAccumulatorClean() const noexcept {
             from = i;
         }
     }
+    // Return before the thread_local: mingw emulates TLS with a call per access.
+    if (usable[0] && usable[1]) return;
 
     // Per-thread cache (Lazy SMP: each helper searches its own Board on its
     // own thread). Stale entries from other positions are still correct diff

@@ -57,14 +57,6 @@ using chess::Move;
 
 namespace {
 
-// Per thread (Lazy SMP): each ancestor writes evalStack[ply] before its
-// grandchild two plies down reads it. Slot 0 is the root, which never runs
-// through searchPosition, so getBestMove seeds it.
-thread_local int32_t evalStack[MAX_PLY] = {};
-// The LMR reduction of the move being searched at each ply, 0 outside a
-// reduced search (per thread, like evalStack).
-thread_local int reductionStack[MAX_PLY] = {};
-
 // A missing king (reachable only from an illegal FEN) is decisive, not an eval.
 int32_t evaluate(const Board& b) noexcept {
     if (b.bb[Board::KING][0] == 0 || b.bb[Board::KING][1] == 0) [[unlikely]]
@@ -474,9 +466,9 @@ SearchMoveResult searchMoves(Board& b, MovePicker& movePicker, const SearchConte
                 ++gSearchStats.lmrSearches;
                 gSearchStats.lmrReductionSum += static_cast<uint64_t>(childDepth - reducedDepth);
             }
-            reductionStack[ctx.ply] = childDepth - reducedDepth;
+            runtime.reductionStack[ctx.ply] = childDepth - reducedDepth;
             score = search(reducedDepth, alpha, scoutBeta, true);
-            reductionStack[ctx.ply] = 0;
+            runtime.reductionStack[ctx.ply] = 0;
             if (score > alpha) {
                 if constexpr (kSearchStats) ++gSearchStats.lmrResearches;
                 score = search(childDepth, alpha, scoutBeta, !ctx.cutNode);
@@ -653,17 +645,17 @@ int32_t searchPosition(Board& b, SearchRuntime& runtime, int depth, int32_t alph
 
     // In check there is no static eval: the sentinel keeps a stale value out of
     // the comparison two plies down, where the same side is to move.
-    evalStack[ply] = inCheck ? NEG_INF : staticEval;
+    runtime.evalStack[ply] = inCheck ? NEG_INF : staticEval;
     const bool improving = !inCheck && ply >= 2
-        && evalStack[ply - 2] != NEG_INF && staticEval > evalStack[ply - 2];
+        && runtime.evalStack[ply - 2] != NEG_INF && staticEval > runtime.evalStack[ply - 2];
 
     // Hindsight: a node reduced a lot whose opponent is not worse off gets a
     // ply back; a reduced node where both static evals look good gives one up.
-    if (ply > 0 && !inCheck && evalStack[ply - 1] != NEG_INF) {
-        const int priorReduction = reductionStack[ply - 1];
-        if (HINDSIGHT_EXT && priorReduction >= 3 && staticEval <= -evalStack[ply - 1]) ++depth;
+    if (ply > 0 && !inCheck && runtime.evalStack[ply - 1] != NEG_INF) {
+        const int priorReduction = runtime.reductionStack[ply - 1];
+        if (HINDSIGHT_EXT && priorReduction >= 3 && staticEval <= -runtime.evalStack[ply - 1]) ++depth;
         if (HINDSIGHT_MARGIN > 0 && priorReduction >= 2 && depth >= 2
-            && staticEval + evalStack[ply - 1] > HINDSIGHT_MARGIN) --depth;
+            && staticEval + runtime.evalStack[ply - 1] > HINDSIGHT_MARGIN) --depth;
     }
 
     const int side = Board::colorToIndex(activeColor);
@@ -888,7 +880,7 @@ Move getBestMove(Board& rootBoard, const MoveList& moves, SearchRuntime& runtime
 
     // ply 2 compares against the root, which never writes slot 0 itself;
     // unseeded, `improving` there would mean eval > 0.
-    evalStack[0] = rootBoard.checkersTo(rootBoard.getActiveColor()) ? NEG_INF : evaluate(rootBoard);
+    runtime.evalStack[0] = rootBoard.checkersTo(rootBoard.getActiveColor()) ? NEG_INF : evaluate(rootBoard);
 
     const auto scoreMove = [&](const Move& m, int32_t lo, int32_t hi, bool cut) {
         Board::MoveState state;
