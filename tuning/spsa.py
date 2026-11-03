@@ -13,7 +13,8 @@ where c and a come from each parameter's c_end and r_end (a_end = r_end * c_end^
 Groups live in groups/<name>.json. "parameter_ranges" accepts both the
 chess-tuning-tools form, "Integer(min, max)" (start = engine default,
 c_end = (max - min) / 20, r_end = 0.002), and the explicit form
-{"start": .., "min": .., "max": .., "c_end": .., "r_end": ..}.
+{"start": .., "min": .., "max": .., "c_end": .., "r_end": ..}, where a
+missing "start" is the engine default too.
 
 State (theta and the iteration) is saved after every iteration to
 spsa_<group>_state.json, so a run interrupted with Ctrl-C resumes where it
@@ -71,6 +72,13 @@ def load_params(group_file):
                 sys.exit(f"{key}: the engine offers no spin option {option_name(key)}")
             spec = {"start": start, "min": lo, "max": hi,
                     "c_end": (hi - lo) / 20, "r_end": 0.002}
+        elif "start" not in spec:
+            if defaults is None:
+                defaults = engine_defaults()
+            start = defaults.get(option_name(key).lower())
+            if start is None:
+                sys.exit(f"{key}: the engine offers no spin option {option_name(key)}")
+            spec = {"start": start, **spec}
         params.append({"key": key, "option": option_name(key), **spec})
     return params
 
