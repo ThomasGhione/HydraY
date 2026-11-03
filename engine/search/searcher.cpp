@@ -791,9 +791,9 @@ int32_t searchPosition(Board& b, SearchRuntime& runtime, int depth, int32_t alph
                                              -CORR_BONUS_CAP, CORR_BONUS_CAP);
             const CorrectionHistory::Cells cells = runtime.corrHist.cellsFor(b);
             applyHistoryGravity(*cells.pawn, bonus, CORR_HIST_LIMIT);
-            applyHistoryGravity(*cells.minor, bonus * 156 / 128, CORR_HIST_LIMIT);
-            applyHistoryGravity(*cells.nonPawnWhite, bonus * 178 / 128, CORR_HIST_LIMIT);
-            applyHistoryGravity(*cells.nonPawnBlack, bonus * 178 / 128, CORR_HIST_LIMIT);
+            applyHistoryGravity(*cells.minor, bonus * CORR_UPDATE_MINOR / 128, CORR_HIST_LIMIT);
+            applyHistoryGravity(*cells.nonPawnWhite, bonus * CORR_UPDATE_NON_PAWN / 128, CORR_HIST_LIMIT);
+            applyHistoryGravity(*cells.nonPawnBlack, bonus * CORR_UPDATE_NON_PAWN / 128, CORR_HIST_LIMIT);
         }
     }
 

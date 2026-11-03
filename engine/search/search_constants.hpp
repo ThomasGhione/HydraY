@@ -126,9 +126,13 @@ inline constexpr int     CORR_HIST_SIZE       = 1 << CORR_HIST_BITS;
 inline constexpr int32_t CORR_HIST_LIMIT      = 1024;
 inline constexpr int32_t CORR_BONUS_CAP       = CORR_HIST_LIMIT / 4;
 inline constexpr int32_t CORR_HIST_SCALE      = 131072;
-inline constexpr int32_t CORR_WEIGHT_PAWN     = 10347;
-inline constexpr int32_t CORR_WEIGHT_MINOR    = 8821;
-inline constexpr int32_t CORR_WEIGHT_NON_PAWN = 11665;
+// Weights of each table in the applied correction (UCI spins).
+inline int32_t CORR_WEIGHT_PAWN     = 10347;
+inline int32_t CORR_WEIGHT_MINOR    = 8821;
+inline int32_t CORR_WEIGHT_NON_PAWN = 11665;
+// Update bonus of the minor and non-pawn tables, in 128ths of the pawn one (UCI spins).
+inline int32_t CORR_UPDATE_MINOR    = 156;
+inline int32_t CORR_UPDATE_NON_PAWN = 178;
 // Global strength of the applied correction, in percent (UCI spin).
 inline int32_t CORR_HIST_WEIGHT_PCT = 100;
 

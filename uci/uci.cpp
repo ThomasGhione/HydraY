@@ -85,6 +85,11 @@ namespace {
         {"HINDSIGHT_MARGIN",     &engine::HINDSIGHT_MARGIN,                0, 2000},
         {"NMP_BASE_R",           &engine::NMP_BASE_R,                      1,    8},
         {"CORR_HIST_WEIGHT_PCT", &engine::CORR_HIST_WEIGHT_PCT,            0,  400},
+        {"CORR_WEIGHT_PAWN",     &engine::CORR_WEIGHT_PAWN,                0, 32768},
+        {"CORR_WEIGHT_MINOR",    &engine::CORR_WEIGHT_MINOR,               0, 32768},
+        {"CORR_WEIGHT_NON_PAWN", &engine::CORR_WEIGHT_NON_PAWN,            0, 32768},
+        {"CORR_UPDATE_MINOR",    &engine::CORR_UPDATE_MINOR,               0,  512},
+        {"CORR_UPDATE_NON_PAWN", &engine::CORR_UPDATE_NON_PAWN,            0,  512},
 #endif
     };
 
