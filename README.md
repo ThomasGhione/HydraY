@@ -263,8 +263,8 @@ default 3), `--nodes` (per move, default 8000), `--net` (labeler, default the
 embedded net), `--tb` (Syzygy, default `engine/syzygy/files`), `--shard`,
 `--seal-on-exit`, `--start standard|chess324`, `--eg-every`, `--games` (games started: about
 1 in 4 is discarded at the first search, see below),
-`--target` (ETA line only), `--seed` (benchmark mode), `--first-shard` and
-`--machine`/`--build` (recorded in the manifests). Both `--flag value` and
+`--target` (ETA line only), `--seed` (benchmark mode), `--first-shard`,
+`--min-free-gb` and `--machine`/`--build` (recorded in the manifests). Both `--flag value` and
 `--flag=value` work; a wrong value stops the run instead of being guessed.
 
 Self-play games are written in bulletformat. All threads append whole games
@@ -280,6 +280,14 @@ endgame seeding, tablebases and seed. A restart with other settings seals the
 open shard first, so a shard never mixes two configurations. A new shard
 takes the number after every local shard and manifest, and after
 `--first-shard`; `<prefix>.lock` stops a second datagen on the same prefix.
+
+**A full disk** never corrupts a shard. Below `--min-free-gb` free (default
+4) the threads finish their game and wait, and resume past it plus 1 GB, for
+instance once the uploader has deleted an uploaded shard; the progress line
+says `PAUSED`. A write that fails anyway is cut back to the last whole game
+and pauses too, while a failure with room on the disk stops the run with an
+error. At the start a `.part` that ends in a partial record, after a crash,
+loses those bytes instead of shifting every record appended after them.
 When Syzygy tablebases are present (see below), games are
 adjudicated at <6 pieces with the exact WDL result; without tablebases the
 adjudication disables itself (the startup banner says which mode is active).
@@ -341,7 +349,11 @@ manifests and
 positions, nodes, start, net, build and dates. The token, the dataset and
 the owner are checked before the datagen starts. At the stop a last pass
 uploads the shard sealed at exit (`stop_grace_period` gives it 10 minutes);
-anything left goes up at the next start.
+anything left goes up at the next start. With `--delete-after-upload` a full
+disk sorts itself out: the datagen pauses with 4 GB still free, room the
+uploader needs, and resumes as uploaded shards are deleted. Without it the
+datagen stays paused until space is freed by hand. The container logs are
+capped at 30 MB.
 
 **Plain `docker run`.** The container takes the flags of `./chess datagen`
 after its defaults, the machine-id prefix (mount `/etc/machine-id` at

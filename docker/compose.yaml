@@ -33,9 +33,16 @@ services:
       # - --out=/data/NAME        # default /data/m<machine-id hash>-v<version>
       - --nodes=8000
       - --seal-on-exit
+      - --min-free-gb=4           # pause below 4 GB free, room left for the upload
       # Upload of the sealed shards: uncomment and set the dataset.
       # - --hf-repo=USER/hydray-data
       # - --delete-after-upload
+    # The default json-file log has no size limit.
+    logging:
+      driver: json-file
+      options:
+        max-size: 10m
+        max-file: "3"
     # Time for the last game, the seal and the upload of the last shard.
     stop_grace_period: 10m
     restart: unless-stopped

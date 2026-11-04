@@ -168,14 +168,18 @@ class Uploader:
                     continue
                 print(f"uploaded {self.remote(shard.name)} (SHA-256 checked)", flush=True)
                 uploaded = True
-            if manifest.exists():
-                self.cache.mkdir(parents=True, exist_ok=True)
-                shutil.copy(manifest, self.cache / manifest.name)
+            # The deletion first: on a full disk it is what makes room again.
             if args.delete_after_upload:
                 shard.unlink()
                 print(f"deleted {shard} (its manifest stays)", flush=True)
             else:
                 self.done.add((shard.name, st.st_size, st.st_mtime_ns))
+            if manifest.exists():
+                try:  # the index downloads what this cache misses
+                    self.cache.mkdir(parents=True, exist_ok=True)
+                    shutil.copy(manifest, self.cache / manifest.name)
+                except OSError:
+                    pass
         if uploaded:
             self.publish_index()
         return uploaded

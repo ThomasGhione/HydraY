@@ -95,6 +95,21 @@ std::atomic<uint64_t> g_totalEndgameSeeded{0};
 std::atomic<uint64_t> g_discardedOpenings{0};
 std::atomic<uint64_t> g_discardedSeeds{0};
 
+// Disk guard: below g_minFreeBytes free the workers wait before their next
+// game instead of failing writes; they resume past the threshold plus
+// DISK_RESUME_MARGIN, typically once the uploader has deleted a shard.
+constexpr uint64_t DISK_RESUME_MARGIN = 1ULL << 30;
+uint64_t          g_minFreeBytes = 4ULL << 30;
+std::string       g_dataDir = ".";
+std::atomic<bool> g_diskPaused{false};
+std::atomic<int>  g_exitCode{0};
+
+uint64_t freeBytes() {
+    std::error_code ec;
+    const auto info = std::filesystem::space(g_dataDir, ec);
+    return ec ? UINT64_MAX : static_cast<uint64_t>(info.available);
+}
+
 // Benchmark mode (--seed, --games): each game starts
 // from its own RNG stream, an empty TT and empty histories, so a run replays
 // identically at any thread count.
@@ -163,6 +178,8 @@ bool writeWholeFile(const std::string& path, const std::string& text) {
 // The open .part keeps the settings it was started with in .part.json; a
 // restart with other settings seals that shard first, so a shard never mixes
 // two configurations.
+enum class WriteStatus { Ok, Failed, SealFailed };
+
 class ShardWriter {
 public:
     // firstIndex: the lowest index a new shard may take (shards already
@@ -173,7 +190,7 @@ public:
         prefix_ = prefix;
         shardSize_ = shardSize;
         settings_ = settings;
-        if (shardSize_ == 0) return openFile(prefix_ + ".bin");
+        if (shardSize_ == 0) return openFile(prefix_ + ".bin") && repairTail();
 
         const fs::path p(prefix_);
         const fs::path dir = p.parent_path().empty() ? fs::path(".") : p.parent_path();
@@ -209,8 +226,7 @@ public:
         } else {
             index_ = (partIndex >= 0) ? partIndex : nextIndex;
         }
-        if (!openFile(partPath())) return false;
-        inShard_ = static_cast<uint64_t>(out_.tellp()) / sizeof(BulletRecord);
+        if (!openFile(partPath()) || !repairTail()) return false;
 
         const std::string partSettings = readWholeFile(partSidecarPath());
         if (inShard_ > 0 && partSettings != sidecarText()) {
@@ -223,15 +239,25 @@ public:
         return inShard_ < shardSize_ || (seal(sidecarText()) && openNext());
     }
 
-    // One game per call, so a game never straddles two shards.
-    bool write(const std::vector<BulletRecord>& records) {
+    // One game per call, so a game never straddles two shards. Failed: the
+    // file is cut back to the game before, so a full disk never leaves half a
+    // record. SealFailed: the game is written, the seal is retried next game.
+    WriteStatus write(const std::vector<BulletRecord>& records) {
         std::lock_guard lock(mutex_);
         out_.write(reinterpret_cast<const char*>(records.data()),
                    static_cast<std::streamsize>(records.size() * sizeof(BulletRecord)));
         out_.flush();
-        if (!out_) return false;
+        if (!out_) {
+            out_.close();
+            std::error_code ec;
+            std::filesystem::resize_file(currentPath(), inShard_ * sizeof(BulletRecord), ec);
+            if (ec) std::cerr << "datagen: cannot cut " << currentPath() << " back: " << ec.message() << "\n";
+            openFile(currentPath());
+            return WriteStatus::Failed;
+        }
         inShard_ += records.size();
-        return shardSize_ == 0 || inShard_ < shardSize_ || (seal(sidecarText()) && openNext());
+        if (shardSize_ == 0 || inShard_ < shardSize_) return WriteStatus::Ok;
+        return seal(sidecarText()) && openNext() ? WriteStatus::Ok : WriteStatus::SealFailed;
     }
 
     // At exit: an empty .part is removed, a partial one sealed when asked.
@@ -262,9 +288,28 @@ public:
 
 private:
     bool openFile(const std::string& path) {
+        out_.clear();
         out_.open(path, std::ios::binary | std::ios::app);
         if (!out_) std::cerr << "datagen: cannot open " << path << " for append.\n";
         return static_cast<bool>(out_);
+    }
+
+    // A crash or a full disk mid-write can leave a partial record at the end:
+    // appending after it would shift every later record. Cut it off.
+    bool repairTail() {
+        const uint64_t bytes = static_cast<uint64_t>(out_.tellp());
+        inShard_ = bytes / sizeof(BulletRecord);
+        if (bytes % sizeof(BulletRecord) == 0) return true;
+        out_.close();
+        std::error_code ec;
+        std::filesystem::resize_file(currentPath(), inShard_ * sizeof(BulletRecord), ec);
+        if (ec) {
+            std::cerr << "datagen: cannot cut the partial record off " << currentPath() << "\n";
+            return false;
+        }
+        std::cout << "[datagen] " << currentPath() << ": cut a partial record of "
+                  << bytes % sizeof(BulletRecord) << " bytes off the end\n";
+        return openFile(currentPath());
     }
 
     // The manifest goes down before the rename: a sealed .bin always has one.
@@ -287,11 +332,14 @@ private:
         std::error_code ec;
         if (!writeWholeFile(manifestPath(), manifest)) {
             std::cerr << "datagen: cannot write " << manifestPath() << "\n";
+            std::filesystem::remove(manifestPath() + ".tmp", ec);
+            openFile(partPath());   // keeps appending; the seal is retried
             return false;
         }
         std::filesystem::rename(partPath(), sealedPath(), ec);
         if (ec) {
             std::cerr << "datagen: cannot seal " << partPath() << ": " << ec.message() << "\n";
+            openFile(partPath());
             return false;
         }
         std::filesystem::remove(partSidecarPath(), ec);
@@ -554,10 +602,22 @@ uint64_t playOneGame(WorkerContext& w, uint64_t nodesPerMove, bool endgameSeed) 
         flat.push_back(p.record);
     }
     if (!flat.empty()) {
-        if (!g_writer.write(flat)) {
-            std::cerr << "datagen: write failed (disk full?) - stopping.\n";
-            g_stop.store(true, std::memory_order_release);
-            return 0;
+        const WriteStatus status = g_writer.write(flat);
+        if (status != WriteStatus::Ok) {
+            const uint64_t free = freeBytes();
+            if (free < g_minFreeBytes + DISK_RESUME_MARGIN) {
+                // Full disk: pause until the guard sees room again.
+                if (!g_diskPaused.exchange(true)) {
+                    std::cerr << "datagen: write failed with " << free / (1 << 20)
+                              << " MB free - paused until there is room\n";
+                }
+            } else {
+                std::cerr << "datagen: write failed with " << free / (1 << 20)
+                          << " MB free (not a full disk) - stopping\n";
+                g_exitCode.store(1);
+                g_stop.store(true, std::memory_order_release);
+            }
+            if (status == WriteStatus::Failed) return 0;   // the game is cut off the file
         }
     }
 
@@ -575,6 +635,10 @@ void workerLoop(int threadId, uint64_t nodesPerMove) {
         ^ (static_cast<uint64_t>(threadId) << 56);
     WorkerContext w(seed);
     while (!g_stop.load(std::memory_order_acquire)) {
+        while (g_diskPaused.load(std::memory_order_acquire) && !g_stop.load(std::memory_order_acquire)) {
+            std::this_thread::sleep_for(std::chrono::seconds(1));
+        }
+        if (g_stop.load(std::memory_order_acquire)) break;
         // One global counter: game N is the same game at any thread count.
         const uint64_t gameId = g_nextGameId.fetch_add(1, std::memory_order_relaxed);
         if (g_gameLimit != 0 && gameId >= g_gameLimit) break;
@@ -694,6 +758,7 @@ constexpr const char* DATAGEN_USAGE =
     "  --shard N        positions per shard, 0 = one unsealed PREFIX.bin\n"
     "                   (default 50000000)\n"
     "  --seal-on-exit   seal the partial shard when the run stops\n"
+    "  --min-free-gb N  pause below N GB free on the output disk, 0 = never (default 4)\n"
     "  --first-shard N  lowest index for a new shard, past the ones uploaded and\n"
     "                   deleted here (default 0; local files and manifests count too)\n"
     "  --start MODE     standard or chess324 (default standard)\n"
@@ -722,6 +787,7 @@ struct DatagenOptions {
     std::string tbPath = "engine/syzygy/files";
     uint64_t shardSize = DEFAULT_SHARD_POSITIONS;
     int firstShard = 0;
+    uint64_t minFreeGb = 4;
     bool sealOnExit = false;
     std::string machine;
     std::string build = "unknown";
@@ -785,6 +851,9 @@ bool parseDatagenArgs(int argc, char* argv[], DatagenOptions& o) {
         } else if (flag == "--shard") {
             if (!count(0, ANY)) return false;
             o.shardSize = n;
+        } else if (flag == "--min-free-gb") {
+            if (!count(0, 1 << 20)) return false;
+            o.minFreeGb = n;
         } else if (flag == "--first-shard") {
             if (!count(0, 9999)) return false;
             o.firstShard = static_cast<int>(n);
@@ -865,6 +934,9 @@ int runDatagen(int argc, char* argv[]) {
     const std::string metaPath = outPrefix + ".meta";
     const MetaCounters resumedMeta = loadMeta(metaPath);
     if (!lockPrefix(outPrefix)) return 1;
+    g_dataDir = std::filesystem::path(outPrefix).parent_path().string();
+    if (g_dataDir.empty()) g_dataDir = ".";
+    g_minFreeBytes = opts.minFreeGb << 30;
     const std::string machine = opts.machine.empty() ? hostName() : opts.machine;
     // One "key": value per line; the shard fields are added at the seal.
     const std::string settings =
@@ -931,10 +1003,25 @@ int runDatagen(int argc, char* argv[]) {
 
     const auto start = std::chrono::steady_clock::now();
     auto lastReport = start;
+    auto lastDiskCheck = start - std::chrono::seconds(10);
     while (!g_stop.load(std::memory_order_acquire)
            && g_activeWorkers.load(std::memory_order_acquire) > 0) {
         std::this_thread::sleep_for(std::chrono::seconds(1));
         const auto now = std::chrono::steady_clock::now();
+        // A write failure pauses even with the guard off: the check resumes it.
+        const bool paused = g_diskPaused.load(std::memory_order_acquire);
+        if ((g_minFreeBytes != 0 || paused) && now - lastDiskCheck >= std::chrono::seconds(10)) {
+            lastDiskCheck = now;
+            const uint64_t free = freeBytes();
+            if (!paused && free < g_minFreeBytes) {
+                g_diskPaused.store(true, std::memory_order_release);
+                std::cout << "[datagen] PAUSED: " << free / (1 << 20) << " MB free in " << g_dataDir
+                          << ", under --min-free-gb " << opts.minFreeGb << "\n" << std::flush;
+            } else if (paused && free >= g_minFreeBytes + DISK_RESUME_MARGIN) {
+                g_diskPaused.store(false, std::memory_order_release);
+                std::cout << "[datagen] resumed: " << free / (1 << 20) << " MB free\n" << std::flush;
+            }
+        }
         if (now - lastReport < std::chrono::seconds(30)) continue;
         lastReport = now;
 
@@ -961,6 +1048,7 @@ int runDatagen(int argc, char* argv[]) {
                   << "  discarded " << fmtCount(g_discardedOpenings.load(std::memory_order_relaxed)
                                                 + g_discardedSeeds.load(std::memory_order_relaxed))
                   << "  pos/s " << static_cast<uint64_t>(rate)
+                  << (g_diskPaused.load(std::memory_order_relaxed) ? "  PAUSED (disk)" : "")
                   << "  ETA(" << fmtCount(g_targetPositions) << ") "
                   << std::round(etaDays * 10.0) / 10.0 << " days\n" << std::flush;
     }
@@ -978,7 +1066,7 @@ int runDatagen(int argc, char* argv[]) {
               << "  discarded this run: " << g_discardedOpenings.load() << " openings past "
               << OPENING_MAX_IMBALANCE_CP << " cp, " << g_discardedSeeds.load()
               << " endgame seeds without a legal position\n";
-    return 0;
+    return g_exitCode.load();
 }
 
 int runDatagenDump(int argc, char* argv[]) {
