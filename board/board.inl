@@ -97,7 +97,7 @@ inline void Board::refreshNnueAccumulator() noexcept {
                                               static_cast<uint8_t>(add[ai + k]));
             }
         }
-        NNUE::Accumulator::fusePair<S, A>(acc.v[0], acc.v[1], subRow, addRow);
+        NNUE::Accumulator::fusePair<S, A>(acc.v[0], acc.v[1], nullptr, nullptr, subRow, addRow);
     });
 }
 
@@ -186,10 +186,10 @@ inline void Board::ensureNnueAccumulatorClean() const noexcept {
                         for (int k = 0; k < A; ++k) addRow[p][k] = row(p, add[ai + k]);
                     }
                     if (first) {
-                        NNUE::Accumulator::fusePairFrom<S, A>(src.v[0], src.v[1], dst.v[0], dst.v[1], subRow, addRow);
+                        NNUE::Accumulator::fusePair<S, A, true>(dst.v[0], dst.v[1], src.v[0], src.v[1], subRow, addRow);
                         first = false;
                     } else {
-                        NNUE::Accumulator::fusePair<S, A>(dst.v[0], dst.v[1], subRow, addRow);
+                        NNUE::Accumulator::fusePair<S, A>(dst.v[0], dst.v[1], nullptr, nullptr, subRow, addRow);
                     }
                 });
             }
