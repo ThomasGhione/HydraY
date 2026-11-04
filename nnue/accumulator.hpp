@@ -43,19 +43,6 @@ struct alignas(64) Accumulator {
     uint8_t  ndelta;
     AccDelta delta[ACC_MAX_DELTAS];
 
-    // Wipes both perspectives to the bias and installs the given own-king
-    // squares (LERF, already from each perspective's view) as bases.
-    inline void resetWithKings(int wKingLerf, int bKingLerfFromBlack) noexcept {
-        const Deep::NetworkDeep& net = *activeNetwork;
-        std::memcpy(v[0], net.l0b, sizeof(net.l0b));
-        std::memcpy(v[1], net.l0b, sizeof(net.l0b));
-        base[0] = kingFeatureBase(wKingLerf);
-        base[1] = kingFeatureBase(bKingLerfFromBlack);
-        flip[0] = static_cast<uint8_t>(kingFlip(wKingLerf));
-        flip[1] = static_cast<uint8_t>(kingFlip(bKingLerfFromBlack));
-        dirty[0] = dirty[1] = false;
-    }
-
     // Both perspectives in one traversal of the rows, writing d0/d1 from
     // s0/s1 (another frame) when From, in place otherwise (s0/s1 unused).
     // int16 is modular, so the order the contributions are summed in does not
@@ -88,10 +75,6 @@ struct alignas(64) Accumulator {
         const bool isOpp = (p == 1) ? !black : black;
         const int feat768 = (isOpp ? 384 : 0) + type * 64 + sqView;
         return activeNetwork->l0w[rowBase + (feat768 ^ rowFlip)];
-    }
-
-    [[nodiscard]] inline const int16_t* featureRow(int p, uint8_t piece, uint8_t index) const noexcept {
-        return rowFor(base[p], flip[p], p, piece, index);
     }
 
     // Single-row counterpart of fusePair.

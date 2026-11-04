@@ -19,6 +19,7 @@
 // The struct mirrors the leading bytes of bullet's quantised.bin (little-endian
 // i16; l0f factoriser already merged into l0w at save).
 
+#include <array>
 #include <cstddef>
 #include <cstdint>
 
@@ -28,19 +29,24 @@ inline constexpr int INPUTS = 768;
 inline constexpr int HIDDEN = 1024;
 inline constexpr int INPUT_BUCKETS = 4;
 
-// Keep in sync with trainer.rs/sanity.rs BUCKET_LAYOUT (32-entry half-board
-// map, files a-d per rank starting at rank 1; e-h fold onto d-a). Expanded
-// here to 64 LERF squares exactly like bullet's ChessBucketsMirrored::new.
-inline constexpr uint8_t KING_BUCKET_MAP[64] = {
-    0, 0, 1, 1, 1, 1, 0, 0,
-    2, 2, 2, 2, 2, 2, 2, 2,
-    3, 3, 3, 3, 3, 3, 3, 3,
-    3, 3, 3, 3, 3, 3, 3, 3,
-    3, 3, 3, 3, 3, 3, 3, 3,
-    3, 3, 3, 3, 3, 3, 3, 3,
-    3, 3, 3, 3, 3, 3, 3, 3,
-    3, 3, 3, 3, 3, 3, 3, 3,
+// The same literal as BUCKET_LAYOUT in trainer_deep.rs, sanity.rs and
+// sanity_deep.rs: files a-d per rank, rank 1 first; e-h fold onto d-a.
+inline constexpr uint8_t BUCKET_LAYOUT[32] = {
+    0, 0, 1, 1,
+    2, 2, 2, 2,
+    3, 3, 3, 3,
+    3, 3, 3, 3,
+    3, 3, 3, 3,
+    3, 3, 3, 3,
+    3, 3, 3, 3,
+    3, 3, 3, 3,
 };
+// Expanded to the 64 LERF squares as bullet's ChessBucketsMirrored::new does.
+inline constexpr std::array<uint8_t, 64> KING_BUCKET_MAP = [] {
+    std::array<uint8_t, 64> map{};
+    for (int sq = 0; sq < 64; ++sq) map[sq] = BUCKET_LAYOUT[(sq / 8) * 4 + (sq % 8 < 4 ? sq % 8 : 7 - sq % 8)];
+    return map;
+}();
 
 // Feature base (= 768 * bucket) and file-flip mask for a perspective whose
 // own king, seen from that perspective, sits on `lerfKsq`.

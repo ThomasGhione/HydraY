@@ -16,6 +16,13 @@ namespace {
     return y * y;
 }
 
+// The linear output layer, from l1's activations to centipawns.
+[[nodiscard]] inline int32_t outputLayer(const NetworkDeep& net, const float* a1, int outputBucket) noexcept {
+    float y = net.l2b[outputBucket];
+    for (int o = 0; o < L1_SIZE; ++o) y += a1[o] * net.l2w[outputBucket][o];
+    return static_cast<int32_t>(std::lround(y * net.outputScale));
+}
+
 // CReLU + pairwise product: 1024 i16 accumulators -> 512 values in [0, QA].
 // The division by QA is integer and truncating, as in sanity_deep.rs.
 inline void pairwise(const int16_t* acc, int32_t* out) noexcept {
@@ -46,12 +53,7 @@ int32_t forwardScalar(const NetworkDeep& net,
         a1[o] = screlu(static_cast<float>(sum) / static_cast<float>(QA * QB)
                        + net.l1b[outputBucket][o]);
     }
-
-    float y = net.l2b[outputBucket];
-    for (int o = 0; o < L1_SIZE; ++o) {
-        y += a1[o] * net.l2w[outputBucket][o];
-    }
-    return static_cast<int32_t>(std::lround(y * net.outputScale));
+    return outputLayer(net, a1, outputBucket);
 }
 
 // ---------------------------------------------------------------------------
@@ -140,7 +142,7 @@ inline void activate(const int32_t* sums, const float* bias, float* out) noexcep
         _mm256_store_ps(out + o, _mm256_mul_ps(z, z));
     }
 }
-static_assert(L1_SIZE % 8 == 0, "activate lavora a otto uscite per volta");
+static_assert(L1_SIZE % 8 == 0, "activate works eight outputs at a time");
 
 } // namespace
 #endif // __AVX2__
@@ -290,7 +292,7 @@ int32_t forwardSimd(const NetworkDeep& net,
         _mm256_store_si256(reinterpret_cast<__m256i*>(sums), lo);
         _mm256_store_si256(reinterpret_cast<__m256i*>(sums + 8), hi);
     }
-    static_assert(L1_SIZE == 16, "il percorso sparso usa due accumulatori da otto corsie");
+    static_assert(L1_SIZE == 16, "the sparse path keeps two accumulators of eight lanes");
 #else
     // Without VNNI: i16 lanes, with the weights already widened at load time
     // (see l1w16 in loadFromMemory) to drop a cvtepi8_epi16 from the inner loop.
@@ -328,12 +330,7 @@ int32_t forwardSimd(const NetworkDeep& net,
 
     alignas(32) float a1[L1_SIZE];
     activate(sums, net.l1b[outputBucket], a1);
-
-    float y = net.l2b[outputBucket];
-    for (int o = 0; o < L1_SIZE; ++o) {
-        y += a1[o] * net.l2w[outputBucket][o];
-    }
-    return static_cast<int32_t>(std::lround(y * net.outputScale));
+    return outputLayer(net, a1, outputBucket);
 #endif
 }
 

@@ -20,22 +20,6 @@
 
 namespace NNUE::Deep::tools {
 
-constexpr int BUCKET_LAYOUT[32] = {
-    0, 0, 1, 1,
-    2, 2, 2, 2,
-    3, 3, 3, 3,
-    3, 3, 3, 3,
-    3, 3, 3, 3,
-    3, 3, 3, 3,
-    3, 3, 3, 3,
-    3, 3, 3, 3,
-};
-
-int kingBucket(int ksq) {
-    static constexpr int FILE_FOLD[8] = {0, 1, 2, 3, 3, 2, 1, 0};
-    return BUCKET_LAYOUT[(ksq / 8) * 4 + FILE_FOLD[ksq % 8]];
-}
-
 struct Piece { int type; bool black; int sq; };
 
 // False on a malformed FEN (a missing king).
@@ -69,8 +53,8 @@ bool accumulate(const NetworkDeep& net, const std::string& fen,
 
     const auto params = [&](bool fromBlackView, int& base, int& flip) {
         const int own = fromBlackView ? (bk ^ 56) : wk;
-        flip = (own % 8) > 3 ? 7 : 0;
-        base = INPUTS * kingBucket(own);
+        flip = kingFlip(own);
+        base = kingFeatureBase(own);
     };
     int usBase, usFlip, themBase, themFlip;
     params(blackToMove, usBase, usFlip);
@@ -119,10 +103,10 @@ static_assert(sizeof(Record) == 32, "must match bulletformat::ChessBoard");
 // collapses away. holdoutloss --selfcheck holds the two paths against each other.
 template<class F>
 int forEachFeature(const Record& r, F&& f) {
-    const int usFlip   = (r.ksq & 7) > 3 ? 7 : 0;
-    const int usBase   = INPUTS * kingBucket(r.ksq);
-    const int themFlip = (r.oppKsq & 7) > 3 ? 7 : 0;
-    const int themBase = INPUTS * kingBucket(r.oppKsq);
+    const int usFlip   = kingFlip(r.ksq);
+    const int usBase   = kingFeatureBase(r.ksq);
+    const int themFlip = kingFlip(r.oppKsq);
+    const int themBase = kingFeatureBase(r.oppKsq);
     uint64_t occ = r.occ;
     int idx = 0;
     while (occ != 0) {

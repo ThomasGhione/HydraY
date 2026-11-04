@@ -200,9 +200,46 @@ bool Board::hasInsufficientMaterialDraw() const noexcept {
         || (std::popcount(bMinors) <= 1 && wMinors == 0ULL);
 }
 
+namespace {
+
+// Perspective p's own king square from its own view: lerf for white, lerf ^ 56
+// for black, which folds back to the engine index.
+int ownKingView(const Board& b, int p) noexcept {
+    const int engineKing = std::countr_zero(b.bb[Board::KING][p]);
+    return (p == 1) ? engineKing : (engineKing ^ 56);
+}
+
+// Brings row, perspective p's values for the pieces in `cached` (by colour and
+// type - 1), to the pieces of b, and cached with it. The diff is collected
+// first and applied in chunks: a board holds at most 64 pieces, so neither
+// side of it can exceed that.
+__attribute__((always_inline))
+inline void syncRow(const Board& b, int16_t* row, uint64_t (&cached)[2][6], int p, int rowBase, int rowFlip) noexcept {
+    const int16_t* sub[64];
+    const int16_t* add[64];
+    int ns = 0;
+    int na = 0;
+    for (int c = 0; c < 2; ++c) {
+        for (int t = 0; t < 6; ++t) {
+            const uint8_t piece = static_cast<uint8_t>((c == 0 ? Board::WHITE : Board::BLACK) | (t + 1));
+            uint64_t added   = b.bb[t + 1][c] & ~cached[c][t];
+            uint64_t removed = cached[c][t] & ~b.bb[t + 1][c];
+            while (added)
+                add[na++] = NNUE::Accumulator::rowFor(rowBase, rowFlip, p, piece, static_cast<uint8_t>(pieces::popLSB(added)));
+            while (removed)
+                sub[ns++] = NNUE::Accumulator::rowFor(rowBase, rowFlip, p, piece, static_cast<uint8_t>(pieces::popLSB(removed)));
+            cached[c][t] = b.bb[t + 1][c];
+        }
+    }
+    NNUE::Accumulator::applyRows(row, sub, ns, add, na);
+}
+
+} // namespace
+
 // From-scratch rebuild of the current frame, which becomes the oldest one of
-// the line. rebuildBitboardsFromSquares sets the bitboards directly (NOT
-// through addPieceToBB), so bulk rebuilds land here once at the end.
+// the line: a diff from the empty board, whose values are the bias.
+// rebuildBitboardsFromSquares sets the bitboards directly (NOT through
+// addPieceToBB), so bulk rebuilds land here once at the end.
 void Board::refreshNnueAccumulator() noexcept {
     if (NNUE::activeNetwork == nullptr) return;
     accFloor = accTop;
@@ -212,26 +249,15 @@ void Board::refreshNnueAccumulator() noexcept {
     // is guarded upstream by the kings-missing check.
     acc.dirty[0] = acc.dirty[1] = true;
     if (bb[KING][0] == 0 || bb[KING][1] == 0) return;
-    const int wKingLerf      = std::countr_zero(bb[KING][0]) ^ 56;
-    const int bKingLerfView  = std::countr_zero(bb[KING][1]); // lerf ^ 56
-    acc.resetWithKings(wKingLerf, bKingLerfView);
-    uint16_t add[64];   // piece << 8 | square
-    int na = 0;
-    for (uint8_t index = 0; index < 64; ++index) {
-        const uint8_t piece = get(index);
-        if (piece != EMPTY) add[na++] = static_cast<uint16_t>(piece << 8 | index);
+    for (int p = 0; p < 2; ++p) {
+        const int view = ownKingView(*this, p);
+        acc.base[p] = NNUE::kingFeatureBase(view);
+        acc.flip[p] = static_cast<uint8_t>(NNUE::kingFlip(view));
+        acc.dirty[p] = false;
+        uint64_t empty[2][6] = {};
+        std::memcpy(acc.v[p], NNUE::activeNetwork->l0b, sizeof(acc.v[p]));
+        syncRow(*this, acc.v[p], empty, p, acc.base[p], acc.flip[p]);
     }
-    NNUE::Accumulator::forEachPass(0, na, [&]<int S, int A>(int, int ai) {
-        const int16_t* subRow[2][2] = {};
-        const int16_t* addRow[2][2];
-        for (int p = 0; p < 2; ++p) {
-            for (int k = 0; k < A; ++k) {
-                addRow[p][k] = acc.featureRow(p, static_cast<uint8_t>(add[ai + k] >> 8),
-                                              static_cast<uint8_t>(add[ai + k]));
-            }
-        }
-        NNUE::Accumulator::fusePair<S, A>(acc.v[0], acc.v[1], nullptr, nullptr, subRow, addRow);
-    });
 }
 
 // Computes the current frame. Its nearest computed ancestor, at most
@@ -253,10 +279,7 @@ void Board::ensureNnueAccumulatorClean() const noexcept {
     int rowBase[2];
     int rowFlip[2];
     for (int p = 0; p < 2; ++p) {
-        // Own king square from this perspective's view: lerf for white,
-        // lerf ^ 56 for black - which folds back to the raw engine index.
-        const int engineKing = std::countr_zero(bb[KING][p]);
-        kingView[p] = (p == 1) ? engineKing : (engineKing ^ 56);
+        kingView[p] = ownKingView(*this, p);
         rowBase[p] = NNUE::kingFeatureBase(kingView[p]);
         rowFlip[p] = NNUE::kingFlip(kingView[p]);
     }
@@ -376,28 +399,7 @@ void Board::ensureNnueAccumulatorClean() const noexcept {
         if (usable[p]) continue;
         finny.ensureInitialised();
         NNUE::FinnyEntry& e = finny.entry[p][NNUE::KING_BUCKET_MAP[kingView[p]]][rowFlip[p] ? 1 : 0];
-
-        // Collect the diff first and apply it in chunks: a board holds at most
-        // 64 pieces, so neither side of the diff can exceed that.
-        const int16_t* sub[64];
-        const int16_t* add[64];
-        int ns = 0;
-        int na = 0;
-        for (int c = 0; c < 2; ++c) {
-            for (int t = 0; t < 6; ++t) {
-                const uint8_t piece = static_cast<uint8_t>((c == 0 ? 0x8 : 0) | (t + 1));
-                uint64_t added   = bb[t + 1][c] & ~e.bb[c][t];
-                uint64_t removed = e.bb[c][t] & ~bb[t + 1][c];
-                while (added)
-                    add[na++] = NNUE::Accumulator::rowFor(rowBase[p], rowFlip[p], p, piece,
-                                                          static_cast<uint8_t>(pieces::popLSB(added)));
-                while (removed)
-                    sub[ns++] = NNUE::Accumulator::rowFor(rowBase[p], rowFlip[p], p, piece,
-                                                          static_cast<uint8_t>(pieces::popLSB(removed)));
-                e.bb[c][t] = bb[t + 1][c];
-            }
-        }
-        NNUE::Accumulator::applyRows(e.v, sub, ns, add, na);
+        syncRow(*this, e.v, e.bb, p, rowBase[p], rowFlip[p]);
         std::memcpy(top.v[p], e.v, sizeof(e.v));
     }
 }
