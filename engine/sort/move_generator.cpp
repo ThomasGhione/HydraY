@@ -56,34 +56,26 @@ inline void appendPawnTargets(const Board& b, MoveList& moves, int from, uint64_
     }
 }
 
-// Pushes and captures; `evasionMask` is ~0 outside single check.
-template<bool IsWhite>
+// Pushes and captures, or with Tactical only the captures and the pushes that
+// promote; `evasionMask` is ~0 outside single check. En passant skips the pin
+// ray: appendPawnTargets checks it in full.
+template<bool IsWhite, bool Tactical>
 inline void appendPawnMoves(const Board& b, MoveList& moves, const SideView<IsWhite>& v,
                             uint64_t evasionMask, uint64_t pinnedMask, const uint64_t* pinRays) noexcept {
-    uint64_t pawns = v.pawns;
-    while (pawns) {
-        const int from = pieces::popLSB(pawns);
-        const uint64_t ep = (pieces::PAWN_ATTACKS[v.side][from] & v.enPassantBit) ? v.enPassantBit : 0ULL;
-        uint64_t mask = (pieces::getPawnForwardPushes(from, IsWhite, v.occ)
-                         | (pieces::PAWN_ATTACKS[v.side][from] & v.oppOcc) | ep) & evasionMask;
-        if (pinnedMask & (1ULL << from)) mask &= pinRays[from];
-        appendPawnTargets<IsWhite>(b, moves, from, mask | ep, v.enPassant);
-    }
-}
-
-// Captures, en passant and the pushes that promote.
-template<bool IsWhite>
-inline void appendPawnTactical(const Board& b, MoveList& moves, const SideView<IsWhite>& v,
-                               uint64_t pinnedMask, const uint64_t* pinRays) noexcept {
     constexpr int push = IsWhite ? -8 : 8;
     uint64_t pawns = v.pawns;
     while (pawns) {
         const int from = pieces::popLSB(pawns);
-        uint64_t attacks = pieces::PAWN_ATTACKS[v.side][from] & (v.oppOcc | v.enPassantBit);
-        if (chess::rank(from) == (IsWhite ? 1 : 6) && !(v.occ & (1ULL << (from + push))))
-            attacks |= 1ULL << (from + push);
-        if (pinnedMask & (1ULL << from)) attacks &= pinRays[from];
-        appendPawnTargets<IsWhite>(b, moves, from, attacks, v.enPassant);
+        const uint64_t attacks = pieces::PAWN_ATTACKS[v.side][from];
+        uint64_t mask = attacks & v.oppOcc;
+        if constexpr (Tactical) {
+            if (chess::rank(from) == (IsWhite ? 1 : 6) && !(v.occ & (1ULL << (from + push))))
+                mask |= 1ULL << (from + push);
+        } else {
+            mask = (mask | pieces::getPawnForwardPushes(from, IsWhite, v.occ)) & evasionMask;
+        }
+        if (pinnedMask & (1ULL << from)) mask &= pinRays[from];
+        appendPawnTargets<IsWhite>(b, moves, from, mask | (attacks & v.enPassantBit), v.enPassant);
     }
 }
 
@@ -169,8 +161,9 @@ uint64_t computePinRays(const Board& b, int kingSq, uint64_t pinRays[64]) noexce
     return pinnedMask;
 }
 
-template<bool IsWhite>
-MoveList generateLegalMovesFor(const Board& b, uint64_t checkers) noexcept {
+// All legal moves, or with Tactical (never in check) the captures and promotions.
+template<bool IsWhite, bool Tactical>
+MoveList generateMovesFor(const Board& b, uint64_t checkers) noexcept {
     MoveList moves;
     const SideView<IsWhite> v(b);
     const bool inCheck = (checkers != 0ULL);
@@ -183,47 +176,38 @@ MoveList generateLegalMovesFor(const Board& b, uint64_t checkers) noexcept {
         ? (checkers | BETWEEN[kingFrom][std::countr_zero(checkers)])
         : ~0ULL;
 
-    uint64_t mask = pieces::KING_ATTACKS[kingFrom] & ~v.ownOcc;
-    if (mask & (mask - 1)) {
-        // Two or more king steps: one attack map is cheaper than a scan per step.
-        mask &= ~enemyAttacks<IsWhite>(b, v.occ ^ v.kings);
-        while (mask) moves.emplace_back(kingFrom, pieces::popLSB(mask));
-    } else if (mask) {
-        const int to = std::countr_zero(mask);
-        if (b.isLegalPseudoMove(kingFrom, to, kingPiece)) moves.emplace_back(kingFrom, to);
-    }
+    if constexpr (!Tactical) {
+        uint64_t mask = pieces::KING_ATTACKS[kingFrom] & ~v.ownOcc;
+        if (mask & (mask - 1)) {
+            // Two or more king steps: one attack map is cheaper than a scan per step.
+            mask &= ~enemyAttacks<IsWhite>(b, v.occ ^ v.kings);
+            while (mask) moves.emplace_back(kingFrom, pieces::popLSB(mask));
+        } else if (mask) {
+            const int to = std::countr_zero(mask);
+            if (b.isLegalPseudoMove(kingFrom, to, kingPiece)) moves.emplace_back(kingFrom, to);
+        }
 
-    if (!inCheck) { // castling: illegal when in check.
-        const int f = chess::file(kingFrom);
-        if (f <= 5 && b.isLegalPseudoMove(kingFrom, kingFrom + 2, kingPiece)) moves.emplace_back(kingFrom, kingFrom + 2);
-        if (f >= 2 && b.isLegalPseudoMove(kingFrom, kingFrom - 2, kingPiece)) moves.emplace_back(kingFrom, kingFrom - 2);
+        if (!inCheck) { // castling: illegal when in check.
+            const int f = chess::file(kingFrom);
+            if (f <= 5 && b.isLegalPseudoMove(kingFrom, kingFrom + 2, kingPiece)) moves.emplace_back(kingFrom, kingFrom + 2);
+            if (f >= 2 && b.isLegalPseudoMove(kingFrom, kingFrom - 2, kingPiece)) moves.emplace_back(kingFrom, kingFrom - 2);
+        }
+        if (inDoubleCheck) return moves; // only the king can move
     }
-    if (inDoubleCheck) return moves; // only the king can move
 
     // Read only where pinnedMask has a bit, so left uninitialised.
     uint64_t pinRays[64];
     const uint64_t pinnedMask = (v.ownOcc ^ v.kings) ? computePinRays<IsWhite>(b, kingFrom, pinRays) : 0ULL;
-    appendPawnMoves<IsWhite>(b, moves, v, evasionMask, pinnedMask, pinRays);
-    appendAllPieceMoves<IsWhite>(moves, v, ~v.ownOcc & evasionMask, pinnedMask, pinRays);
-    return moves;
-}
+    appendPawnMoves<IsWhite, Tactical>(b, moves, v, evasionMask, pinnedMask, pinRays);
+    appendAllPieceMoves<IsWhite>(moves, v, (Tactical ? v.oppOcc : ~v.ownOcc) & evasionMask, pinnedMask, pinRays);
 
-template<bool IsWhite>
-MoveList generateTacticalMovesFor(const Board& b) noexcept {
-    MoveList moves;
-    const SideView<IsWhite> v(b);
-    const int kingSq = std::countr_zero(v.kings);
-
-    uint64_t pinRays[64];
-    const uint64_t pinnedMask = (v.ownOcc ^ v.kings) ? computePinRays<IsWhite>(b, kingSq, pinRays) : 0ULL;
-    appendPawnTactical<IsWhite>(b, moves, v, pinnedMask, pinRays);
-    appendAllPieceMoves<IsWhite>(moves, v, v.oppOcc, pinnedMask, pinRays);
-
-    // A king cannot be pinned, but it may not capture a defended piece.
-    uint64_t kingCaptures = pieces::KING_ATTACKS[kingSq] & v.oppOcc;
-    while (kingCaptures) {
-        const int to = pieces::popLSB(kingCaptures);
-        if (b.isLegalPseudoMove(kingSq, to, Board::KING | v.color)) moves.emplace_back(kingSq, to);
+    if constexpr (Tactical) {
+        // A king cannot be pinned, but it may not capture a defended piece.
+        uint64_t kingCaptures = pieces::KING_ATTACKS[kingFrom] & v.oppOcc;
+        while (kingCaptures) {
+            const int to = pieces::popLSB(kingCaptures);
+            if (b.isLegalPseudoMove(kingFrom, to, kingPiece)) moves.emplace_back(kingFrom, to);
+        }
     }
     return moves;
 }
@@ -231,13 +215,13 @@ MoveList generateTacticalMovesFor(const Board& b) noexcept {
 } // namespace
 
 MoveList generateLegalMoves(const Board& b, uint64_t checkers) noexcept {
-    return (b.getActiveColor() == Board::WHITE) ? generateLegalMovesFor<true>(b, checkers)
-                                                : generateLegalMovesFor<false>(b, checkers);
+    return (b.getActiveColor() == Board::WHITE) ? generateMovesFor<true, false>(b, checkers)
+                                                : generateMovesFor<false, false>(b, checkers);
 }
 
 MoveList generateTacticalMoves(const Board& b) noexcept {
-    return (b.getActiveColor() == Board::WHITE) ? generateTacticalMovesFor<true>(b)
-                                                : generateTacticalMovesFor<false>(b);
+    return (b.getActiveColor() == Board::WHITE) ? generateMovesFor<true, true>(b, 0)
+                                                : generateMovesFor<false, true>(b, 0);
 }
 
 MovePicker generateQSearchEvasions(const Board& b, uint64_t checkers) noexcept {
