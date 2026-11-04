@@ -298,85 +298,20 @@ Inspect a file with `./chess datagen-dump <file.bin> [count]`.
 
 #### In Docker
 
-The image runs the datagen on any machine with Docker and an AVX2 + BMI2 CPU,
-and can upload the sealed shards to a Hugging Face dataset as they come.
-
-**Start (Docker Compose).** The settings are in `docker/compose.yaml`: the
-`command:` list holds the `./chess datagen` flags (`--nodes`, `--threads`,
-...), `user:` the owner of the files (`id -u`:`id -g`), the volumes the data
-folder (`data/` at the repository root) and the optional tablebases.
-`docker/.env`, ignored by git, holds only the token. From the repository root:
+`docker/` runs the datagen in a container on any machine with an AVX2 + BMI2
+CPU, and can upload the sealed shards to a Hugging Face dataset as they come
+(checked by SHA-256, never overwriting, one folder per machine). From the
+repository root:
 
 ```sh
 cp docker/.env.example docker/.env     # HF_TOKEN=..., only for the upload
 docker compose -f docker/compose.yaml up -d --build
-docker compose -f docker/compose.yaml logs -f      # progress, seals, uploads
-docker compose -f docker/compose.yaml down         # stop: shard sealed and uploaded
+docker compose -f docker/compose.yaml logs -f
+docker compose -f docker/compose.yaml down
 ```
 
-The prefix needs no setting: it is `m` plus 8 hex digits of the hash of the
-host's `/etc/machine-id`, stable across restarts and different on every
-machine, and the engine version, as in `m956ee98b-v4.3.1.s0000.bin`: a new
-version starts new names (`--out=/data/NAME` overrides it). Data that changes
-without a version bump (a retuned search, a new net) is told apart by the
-manifests. The host name and the build
-(version, a hash of the sources, the ISA; the commit when the build gets
-`GIT_COMMIT=$(git rev-parse --short HEAD)` in the environment) go in every
-manifest.
-
-The service restarts by itself after a crash or a reboot and resumes where it
-stopped (`down` stops it for good). The threads default to every CPU of the
-machine. `--games` does not fit it, since the run would restart when it ends:
-for a fixed batch use `docker compose -f docker/compose.yaml run --rm datagen
---games=1000` (the arguments of `run` replace `command:`).
-
-**Upload.** Uncomment `--hf-repo=USER/NAME` in `command:` (the dataset is
-created private if missing) and, to free the disk, `--delete-after-upload`.
-Every sealed shard goes with its manifest, in one commit, to the machine's
-folder in the dataset (`m956ee98b/`, every version inside), and counts as uploaded only once the Hub reports its
-SHA-256; only then is the local shard deleted. The manifest stays (a few
-hundred bytes), and at the start the datagen continues the numbering after
-the last shard in the dataset, so even an emptied `data/` never reuses a
-name. Nothing on the Hub is overwritten: a name already there with other
-content is reported as `CONFLICT` and left alone on both sides.
-
-`OWNER` in the folder names the machine that writes it: a second machine on
-the same folder is refused at the start, before it generates anything. Run
-one datagen per machine: a second one, from another `data/`, needs its own
-`--out` and `--hf-subdir`. After each upload `index.jsonl` lists the folder's
-manifests and
-`README.md`, the dataset card, sums up every folder: machine, shards,
-positions, nodes, start, net, build and dates. The token, the dataset and
-the owner are checked before the datagen starts. At the stop a last pass
-uploads the shard sealed at exit (`stop_grace_period` gives it 10 minutes);
-anything left goes up at the next start. With `--delete-after-upload` a full
-disk sorts itself out: the datagen pauses with 4 GB still free, room the
-uploader needs, and resumes as uploaded shards are deleted. Without it the
-datagen stays paused until space is freed by hand. The container logs are
-capped at 30 MB.
-
-**Plain `docker run`.** The container takes the flags of `./chess datagen`
-after its defaults, the machine-id prefix (mount `/etc/machine-id` at
-`/host/machine-id`, or give `--out`) and `--threads` = the CPUs it may use
-(`--cpus` included), plus the upload flags `--hf-repo USER/NAME`,
-`--hf-subdir DIR` (default: the machine hash, else the `--out` name), `--hf-every SECONDS` (600) and
-`--delete-after-upload`:
-
-```sh
-docker build -f docker/Dockerfile -t hydray-datagen .
-docker run -d --name datagen --init --user "$(id -u):$(id -g)" -e HF_TOKEN \
-    -v "$PWD/data:/data" \
-    -v "$PWD/engine/syzygy/files:/hydray/engine/syzygy/files:ro" \
-    -v /etc/machine-id:/host/machine-id:ro -v /etc/hostname:/host/hostname:ro \
-    hydray-datagen --nodes 8000 --seal-on-exit \
-    --hf-repo user/hydray-data --delete-after-upload
-docker stop -t 600 datagen
-docker run --rm -v "$PWD/data:/data" hydray-datagen dump /data/<prefix>.s0000.bin 5
-```
-
-The uploader also runs without Docker:
-`nnue/tools/hf_upload.py --data data --repo user/hydray-data --once` (needs
-`pip install huggingface_hub`).
+The settings are in `docker/compose.yaml`; [docker/README.md](docker/README.md)
+covers them, the upload, the file names, disk space and plain `docker run`.
 
 ### Training
 
