@@ -37,17 +37,9 @@ void rebuildSearchDerivedTables() noexcept {
             LMR_REDUCTIONS[d][m] = static_cast<int8_t>(std::max(1, static_cast<int>(raw)));
         }
     }
-    for (int d = 1; d <= FUTILITY_DEPTH_CAP; ++d) {
-        FUTILITY_MARGINS[d] = FUTILITY_MID_STEP * d;
-    }
-    for (int improving = 0; improving < 2; ++improving) {
-        for (int d = 1; d <= LMP_DEPTH_CAP; ++d) {
-            LMP_THRESHOLDS[improving][d] = lmpBaseThreshold(improving, d) * LMP_SCALE_PCT[improving] / 100;
-        }
-    }
 }
 
-// Built once at startup; the UCI layer rebuilds after writing a generator spin.
+// Built once at startup; the UCI layer rebuilds after writing LMR_C_PERCENT.
 [[maybe_unused]] static const bool searchTablesBuilt = (rebuildSearchDerivedTables(), true);
 
 namespace Searcher {
@@ -57,10 +49,16 @@ using chess::Move;
 
 namespace {
 
-// A missing king (reachable only from an illegal FEN) is decisive, not an eval.
+// A king can only vanish after an illegal FEN: losing ours is a mate, taking
+// theirs a win. 0 while both kings stand.
+int32_t missingKingScore(const Board& b, int ply) noexcept {
+    if (b.bb[Board::KING][0] != 0 && b.bb[Board::KING][1] != 0) [[likely]] return 0;
+    return ((b.bb[Board::KING][0] == 0) == (b.getActiveColor() == Board::WHITE)) ? -MATE_VALUE + ply : MATE_VALUE - ply;
+}
+
+// A missing king is decisive, not an eval.
 int32_t evaluate(const Board& b) noexcept {
-    if (b.bb[Board::KING][0] == 0 || b.bb[Board::KING][1] == 0) [[unlikely]]
-        return ((b.bb[Board::KING][0] == 0) == (b.getActiveColor() == Board::WHITE)) ? -MATE_VALUE : MATE_VALUE;
+    if (const int32_t score = missingKingScore(b, 0); score != 0) [[unlikely]] return score;
     return NNUE::evaluate(b);
 }
 
@@ -71,6 +69,41 @@ int32_t cachedEval(uint64_t hashKey, Board& b) noexcept {
     const int32_t value = evaluate(b);
     evalCache.store(hashKey, value);
     return value;
+}
+
+// Whether a bound of this flag proves a cutoff for the [alpha, beta] window.
+constexpr bool ttBoundCutoff(uint8_t flag, int32_t score, int32_t alpha, int32_t beta) noexcept {
+    return flag == TT::Entry::EXACT
+        || (flag == TT::Entry::LOWERBOUND && score >= beta)
+        || (flag == TT::Entry::UPPERBOUND && score <= alpha);
+}
+
+// Mate and TB scores carry their ply distance; rebase them on TT store/load.
+// |score| <= MATE_VALUE and ply <= MAX_PLY keep the result inside int16_t.
+constexpr int32_t scoreToTT(int32_t score, int ply) noexcept {
+    if (score >= TB_WIN_BOUND)  return score + ply;
+    if (score <= -TB_WIN_BOUND) return score - ply;
+    return score;
+}
+
+constexpr int32_t scoreFromTT(int32_t score, int ply) noexcept {
+    return scoreToTT(score, -ply);
+}
+
+// The static eval of a node not in check: raw (from the TT entry or the eval
+// cache), corrected by the correction history, and the value the pruning
+// reads, which a TT bound that proves the corrected eval wrong replaces (an
+// equal one changes nothing).
+struct NodeEval { int32_t raw, corrected, value; };
+
+__attribute__((always_inline))
+inline NodeEval nodeEval(Board& b, SearchRuntime& runtime, const TT::ProbeResult& tte, int ply) noexcept {
+    const int32_t raw = (tte.hit && tte.staticEval != TT::Entry::NO_EVAL) ? tte.staticEval
+                                                                          : cachedEval(b.getHash(), b);
+    const int32_t corrected = std::clamp(raw + runtime.corrHist.correction(b), -TB_WIN_BOUND + 1, TB_WIN_BOUND - 1);
+    const int32_t ttScore = scoreFromTT(tte.score, ply);
+    const bool replaced = tte.hit && ttBoundCutoff(tte.flag, ttScore, corrected, corrected);
+    return {raw, corrected, replaced ? std::clamp(ttScore, -TB_WIN_BOUND + 1, TB_WIN_BOUND - 1) : corrected};
 }
 
 // "Level enough that a repetition is acceptable": half a pawn, converted to
@@ -115,25 +148,6 @@ bool skipToLosingCaptures(MovePicker& picker, const Board& b,
     return true;
 }
 
-// Mate and TB scores carry their ply distance; rebase them on TT store/load.
-// |score| <= MATE_VALUE and ply <= MAX_PLY keep the result inside int16_t.
-constexpr int32_t scoreToTT(int32_t score, int ply) noexcept {
-    if (score >= TB_WIN_BOUND)  return score + ply;
-    if (score <= -TB_WIN_BOUND) return score - ply;
-    return score;
-}
-
-constexpr int32_t scoreFromTT(int32_t score, int ply) noexcept {
-    return scoreToTT(score, -ply);
-}
-
-// Whether a bound of this flag proves a cutoff for the [alpha, beta] window.
-constexpr bool ttBoundCutoff(uint8_t flag, int32_t score, int32_t alpha, int32_t beta) noexcept {
-    return flag == TT::Entry::EXACT
-        || (flag == TT::Entry::LOWERBOUND && score >= beta)
-        || (flag == TT::Entry::UPPERBOUND && score <= alpha);
-}
-
 // delta > 0 is a bonus, delta < 0 a malus; the decay scales with |delta|.
 void applyHistoryGravity(int16_t& cell, int32_t delta, int32_t maxValue) noexcept {
     const int32_t value = cell + delta - cell * std::abs(delta) / maxValue;
@@ -162,14 +176,8 @@ inline bool enterNode(Board& b, SearchRuntime& runtime, int ply, int32_t& outSco
         outScore = evaluate(b);
         return true;
     }
-    // A king can only vanish after an illegal FEN: losing ours is a mate,
-    // taking theirs a win.
-    if (b.bb[Board::KING][0] == 0 || b.bb[Board::KING][1] == 0) {
-        const bool ourKingGone = (b.bb[Board::KING][0] == 0) == (b.getActiveColor() == Board::WHITE);
-        outScore = ourKingGone ? (-MATE_VALUE + ply) : (MATE_VALUE - ply);
-        return true;
-    }
-    return false;
+    outScore = missingKingScore(b, ply);
+    return outScore != 0;
 }
 
 // Lazy SMP helper state, one slot per helper thread, kept across searches so
@@ -349,9 +357,9 @@ SearchMoveResult searchMoves(Board& b, MovePicker& movePicker, const SearchConte
     // Interior non-PV node past the root: the gate for futility, LMP, history and SEE pruning.
     const bool interiorNonPv = !ctx.isPVNode && !ctx.inCheck && ctx.ply > 0;
     const bool canFutilityPrune = interiorNonPv && ctx.depth >= 1 && ctx.depth <= FUTILITY_MAX_DEPTH;
-    const int32_t futilityMargin = canFutilityPrune ? FUTILITY_MARGINS[ctx.depth] : 0;
+    const int32_t futilityMargin = canFutilityPrune ? FUTILITY_MID_STEP * ctx.depth : 0;
     const bool canLMP = interiorNonPv && ctx.depth >= 1 && ctx.depth <= LMP_MAX_DEPTH;
-    const int lmpThreshold = canLMP ? LMP_THRESHOLDS[ctx.improving][ctx.depth] : 999;
+    const int lmpLimit = canLMP ? lmpThreshold(ctx.improving, ctx.depth) : 999;
 
     const int usSide = Board::colorToIndex(ctx.activeColor);
     const int oppKingSq = std::countr_zero(b.bb[Board::KING][usSide ^ 1]);
@@ -374,7 +382,7 @@ SearchMoveResult searchMoves(Board& b, MovePicker& movePicker, const SearchConte
         const MoveTraits t = moveTraits(b, m, enPassant, promotionRank);
         const bool isQuietMove = !t.isCapture && !t.isPromotion;
 
-        if (canLMP && isQuietMove && moveIndex >= lmpThreshold) {
+        if (canLMP && isQuietMove && moveIndex >= lmpLimit) {
             if constexpr (kSearchStats) ++gSearchStats.prunedLmp;
             prunedAny = true;
             if (!lmpSkipTried) {
@@ -627,21 +635,8 @@ int32_t searchPosition(Board& b, SearchRuntime& runtime, int depth, int32_t alph
     // The raw eval goes back into the TT, so a later visit skips the forward
     // pass (NO_EVAL in check). The correction history learns against the
     // corrected eval; the pruning gates read staticEval, tightened by the TT.
-    int32_t rawStaticEval = TT::Entry::NO_EVAL;
-    int32_t correctedEval = 0;
-    int32_t staticEval = 0;
-    if (!inCheck) {
-        rawStaticEval = (tte.hit && tte.staticEval != TT::Entry::NO_EVAL) ? tte.staticEval
-                                                                          : cachedEval(hashKey, b);
-        correctedEval = std::clamp(rawStaticEval + runtime.corrHist.correction(b),
-                                   -TB_WIN_BOUND + 1, TB_WIN_BOUND - 1);
-        staticEval = correctedEval;
-        // A TT bound that proves the eval wrong replaces it (an equal one changes nothing).
-        if (tte.hit && ttBoundCutoff(tte.flag, scoreFromTT(tte.score, ply), staticEval, staticEval)) {
-            staticEval = scoreFromTT(tte.score, ply);
-        }
-        staticEval = std::clamp(staticEval, -TB_WIN_BOUND + 1, TB_WIN_BOUND - 1);
-    }
+    const NodeEval eval = inCheck ? NodeEval{TT::Entry::NO_EVAL, 0, 0} : nodeEval(b, runtime, tte, ply);
+    const int32_t staticEval = eval.value;
 
     // In check there is no static eval: the sentinel keeps a stale value out of
     // the comparison two plies down, where the same side is to move.
@@ -778,8 +773,8 @@ int32_t searchPosition(Board& b, SearchRuntime& runtime, int depth, int32_t alph
         const bool bestIsCapture = raisedAlpha
             && moveTraits(b, result.move, b.getEnPassant(), Board::promotionRank(activeColor == Board::WHITE)).isCapture;
         const int32_t target = (!raisedAlpha && result.pruned) ? alpha : best;
-        if (!bestIsCapture && (target > correctedEval) == raisedAlpha) {
-            const int64_t step = int64_t{target - correctedEval} * depth
+        if (!bestIsCapture && (target > eval.corrected) == raisedAlpha) {
+            const int64_t step = int64_t{target - eval.corrected} * depth
                                * (raisedAlpha ? CORR_BONUS_RATE_RAISED : CORR_BONUS_RATE) / 1280;
             const int32_t bonus = static_cast<int32_t>(std::clamp<int64_t>(step, -CORR_BONUS_CAP, CORR_BONUS_CAP));
             const CorrectionHistory::Cells cells = runtime.corrHist.cellsFor(b);
@@ -796,7 +791,7 @@ int32_t searchPosition(Board& b, SearchRuntime& runtime, int depth, int32_t alph
     if (!hasExcludedMove) {
         const auto flag = determineFlag(best, alpha, beta);
         tt.store(hashKey, static_cast<uint8_t>(depth), scoreToTT(best, ply), static_cast<uint8_t>(flag),
-                 flag == TT::Entry::UPPERBOUND ? 0 : TT::Entry::encodeMove(result.move), rawStaticEval);
+                 flag == TT::Entry::UPPERBOUND ? 0 : TT::Entry::encodeMove(result.move), eval.raw);
     }
     return best;
 }
@@ -830,13 +825,9 @@ int32_t quiescenceSearch(Board& b, SearchRuntime& runtime, int32_t alpha, int32_
     if (!inCheck) {
         // The probe above pulled this bucket into cache, so a recorded eval is
         // free here, where 50-80% of all nodes are.
-        rawStaticEval = (tte.hit && tte.staticEval != TT::Entry::NO_EVAL) ? tte.staticEval
-                                                                          : cachedEval(b.getHash(), b);
-        best = std::clamp(rawStaticEval + runtime.corrHist.correction(b), -TB_WIN_BOUND + 1, TB_WIN_BOUND - 1);
-        // As in the main search, a TT bound that proves the eval wrong replaces it.
-        if (tte.hit && ttBoundCutoff(tte.flag, scoreFromTT(tte.score, ply), best, best)) {
-            best = std::clamp(scoreFromTT(tte.score, ply), -TB_WIN_BOUND + 1, TB_WIN_BOUND - 1);
-        }
+        const NodeEval eval = nodeEval(b, runtime, tte, ply);
+        rawStaticEval = eval.raw;
+        best = eval.value;
         // Fail-soft stand pat. No store: the eval cache already returns the eval.
         if (best >= beta) return best;
         alpha = std::max(alpha, best);
@@ -924,10 +915,9 @@ IterativeSearchResult runIterativeDeepening(Board& rootBoard, SearchRuntime& run
     const int firstDepth = std::max(1, startDepth);
     const int maxDepth = std::max(firstDepth, targetDepth);
 
-    if (rootBoard.bb[Board::KING][0] == 0 || rootBoard.bb[Board::KING][1] == 0) {
-        const bool ourKingGone = (rootBoard.bb[Board::KING][0] == 0) == (rootBoard.getActiveColor() == Board::WHITE);
+    if (const int32_t score = missingKingScore(rootBoard, 0); score != 0) {
         result.terminalRoot = result.completedAnyDepth = true;
-        result.bestScore = runtime.eval = ourKingGone ? -MATE_VALUE : MATE_VALUE; // side-to-move relative
+        result.bestScore = runtime.eval = score;
         return result;
     }
 

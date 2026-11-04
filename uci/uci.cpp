@@ -41,7 +41,7 @@ namespace {
         int32_t* value;
         int32_t minValue;
         int32_t maxValue;
-        // Rebuild the search-derived tables (LMR/futility/LMP) after writing.
+        // Rebuild the LMR table after writing.
         bool refreshSearchTables = false;
     };
 
@@ -61,10 +61,10 @@ namespace {
         {"HISTORY_PRUNE_D1",     &engine::HISTORY_PRUNE_THRESHOLD[1], -16384,    0},
         {"HISTORY_PRUNE_D2",     &engine::HISTORY_PRUNE_THRESHOLD[2], -16384,    0},
         {"HISTORY_PRUNE_D3",     &engine::HISTORY_PRUNE_THRESHOLD[3], -16384,    0},
-        {"FUTILITY_MID_STEP",    &engine::FUTILITY_MID_STEP,              80,  600, true},
+        {"FUTILITY_MID_STEP",    &engine::FUTILITY_MID_STEP,              80,  600},
         {"FUTILITY_MAX_DEPTH",   &engine::FUTILITY_MAX_DEPTH,              0, engine::FUTILITY_DEPTH_CAP},
-        {"LMP_SCALE_STD_PCT",    &engine::LMP_SCALE_PCT[0],               10,  250, true},
-        {"LMP_SCALE_IMP_PCT",    &engine::LMP_SCALE_PCT[1],               10,  250, true},
+        {"LMP_SCALE_STD_PCT",    &engine::LMP_SCALE_PCT[0],               10,  250},
+        {"LMP_SCALE_IMP_PCT",    &engine::LMP_SCALE_PCT[1],               10,  250},
         {"LMP_MAX_DEPTH",        &engine::LMP_MAX_DEPTH,                   0, engine::LMP_DEPTH_CAP},
         {"LMR_C_PERCENT",        &engine::LMR_C_PERCENT,                 150,  600, true},
         {"LMR_CUT_BONUS",        &engine::LMR_CUT_BONUS,                   0,    4},

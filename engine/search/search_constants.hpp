@@ -4,10 +4,17 @@
 #include <cstdint>
 #include <limits>
 
-// Search and move-ordering parameters. The plain (non-constexpr) globals are
-// UCI spins for the tuner (kSpinOptions in uci/uci.cpp).
+// Search and move-ordering parameters. The Spin globals are UCI spins for the
+// tuner (kSpinOptions in uci/uci.cpp); a release build offers none and
+// compiles them as constants.
 
 namespace engine {
+
+#ifdef HYDRAY_RELEASE
+using Spin = const int32_t;
+#else
+using Spin = int32_t;
+#endif
 
 // --- Core sizes ---
 inline constexpr int32_t  MAX_PLY                = 64;
@@ -34,85 +41,82 @@ static_assert(MATE_VALUE + MAX_PLY <= std::numeric_limits<int16_t>::max(),
               "rebased mate scores must fit the int16_t TT score field");
 
 // --- Pruning and extensions ---
-// Plain globals, not constexpr, so the tuner can drive them as UCI spins; the
-// UCI layer stops any search before writing one. The derived tables
-// (FUTILITY_MARGINS, LMP_THRESHOLDS, the LMR table in searcher.cpp) are built
-// at startup and rebuilt by rebuildSearchDerivedTables() after a write.
+// The UCI layer stops any search before writing a spin. The LMR table in
+// searcher.cpp is built at startup and rebuilt by rebuildSearchDerivedTables()
+// after a write to LMR_C_PERCENT.
 // Null-move reduction: NMP_BASE_R + depth / 3, deeper the further eval beats beta.
-inline int32_t NMP_BASE_R = 4;
-inline int32_t NMP_EVAL_DIV = 265;
-inline int32_t NMP_EVAL_MAX = 4;
+inline Spin NMP_BASE_R = 4;
+inline Spin NMP_EVAL_DIV = 265;
+inline Spin NMP_EVAL_MAX = 4;
 // Reverse futility pruning margin per remaining ply.
-inline int32_t RFP_MARGIN_PER_DEPTH = 70;
-// FUTILITY_MARGINS[depth] = FUTILITY_MID_STEP * depth, depth 1..FUTILITY_MAX_DEPTH.
+inline Spin RFP_MARGIN_PER_DEPTH = 70;
+// Futility margin FUTILITY_MID_STEP * depth, depth 1..FUTILITY_MAX_DEPTH.
 inline constexpr int FUTILITY_DEPTH_CAP = 10;
-inline int32_t FUTILITY_MAX_DEPTH = 6;
-inline int32_t FUTILITY_MID_STEP = 176;
-inline int32_t FUTILITY_MARGINS[FUTILITY_DEPTH_CAP + 1] = {};
-// LMP_THRESHOLDS[improving][depth], depth 1..LMP_MAX_DEPTH: the base curve
-// scaled by LMP_SCALE_PCT[improving]. Higher = more permissive.
+inline Spin FUTILITY_MAX_DEPTH = 6;
+inline Spin FUTILITY_MID_STEP = 176;
+// LMP threshold, depth 1..LMP_MAX_DEPTH: the base curve scaled by
+// LMP_SCALE_PCT[improving]. Higher = more permissive.
 inline constexpr int LMP_DEPTH_CAP = 10;
-constexpr int lmpBaseThreshold(int improving, int depth) noexcept {
-    return improving ? depth * depth + 7 * depth + 8 : (depth + 2) * (depth + 3);
+inline Spin LMP_MAX_DEPTH = 4;
+inline Spin LMP_SCALE_PCT[2] = {50, 50};
+inline int lmpThreshold(bool improving, int depth) noexcept {
+    const int base = improving ? depth * depth + 7 * depth + 8 : (depth + 2) * (depth + 3);
+    return base * LMP_SCALE_PCT[improving] / 100;
 }
-inline int32_t LMP_MAX_DEPTH = 4;
-inline int32_t LMP_SCALE_PCT[2] = {50, 50};
-inline int LMP_THRESHOLDS[2][LMP_DEPTH_CAP + 1] = {};
 // History-based quiet pruning: skip quiet moves with very negative history.
 // Indexed by depth (0..3); depth 0 unused.
-inline int32_t HISTORY_PRUNE_THRESHOLD[4] = {0, -4096, -6144, -8192};
+inline Spin HISTORY_PRUNE_THRESHOLD[4] = {0, -4096, -6144, -8192};
 
 // SEE capture pruning: skip captures with SEE < -SEE_CAPTURE_MARGIN * depth,
 // depth 1..SEE_PRUNE_MAX_DEPTH.
-inline int32_t SEE_CAPTURE_MARGIN = 70;
-inline int32_t SEE_PRUNE_MAX_DEPTH = 3;
+inline Spin SEE_CAPTURE_MARGIN = 70;
+inline Spin SEE_PRUNE_MAX_DEPTH = 3;
 // SEE quiet pruning: skip quiets with SEE < -QUIET_SEE_MARGIN * depth^2,
 // depth 1..QUIET_SEE_MAX_DEPTH (0 = off).
-inline int32_t QUIET_SEE_MARGIN = 12;
-inline int32_t QUIET_SEE_MAX_DEPTH = 0;
+inline Spin QUIET_SEE_MARGIN = 12;
+inline Spin QUIET_SEE_MAX_DEPTH = 0;
 // Singular extension.
 inline constexpr int SE_MIN_DEPTH     = 6;
 inline constexpr int SE_DEPTH_MARGIN  = 3;
-inline int32_t SE_BETA_MARGIN   = 3;  // seBeta = ttScore - margin*depth
+inline Spin SE_BETA_MARGIN   = 3;  // seBeta = ttScore - margin*depth
 // ProbCut.
-inline int32_t PROBCUT_MARGIN    = 149;
+inline Spin PROBCUT_MARGIN    = 149;
 inline constexpr int32_t PROBCUT_MIN_DEPTH = 3;
 
-// Rebuilds the derived tables from the current generator values. Never during
-// a live search.
+// Rebuilds the LMR table from LMR_C_PERCENT. Never during a live search.
 void rebuildSearchDerivedTables() noexcept;
 
 // --- Late move reductions ---
 // LMR_C == LMR_C_PERCENT / 100.0 (int spin for the tuner).
-inline int32_t LMR_C_PERCENT = 300;
+inline Spin LMR_C_PERCENT = 300;
 // Extra plies of reduction at an expected cut node.
-inline int32_t LMR_CUT_BONUS = 1;
+inline Spin LMR_CUT_BONUS = 1;
 // First reduced move index: LMR_MIN_INDEX_ALL at an expected all node
 // (non-PV, not cut), 4 elsewhere.
-inline int32_t LMR_MIN_INDEX_ALL = 4;
+inline Spin LMR_MIN_INDEX_ALL = 4;
 // 1: below index 4 only quiets that are neither killer nor countermove.
-inline int32_t LMR_EARLY_QUIET_ONLY = 0;
+inline Spin LMR_EARLY_QUIET_ONLY = 0;
 // Reduction change for a quiet by its butterfly history sign: -LMR_GOOD_HIST
 // above zero, +LMR_BAD_HIST otherwise.
-inline int32_t LMR_GOOD_HIST = 1;
-inline int32_t LMR_BAD_HIST = 1;
+inline Spin LMR_GOOD_HIST = 1;
+inline Spin LMR_BAD_HIST = 1;
 // 0: butterfly sign only; 1: LMR_BAD_HIST - LMR_GOOD_HIST * n, n = positive
 // signals among butterfly and continuation history; 2: -LMR_GOOD_HIST if any.
-inline int32_t LMR_HIST_MODE = 1;
+inline Spin LMR_HIST_MODE = 1;
 // Quiet, continuation and capture history bonus: (depth + 1)^2 * HIST_BONUS_PCT / 100.
-inline int32_t HIST_BONUS_PCT = 100;
+inline Spin HIST_BONUS_PCT = 100;
 // 0: no hash move adds an LMR ply; 1: at PV and cut nodes it takes a ply of depth.
-inline int32_t IIR_MODE = 1;
-inline int32_t IIR_MIN_DEPTH = 4;
+inline Spin IIR_MODE = 1;
+inline Spin IIR_MIN_DEPTH = 4;
 // 1: a TT cutoff by a quiet hash move gives it the cutoff history bonus.
-inline int32_t TT_CUT_HIST = 0;
+inline Spin TT_CUT_HIST = 0;
 // Plies less of reduction for a move that gives check (0 = off).
-inline int32_t LMR_CHECK_LESS = 0;
+inline Spin LMR_CHECK_LESS = 0;
 // Hindsight depth: +1 after a reduction of 3+ when the opponent is not worse
 // off (1 = on); -1 after a reduction of 2+ when both static evals sum above
 // HINDSIGHT_MARGIN (0 = off).
-inline int32_t HINDSIGHT_EXT = 0;
-inline int32_t HINDSIGHT_MARGIN = 0;
+inline Spin HINDSIGHT_EXT = 0;
+inline Spin HINDSIGHT_MARGIN = 0;
 inline constexpr int LMR_MAX_DEPTH = 20; // deeper nodes use the last row
 
 // --- History bounds ---
@@ -127,18 +131,18 @@ inline constexpr int32_t CORR_HIST_LIMIT      = 1024;
 inline constexpr int32_t CORR_HIST_SCALE      = 131072;
 // Update bonus: residual * depth * rate / 1280 (160 = 1/8, 128 = 1/10 after a
 // raised alpha), clamped to +-CORR_BONUS_CAP (UCI spins).
-inline int32_t CORR_BONUS_RATE        = 160;
-inline int32_t CORR_BONUS_RATE_RAISED = 128;
-inline int32_t CORR_BONUS_CAP         = CORR_HIST_LIMIT / 4;
+inline Spin CORR_BONUS_RATE        = 160;
+inline Spin CORR_BONUS_RATE_RAISED = 128;
+inline Spin CORR_BONUS_CAP         = CORR_HIST_LIMIT / 4;
 // Weights of each table in the applied correction (UCI spins).
-inline int32_t CORR_WEIGHT_PAWN     = 10347;
-inline int32_t CORR_WEIGHT_MINOR    = 8821;
-inline int32_t CORR_WEIGHT_NON_PAWN = 11665;
+inline Spin CORR_WEIGHT_PAWN     = 10347;
+inline Spin CORR_WEIGHT_MINOR    = 8821;
+inline Spin CORR_WEIGHT_NON_PAWN = 11665;
 // Update bonus of the minor and non-pawn tables, in 128ths of the pawn one (UCI spins).
-inline int32_t CORR_UPDATE_MINOR    = 156;
-inline int32_t CORR_UPDATE_NON_PAWN = 178;
+inline Spin CORR_UPDATE_MINOR    = 156;
+inline Spin CORR_UPDATE_NON_PAWN = 178;
 // Global strength of the applied correction, in percent (UCI spin).
-inline int32_t CORR_HIST_WEIGHT_PCT = 100;
+inline Spin CORR_HIST_WEIGHT_PCT = 100;
 
 // --- Quiescence search ---
 inline constexpr uint8_t MAX_QSEARCH_DEPTH = 48;
@@ -158,9 +162,9 @@ constexpr int32_t materialToEval(int32_t material, int32_t pct = MATERIAL_TO_EVA
 // The ratio grows as material comes off (a rook measures 2.2x in the middlegame,
 // 3.4x in the endgame). The qsearch delta margins pick it by non-pawn material.
 // UCI spins.
-inline int32_t QS_EVAL_PCT_MG      = 300;  // npm > 5000
-inline int32_t QS_EVAL_PCT_LATE_MG = 345;  // 3000 < npm <= 5000
-inline int32_t QS_EVAL_PCT_ENDGAME = 350;  // npm <= 3000
+inline Spin QS_EVAL_PCT_MG      = 300;  // npm > 5000
+inline Spin QS_EVAL_PCT_LATE_MG = 345;  // 3000 < npm <= 5000
+inline Spin QS_EVAL_PCT_ENDGAME = 350;  // npm <= 3000
 
 // --- Aspiration window ---
 inline constexpr int32_t WINDOW_HARD_CAP    = 1500;
