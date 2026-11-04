@@ -61,3 +61,7 @@ config.json
 __pycache__/
 *.pyc
 /tuning/spsa_*_state.json
+
+# Docker datagen: local settings (may hold HF_TOKEN) and the default data folder
+/docker/.env
+/data/

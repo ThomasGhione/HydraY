@@ -281,6 +281,60 @@ first search is discarded (about 25% of the non-seeded games, at the cost of
 a single search each); the progress line counts them as `discarded`.
 Inspect a file with `./chess datagen-dump <file.bin> [count]`.
 
+#### In Docker
+
+The image runs the datagen on any machine with Docker and an AVX2 + BMI2 CPU,
+and can upload the sealed shards to a Hugging Face dataset as they come.
+
+**Start (Docker Compose).** The settings are in `docker/compose.yaml`: the
+`command:` list holds the `./chess datagen` flags (`--out=/data/pc1`, one
+prefix per machine, `--nodes`, `--threads`, ...), `user:` the owner of the
+files (`id -u`:`id -g`), the volumes the data folder (`data/` at the repository
+root) and the optional tablebases. `docker/.env`, ignored by git, holds only
+the token. From the repository root:
+
+```sh
+cp docker/.env.example docker/.env     # HF_TOKEN=..., only for the upload
+docker compose -f docker/compose.yaml up -d --build
+docker compose -f docker/compose.yaml logs -f      # progress, seals, uploads
+docker compose -f docker/compose.yaml down         # stop: shard sealed and uploaded
+```
+
+The service restarts by itself after a crash or a reboot and resumes where it
+stopped (`down` stops it for good). The threads default to every CPU of the
+machine. `--games` does not fit it, since the run would restart when it ends:
+for a fixed batch use `docker compose -f docker/compose.yaml run --rm datagen
+--out=/data/pc1 --games=1000` (the arguments of `run` replace `command:`).
+
+**Upload.** Uncomment `--hf-repo=USER/NAME` in `command:` (the dataset is
+created private if missing) and, to free the disk, `--delete-after-upload`.
+Every sealed shard then goes to the dataset folder `<prefix>/` and is checked
+by size on the Hub before any local deletion. The token is checked before the
+datagen starts. At the stop a last pass uploads the shard sealed at exit
+(`stop_grace_period` gives it 10 minutes); anything left goes up at the next
+start.
+
+**Plain `docker run`.** The container takes the flags of `./chess datagen`
+after its defaults, `--out /data/hydray` and `--threads` = the CPUs it may use
+(`--cpus` included), plus the upload flags `--hf-repo USER/NAME`,
+`--hf-subdir DIR` (default: the `--out` name), `--hf-every SECONDS` (600) and
+`--delete-after-upload`:
+
+```sh
+docker build -f docker/Dockerfile -t hydray-datagen .
+docker run -d --name datagen --init --user "$(id -u):$(id -g)" -e HF_TOKEN \
+    -v "$PWD/data:/data" \
+    -v "$PWD/engine/syzygy/files:/hydray/engine/syzygy/files:ro" \
+    hydray-datagen --out /data/pc1 --nodes 8000 --seal-on-exit \
+    --hf-repo user/hydray-data --delete-after-upload
+docker stop -t 600 datagen
+docker run --rm -v "$PWD/data:/data" hydray-datagen dump /data/pc1.s0000.bin 5
+```
+
+The uploader also runs without Docker:
+`nnue/tools/hf_upload.py --data data --repo user/hydray-data --once` (needs
+`pip install huggingface_hub`).
+
 ### Training
 
 The trainer lives in `nnue/trainer/` (Rust, bullet-based), with Colab notebooks
@@ -441,6 +495,7 @@ engine/search/ iterative deepening, alpha-beta/PVS, pruning, search constants
 engine/sort/   move generation, move ordering, SEE
 engine/syzygy/ Syzygy tablebase probing (fathom-based)
 nnue/          NNUE net, accumulator, datagen, selftest, trainer
+docker/        datagen image, Compose service, Hugging Face upload
 tt/            Zobrist hashing and transposition table
 uci/           UCI protocol interface
 tests/         functional, performance, and benchmark programs

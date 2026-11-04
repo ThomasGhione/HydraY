@@ -1,0 +1,12 @@
+# Only the sources reach the build: no data, tablebases, objects or tuning.
+.git
+output
+chess
+chess.exe
+release
+nnue/data
+nnue/trainer
+engine/syzygy/files
+tuning
+tests
+*.bin

@@ -1,0 +1,36 @@
+# HydraY datagen with Docker Compose: edit the settings below; docker/.env
+# holds only HF_TOKEN. README, "In Docker", has the walkthrough.
+#
+#   docker compose -f docker/compose.yaml up -d --build
+#   docker compose -f docker/compose.yaml logs -f
+#   docker compose -f docker/compose.yaml down        # seals and uploads the shard
+
+services:
+  datagen:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile
+      args:
+        ARCH: -march=x86-64-v3    # ISA, as in the makefile
+        JOBS: "2"                 # parallel compile jobs
+    image: hydray-datagen
+    init: true
+    user: "1000:1000"             # owner of the files: `id -u`:`id -g`
+    env_file:
+      - path: .env                # HF_TOKEN=...
+        required: false
+    volumes:
+      - ../data:/data
+      - ../engine/syzygy/files:/hydray/engine/syzygy/files:ro   # optional
+    # The flags of ./chess datagen (--help), plus the upload ones. Threads
+    # default to every CPU; --games does not fit a service that restarts.
+    command:
+      - --out=/data/pc1           # one prefix per machine
+      - --nodes=8000
+      - --seal-on-exit
+      # Upload of the sealed shards: uncomment and set the dataset.
+      # - --hf-repo=USER/hydray-data
+      # - --delete-after-upload
+    # Time for the last game, the seal and the upload of the last shard.
+    stop_grace_period: 10m
+    restart: unless-stopped
