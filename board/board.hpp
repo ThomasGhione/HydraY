@@ -139,7 +139,7 @@ public:
     // --- Legality & attack queries ---
     bool isLegalPseudoMove(uint8_t fromIndex, uint8_t toIndex, uint8_t fromPiece) const noexcept;
     bool isSquareAttacked(uint8_t targetIndex, uint8_t byColor, uint8_t excludeSquare = 64) const noexcept;
-    bool inCheck(uint8_t color) const noexcept;
+    bool inCheck(uint8_t color) const noexcept { return checkersTo(color) != 0; }
     // Bitboard of enemy pieces giving check to `color`'s king (0 = no check).
     // One scan answers inCheck (!=0), double check (>1 bit) and, via the
     // checker square, the evasion mask - callers should reuse it.
@@ -212,9 +212,8 @@ private:
     template<uint8_t PieceType>
     [[nodiscard]] inline bool pseudoMoveLegalByType(uint8_t fromIndex, uint8_t toIndex, uint64_t toBit,
                                                     uint8_t movingColor, uint8_t destPiece) const noexcept;
-    // Whether bySide attacks sq with `occ` as blockers, counting only the
-    // attackers in `keep` (a capture takes one off the board).
-    bool attackedBy(uint8_t sq, uint8_t bySide, uint64_t occ, uint64_t keep = ~0ULL) const noexcept;
+    // The pieces of `side` that attack sq with `occ` as the blockers.
+    uint64_t attackersOf(uint8_t sq, uint8_t side, uint64_t occ) const noexcept;
 
     // --- Private helpers: move classification ---
     static constexpr bool isCaptureKind(MoveKind k) noexcept { return k == MoveKind::Capture || k == MoveKind::PromotionCapture; }

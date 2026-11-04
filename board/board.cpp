@@ -50,7 +50,7 @@ inline bool Board::isKingSafeAfterMove(uint8_t movingColor, uint8_t fromIndex, u
     if (!bb[KING][side]) [[unlikely]] return false;
     const uint64_t occNew =
         (occupancy & ~(1ULL << fromIndex) & ~capturedMask) | (1ULL << toIndex);
-    return !attackedBy(std::countr_zero(bb[KING][side]), side ^ 1, occNew, ~capturedMask);
+    return (attackersOf(std::countr_zero(bb[KING][side]), side ^ 1, occNew) & ~capturedMask) == 0;
 }
 
 bool Board::move(Move move) noexcept {
@@ -114,28 +114,10 @@ inline bool Board::pseudoMoveLegalByType(uint8_t fromIndex, uint8_t toIndex, uin
 }
 
 
-[[nodiscard]] uint64_t Board::checkersTo(uint8_t color) const noexcept {
+uint64_t Board::checkersTo(uint8_t color) const noexcept {
     const uint8_t side = colorToIndex(color);
-    const uint64_t kingBB = bb[KING][side];
-    if (!kingBB) [[unlikely]] return 0ULL;
-    const uint8_t kingIndex = std::countr_zero(kingBB);
-    const uint8_t oppSide = side ^ 1;
-
-    uint64_t checkers = (pieces::PAWN_ATTACKS[side][kingIndex] & bb[PAWN][oppSide])
-                      | (pieces::KNIGHT_ATTACKS[kingIndex] & bb[KNIGHT][oppSide])
-                      | (pieces::KING_ATTACKS[kingIndex] & bb[KING][oppSide]);
-
-    const uint64_t rookLike = bb[ROOK][oppSide] | bb[QUEEN][oppSide];
-    if (rookLike) {
-        checkers |= (pieces::getRookAttacks(kingIndex, occupancy) & rookLike);
-    }
-
-    const uint64_t bishopLike = bb[BISHOP][oppSide] | bb[QUEEN][oppSide];
-    if (bishopLike) {
-        checkers |= (pieces::getBishopAttacks(kingIndex, occupancy) & bishopLike);
-    }
-
-    return checkers;
+    if (!bb[KING][side]) [[unlikely]] return 0ULL;
+    return attackersOf(std::countr_zero(bb[KING][side]), side ^ 1, occupancy);
 }
 
 [[nodiscard]] bool Board::isKingMoveLegal(uint8_t fromIndex, uint8_t toIndex, uint64_t toBit,
@@ -162,27 +144,18 @@ inline bool Board::pseudoMoveLegalByType(uint8_t fromIndex, uint8_t toIndex, uin
 // the board, as a moving king needs.
 bool Board::isSquareAttacked(uint8_t targetIndex, uint8_t byColor, uint8_t excludeSquare) const noexcept {
     const uint64_t occMinus = excludeSquare < 64 ? (occupancy & ~(1ULL << excludeSquare)) : occupancy;
-    return attackedBy(targetIndex, colorToIndex(byColor), occMinus);
+    return attackersOf(targetIndex, colorToIndex(byColor), occMinus) != 0;
 }
 
-bool Board::attackedBy(uint8_t sq, uint8_t bySide, uint64_t occ, uint64_t keep) const noexcept {
-    if (pieces::PAWN_ATTACKS[bySide ^ 1][sq] & bb[PAWN][bySide] & keep) return true;
-    if (pieces::KNIGHT_ATTACKS[sq] & bb[KNIGHT][bySide] & keep) return true;
-    if (pieces::KING_ATTACKS[sq] & bb[KING][bySide] & keep) return true;
-
-    const uint64_t rookLike = (bb[ROOK][bySide] | bb[QUEEN][bySide]) & keep;
-    if (rookLike && (pieces::getRookAttacks(sq, occ) & rookLike)) return true;
-
-    const uint64_t bishopLike = (bb[BISHOP][bySide] | bb[QUEEN][bySide]) & keep;
-    return bishopLike && (pieces::getBishopAttacks(sq, occ) & bishopLike);
+uint64_t Board::attackersOf(uint8_t sq, uint8_t side, uint64_t occ) const noexcept {
+    uint64_t attackers = (pieces::PAWN_ATTACKS[side ^ 1][sq] & bb[PAWN][side])
+                       | (pieces::KNIGHT_ATTACKS[sq] & bb[KNIGHT][side])
+                       | (pieces::KING_ATTACKS[sq] & bb[KING][side]);
+    if (const uint64_t rookLike = bb[ROOK][side] | bb[QUEEN][side]) attackers |= pieces::getRookAttacks(sq, occ) & rookLike;
+    if (const uint64_t bishopLike = bb[BISHOP][side] | bb[QUEEN][side]) attackers |= pieces::getBishopAttacks(sq, occ) & bishopLike;
+    return attackers;
 }
 
-__attribute__((hot))
-bool Board::inCheck(uint8_t color) const noexcept {
-    const uint8_t side = colorToIndex(color);
-    if (!bb[KING][side]) [[unlikely]] return false;
-    return attackedBy(std::countr_zero(bb[KING][side]), side ^ 1, occupancy);
-}
 
 
 void Board::recomputeHashAndEp() noexcept {
