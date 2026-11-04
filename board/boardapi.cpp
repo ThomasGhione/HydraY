@@ -66,16 +66,6 @@ inline void Board::relocate(uint8_t piece, uint8_t fromIndex, uint8_t toIndex) n
     if constexpr (Record) recordAcc({NNUE::AccDelta::Move, piece, fromIndex, toIndex});
 }
 
-__attribute__((always_inline))
-inline constexpr bool Board::isCaptureKind(MoveKind kind) noexcept {
-    return kind == MoveKind::Capture || kind == MoveKind::PromotionCapture;
-}
-
-__attribute__((always_inline))
-inline constexpr bool Board::isPromotionKind(MoveKind kind) noexcept {
-    return kind == MoveKind::PromotionQuiet || kind == MoveKind::PromotionCapture;
-}
-
 inline Board::MoveKind Board::classifyMoveKind(uint8_t movingType, uint8_t movingColor, uint8_t fromIndex,
                                                uint8_t toIndex, uint8_t destBefore, const Square& prevEnPassant) noexcept {
     const MoveKind plain = (destBefore != EMPTY) ? MoveKind::Capture : MoveKind::Quiet;

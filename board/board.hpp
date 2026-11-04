@@ -214,8 +214,8 @@ private:
     bool attackedBy(uint8_t sq, uint8_t bySide, uint64_t occ, uint64_t keep = ~0ULL) const noexcept;
 
     // --- Private helpers: move classification ---
-    [[nodiscard]] static constexpr bool     isCaptureKind(MoveKind kind) noexcept;
-    [[nodiscard]] static constexpr bool     isPromotionKind(MoveKind kind) noexcept;
+    static constexpr bool isCaptureKind(MoveKind k) noexcept { return k == MoveKind::Capture || k == MoveKind::PromotionCapture; }
+    static constexpr bool isPromotionKind(MoveKind k) noexcept { return k == MoveKind::PromotionQuiet || k == MoveKind::PromotionCapture; }
     [[nodiscard]] static inline MoveKind    classifyMoveKind(uint8_t movingType, uint8_t movingColor,
                                                               uint8_t fromIndex, uint8_t toIndex,
                                                               uint8_t destBefore, const Square& prevEnPassant) noexcept;
