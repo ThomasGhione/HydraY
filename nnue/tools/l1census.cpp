@@ -14,57 +14,13 @@
 
 #include "fen_accumulator.hpp"
 
-#include <bit>
-#include <cmath>
 #include <cstdio>
-#include <cstring>
-#include <fstream>
 #include <memory>
 #include <string>
 #include <vector>
 
 using namespace NNUE::Deep;
-
-namespace {
-
-// bulletformat::ChessBoard, as in holdoutloss.cpp.
-struct Record {
-    uint64_t occ;
-    uint8_t  pcs[16];
-    int16_t  score;
-    uint8_t  result;
-    uint8_t  ksq;
-    uint8_t  oppKsq;
-    uint8_t  extra[3];
-};
-static_assert(sizeof(Record) == 32);
-
-void addRow(int16_t* acc, const int16_t* w) noexcept {
-    for (int i = 0; i < HIDDEN; ++i) acc[i] = static_cast<int16_t>(acc[i] + w[i]);
-}
-
-// The record is stored in the stm frame: see holdoutloss.cpp.
-int accumulateRecord(const NetworkDeep& net, const Record& r, int16_t* us, int16_t* them) noexcept {
-    const int usFlip = (r.ksq & 7) > 3 ? 7 : 0, usBase = INPUTS * tools::kingBucket(r.ksq);
-    const int thFlip = (r.oppKsq & 7) > 3 ? 7 : 0, thBase = INPUTS * tools::kingBucket(r.oppKsq);
-    std::memcpy(us, net.l0b, sizeof(net.l0b));
-    std::memcpy(them, net.l0b, sizeof(net.l0b));
-    uint64_t occ = r.occ;
-    int idx = 0;
-    while (occ != 0) {
-        const int sq = std::countr_zero(occ);
-        occ &= occ - 1;
-        const uint8_t nibble = (r.pcs[idx / 2] >> (4 * (idx & 1))) & 0xF;
-        ++idx;
-        const bool isOpp = (nibble & 8) != 0;
-        const int type = nibble & 7;
-        addRow(us, net.l0w[usBase + (((isOpp ? 384 : 0) + type * 64 + sq) ^ usFlip)]);
-        addRow(them, net.l0w[thBase + (((isOpp ? 0 : 384) + type * 64 + (sq ^ 56)) ^ thFlip)]);
-    }
-    return (idx - 2) / BUCKET_DIVISOR;
-}
-
-} // namespace
+using namespace NNUE::Deep::tools;
 
 int main(int argc, char** argv) {
     if (argc < 3) {
@@ -78,11 +34,7 @@ int main(int argc, char** argv) {
     }
     const uint64_t offset = argc > 3 ? std::stoull(argv[3]) : 1'000'000;
     const uint64_t count = argc > 4 ? std::stoull(argv[4]) : 600'000;
-    std::ifstream in(argv[2], std::ios::binary);
-    in.seekg(static_cast<std::streamoff>(offset * sizeof(Record)));
-    std::vector<Record> recs(count);
-    in.read(reinterpret_cast<char*>(recs.data()), static_cast<std::streamsize>(count * sizeof(Record)));
-    recs.resize(static_cast<size_t>(in.gcount()) / sizeof(Record));
+    const std::vector<Record> recs = readRecords(argv[2], offset, count);
     if (recs.empty()) {
         std::fprintf(stderr, "no records at offset %llu of %s\n", (unsigned long long)offset, argv[2]);
         return 1;
