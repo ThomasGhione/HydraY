@@ -9,6 +9,12 @@
 #   --threads              the CPUs the container may use
 #   --machine, --build     the host name (/host/hostname) and the image's build
 #
+#   --tb                   the Syzygy 3-4-5 tables, mounted at
+#                          /hydray/engine/syzygy/files: missing or damaged
+#                          ones are fetched and checked before the start
+#   --no-tb                plays the endgames out instead (tests only: such
+#                          shards label endgames worse)
+#
 # Upload of the sealed shards to a Hugging Face dataset (HF_TOKEN in the
 # environment), handled here and not passed to datagen:
 #   --hf-repo USER/NAME     turns the upload on
@@ -47,7 +53,7 @@ version=${version#hydray-}
 
 # Splits the upload flags off and rebuilds the rest as datagen's arguments,
 # noting --out to know where the shards land.
-out= repo= subdir= every=600 delete=
+out= repo= subdir= every=600 delete= notb=
 n=$#
 while [ "$n" -gt 0 ]; do
     a=$1; shift; n=$((n - 1))
@@ -62,6 +68,7 @@ while [ "$n" -gt 0 ]; do
         --hf-subdir) subdir=$v ;;
         --hf-every) every=$v ;;
         --delete-after-upload) delete=--delete-after-upload ;;
+        --no-tb) notb=1 ;;
         --hf-*) echo "datagen.sh: unknown option $a" >&2; exit 1 ;;
         --out) out=$1; set -- "$@" "$a" "$1"; shift; n=$((n - 1)) ;;
         --out=*) out=${a#*=}; set -- "$@" "$a" ;;
@@ -87,6 +94,21 @@ outdir=$(dirname "$out")
 if ! { mkdir -p "$outdir" && [ -w "$outdir" ]; } 2>/dev/null; then
     echo "datagen.sh: $outdir is not writable by uid $(id -u): create data/ before the" \
          "first start (mkdir -p data) and set user: in compose.yaml to \`id -u\`:\`id -g\`" >&2
+    exit 1
+fi
+
+# Shards labelled without tables would mix silently with the others.
+tb=/hydray/engine/syzygy/files
+sums=/hydray/syzygy-3-4-5.sha256
+if [ -n "$notb" ]; then
+    echo "datagen.sh: --no-tb: no tablebases, endgames played out" >&2
+    set -- "$@" --tb /nonexistent
+elif { mkdir -p "$tb" && [ -w "$tb" ]; } 2>/dev/null; then
+    python3 /hydray/fetch_syzygy.py --dir "$tb" --sums "$sums" || exit 1
+elif ! python3 /hydray/fetch_syzygy.py --dir "$tb" --sums "$sums" --check; then
+    echo "datagen.sh: engine/syzygy/files is not writable by uid $(id -u), so the" \
+         "tables cannot be fetched: mkdir -p engine/syzygy/files before the first start," \
+         "or chown it to \`id -u\`:\`id -g\`" >&2
     exit 1
 fi
 

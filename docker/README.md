@@ -13,16 +13,29 @@ README, "Generating training data".
 - Docker with Compose 2.24 or newer (`docker compose version`), for the
   optional `.env`.
 - An x86-64 CPU with AVX2 + BMI2 (`ARCH` in `compose.yaml` for another ISA).
-- Optional: the Syzygy tablebases in `engine/syzygy/files`
-  (`engine/syzygy/download_syzygy.sh`, main README "Syzygy Tablebases"): with
-  them the datagen adjudicates and labels endgames exactly.
+- About 1 GB of disk and an internet connection at the first start, for the
+  Syzygy tables (next section).
+
+## Tablebases
+
+Every shard is made with the Syzygy 3-4-5 tables: games under 6 pieces end
+with the exact result, and the search scores endgames with them. At every
+start the container checks the 290 files in `engine/syzygy/files` against
+the SHA-256 list `engine/syzygy/syzygy-3-4-5.sha256` (under a second) and
+fetches from Lichess (HTTPS) any that is missing or damaged, ~1 GB the first
+time: the log says `fetch_syzygy: fetching ...`, then `N/290`. A fetch that
+stops halfway resumes at the next start, and the files serve the engine on
+the host too.
+
+`--no-tb` in `command:` skips them and plays the endgames out: only for
+tests, since those shards label endgames worse.
 
 ## Quick start
 
 From the repository root:
 
 ```sh
-mkdir -p data                          # before the first start, see below
+mkdir -p data engine/syzygy/files      # before the first start, see below
 id -u; id -g                           # into user: in compose.yaml if not 1000:1000
 cp docker/.env.example docker/.env     # HF_TOKEN=..., only for the upload
 docker compose -f docker/compose.yaml up -d --build
@@ -34,12 +47,12 @@ The shards land in `data/` at the repository root. The service restarts by
 itself after a crash or a reboot and resumes where it stopped; `down` stops it
 for good.
 
-`data/` must exist and belong to the `user:` of `compose.yaml` before the
-first start: a missing `data/` is created by Docker as root, and the container
-cannot write it. The container then stops at once with `... is not writable
-by uid ...`; the fix is `sudo chown "$(id -u):$(id -g)" data` or the right
-`user:`. The same holds for `engine/syzygy/files`, which Docker creates empty
-when the tablebases are missing (harmless: datagen runs without them).
+`data/` and `engine/syzygy/files` must exist and belong to the `user:` of
+`compose.yaml` before the first start: a missing folder is created by Docker
+as root, and the container cannot write it. The container then stops at once
+with `... is not writable by uid ...`; the fix is
+`sudo chown "$(id -u):$(id -g)" data engine/syzygy/files` or the right
+`user:`. A folder with all the tables already in it may be read-only.
 
 The datagen uses every CPU of the container; `--threads=N` in `command:`, or
 `cpus:` in the service, leaves room for other work.
@@ -63,7 +76,7 @@ Everything is in `compose.yaml`; `.env`, ignored by git, holds only the token.
 |---|---|
 | `command:` | the `./chess datagen` flags (`--nodes`, `--threads`, `--start`, ...) and the upload flags below |
 | `user:` | owner of the files written: `id -u`:`id -g` |
-| `volumes:` | `data/`, the optional tablebases, the host's machine-id and host name |
+| `volumes:` | `data/`, the tablebases, the host's machine-id and host name |
 | `build.args` | `ARCH` (ISA, as in the makefile), `JOBS` (compile jobs), `GIT_COMMIT` |
 | `.env` | `HF_TOKEN`, a Hugging Face write token |
 
@@ -169,7 +182,7 @@ never corrupts a shard, and the container log is capped at 30 MB.
 docker build -f docker/Dockerfile -t hydray-datagen .
 docker run -d --name datagen --init --user "$(id -u):$(id -g)" -e HF_TOKEN \
     -v "$PWD/data:/data" \
-    -v "$PWD/engine/syzygy/files:/hydray/engine/syzygy/files:ro" \
+    -v "$PWD/engine/syzygy/files:/hydray/engine/syzygy/files" \
     -v /etc/machine-id:/host/machine-id:ro -v /etc/hostname:/host/hostname:ro \
     hydray-datagen --nodes 8000 --seal-on-exit \
     --hf-repo user/hydray-data --delete-after-upload
@@ -187,7 +200,8 @@ The uploader also runs without Docker:
 
 | Message | Meaning |
 |---|---|
-| `... is not writable by uid ...` | `data/` missing when Docker started (so created as root) or owned by another user: `mkdir -p data`, `chown`, or fix `user:` |
+| `... is not writable by uid ...` | `data/` or `engine/syzygy/files` missing when Docker started (so created as root) or owned by another user: `mkdir -p`, `chown`, or fix `user:` |
+| `fetch_syzygy: ... (attempt N/5)` | a table download failed and is retried; after 5 the container stops and retries at the restart |
 | `PAUSED: ... MB free` | under `--min-free-gb`; it resumes by itself once there is room |
 | `CONFLICT ... on the Hub with other content` | a name taken upstream with other data: nothing was uploaded or deleted; check the prefixes |
 | `... belongs to mXXXXXXXX ...` | the dataset folder is another machine's: give this one another `--out` and `--hf-subdir` |
@@ -204,4 +218,5 @@ The uploader also runs without Docker:
 | `Dockerfile` | static build (`make prod`, `HYDRAY_RELEASE`) into a `python:3.13-slim` image with `huggingface_hub` |
 | `Dockerfile.dockerignore` | only the sources reach the build |
 | `datagen.sh` | entry point: defaults, upload flags, datagen and uploader side by side |
+| `fetch_syzygy.py` | fetches and checks the tablebases against `../engine/syzygy/syzygy-3-4-5.sha256` |
 | `../nnue/tools/hf_upload.py` | the uploader |
