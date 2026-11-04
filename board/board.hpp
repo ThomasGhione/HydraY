@@ -110,11 +110,14 @@ public:
     static constexpr uint16_t REPETITION_HISTORY_CAPACITY = 255; // must be 255 instead of 100 due to the 8-bit prevHistorySize in MoveState
 
     // --- Constructors ---
-    Board() noexcept;
-    explicit Board(const std::string& fen);
+    Board() noexcept { fenToBoard(STARTING_FEN); }
+    explicit Board(const std::string& fen) { fenToBoard(fen); }
     // A copy takes the current position's accumulator only, computed first.
-    Board(const Board& other) noexcept;
-    Board& operator=(const Board& other) noexcept;
+    Board(const Board& other) noexcept { copyFromBoard(other); }
+    Board& operator=(const Board& other) noexcept {
+        if (this != &other) copyFromBoard(other);
+        return *this;
+    }
     Board(Board&& other) noexcept = default;
     Board& operator=(Board&& other) noexcept = default;
 
@@ -141,8 +144,6 @@ public:
     // One scan answers inCheck (!=0), double check (>1 bit) and, via the
     // checker square, the evasion mask - callers should reuse it.
     uint64_t checkersTo(uint8_t color) const noexcept;
-    [[nodiscard]] inline bool isKingSafeAfterMove(uint8_t movingColor, uint8_t fromIndex,
-                                                   uint8_t toIndex, uint64_t capturedMask) const noexcept;
 
     // --- Game state queries ---
     bool isFiftyMoveRule() const noexcept { return halfMoveClock >= 100; }
@@ -161,12 +162,12 @@ public:
     void               rebuildBitboardsFromSquares() noexcept;
     // From-scratch NNUE accumulator recompute (no-op when no net is loaded).
     // Incremental maintenance happens in addPieceToBB/removePieceFromBB.
-    inline void        refreshNnueAccumulator() noexcept;
+    void               refreshNnueAccumulator() noexcept;
     // Computes the current position's accumulator if it is not yet, from the
     // nearest computed ancestor or the Finny table. Must be called with the
     // Board in a consistent state (NNUE::evaluate and the selftest do); const
     // because the accumulator is a cache of board-derived state.
-    inline void        ensureNnueAccumulatorClean() const noexcept;
+    void               ensureNnueAccumulatorClean() const noexcept;
     // The current position's accumulator, valid after ensureNnueAccumulatorClean.
     const NNUE::Accumulator& accumulator() const noexcept { return frame(accTop); }
 
@@ -204,6 +205,8 @@ private:
     inline void undoMoveByKind(const MoveState& st, uint8_t pieceOnTo, uint8_t fromIndex, uint8_t toIndex) noexcept;
 
     // --- Private helpers: legality ---
+    [[nodiscard]] inline bool isKingSafeAfterMove(uint8_t movingColor, uint8_t fromIndex,
+                                                   uint8_t toIndex, uint64_t capturedMask) const noexcept;
     [[nodiscard]] inline bool isKingMoveLegal(uint8_t fromIndex, uint8_t toIndex,
                                                uint64_t toBit, uint8_t movingColor) const noexcept;
     template<uint8_t PieceType>
@@ -225,7 +228,7 @@ private:
     void           recomputeHashAndEp() noexcept;
     void           rebuildRepetitionHistory() noexcept;
     void           updateRepetitionAfterMove(bool resetHistory, MoveState& st) noexcept;
-    inline void    copyFromBoard(const Board& other) noexcept;
+    void           copyFromBoard(const Board& other) noexcept;
 
     // --- Private data ---
     // One byte per square, engine index (a8 = 0, h1 = 63): a read is a single
@@ -267,7 +270,5 @@ static_assert(Move::promotionTypeFromChar('q') == Board::QUEEN
 
 // FEN piece placement of 64 squares (0 = a8), each a piece letter or '.'.
 std::string placementFen(const std::array<char, 64>& squares);
-
-#include "board.inl"
 
 } // namespace chess
