@@ -156,34 +156,25 @@ inline uint64_t getBishopAttacks(uint8_t sq, uint64_t occ) noexcept {
 // Square convention: rank 0 = row 8 (top), rank 7 = row 1. White pawns move to
 // a lower rank number, black to a higher one.
 
-constexpr uint64_t pawnAttacks(int sq, bool isWhite) noexcept {
-    const int f = chess::file(sq);
-    const int r = chess::rank(sq) + (isWhite ? -1 : 1);
+// The squares one (file, rank) offset away from sq that are on the board.
+template<size_t N>
+constexpr uint64_t stepAttacks(int sq, const int8_t (&offsets)[N][2]) noexcept {
     uint64_t a = 0ULL;
-    if (r >= 0 && r < 8) {
-        if (f - 1 >= 0) a |= 1ULL << (r * 8 + f - 1);
-        if (f + 1 < 8)  a |= 1ULL << (r * 8 + f + 1);
-    }
-    return a;
-}
-constexpr uint64_t stepAttacks(int sq, const int8_t offsets[8][2]) noexcept {
-    const int f0 = chess::file(sq), r0 = chess::rank(sq);
-    uint64_t a = 0ULL;
-    for (int i = 0; i < 8; ++i) {
-        const int f = f0 + offsets[i][0], r = r0 + offsets[i][1];
+    for (const auto& o : offsets) {
+        const int f = chess::file(sq) + o[0], r = chess::rank(sq) + o[1];
         if (f >= 0 && f < 8 && r >= 0 && r < 8) a |= 1ULL << (r * 8 + f);
     }
     return a;
 }
+constexpr uint64_t pawnAttacks(int sq, bool isWhite) noexcept {
+    const int8_t dr = isWhite ? -1 : 1;
+    return stepAttacks(sq, {{-1, dr}, {1, dr}});
+}
 constexpr uint64_t pawnSinglePush(int sq, bool isWhite) noexcept {
-    const int f = chess::file(sq), r = chess::rank(sq);
-    if (isWhite) return r > 0 ? 1ULL << ((r - 1) * 8 + f) : 0ULL;
-    return r < 7 ? 1ULL << ((r + 1) * 8 + f) : 0ULL;
+    return stepAttacks(sq, {{0, static_cast<int8_t>(isWhite ? -1 : 1)}});
 }
 constexpr uint64_t pawnDoublePush(int sq, bool isWhite) noexcept {
-    const int f = chess::file(sq), r = chess::rank(sq);
-    if (isWhite) return r == 6 ? 1ULL << ((r - 2) * 8 + f) : 0ULL;
-    return r == 1 ? 1ULL << ((r + 2) * 8 + f) : 0ULL;
+    return chess::rank(sq) == (isWhite ? 6 : 1) ? stepAttacks(sq, {{0, static_cast<int8_t>(isWhite ? -2 : 2)}}) : 0ULL;
 }
 
 // PAWN_ATTACKS[side][sq]: squares a pawn of `side` on sq attacks. The pawns of
