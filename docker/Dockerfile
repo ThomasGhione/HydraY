@@ -30,7 +30,7 @@ RUN pip install --no-cache-dir --root-user-action=ignore huggingface_hub==2.3.0
 ENV HF_HOME=/tmp/hf PYTHONUNBUFFERED=1
 COPY --from=build /src/chess /src/BUILD_ID /hydray/
 COPY nnue/tools/hf_upload.py /hydray/hf_upload.py
-COPY docker/datagen.sh docker/fetch_syzygy.py engine/syzygy/syzygy-3-4-5.sha256 /hydray/
+COPY docker/datagen.sh engine/syzygy/fetch_syzygy.py engine/syzygy/syzygy-3-4-5.sha256 /hydray/
 # datagen looks for tablebases at engine/syzygy/files relative to the cwd.
 WORKDIR /hydray
 VOLUME ["/data"]

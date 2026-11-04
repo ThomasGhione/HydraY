@@ -218,5 +218,5 @@ The uploader also runs without Docker:
 | `Dockerfile` | static build (`make prod`, `HYDRAY_RELEASE`) into a `python:3.13-slim` image with `huggingface_hub` |
 | `Dockerfile.dockerignore` | only the sources reach the build |
 | `datagen.sh` | entry point: defaults, upload flags, datagen and uploader side by side |
-| `fetch_syzygy.py` | fetches and checks the tablebases against `../engine/syzygy/syzygy-3-4-5.sha256` |
 | `../nnue/tools/hf_upload.py` | the uploader |
+| `../engine/syzygy/fetch_syzygy.py` | fetches the tablebases and checks them against `syzygy-3-4-5.sha256` |

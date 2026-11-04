@@ -349,8 +349,10 @@ SyzygyProbeDepth  minimum depth to probe at internal nodes (default 1)
 ```
 
 `engine/syzygy/download_syzygy.sh` downloads the 3-4-5 piece files (~1 GB,
-not tracked in git) into `engine/syzygy/files`. The same files power datagen
-adjudication.
+not tracked in git) from Lichess into `engine/syzygy/files`, each checked
+against `engine/syzygy/syzygy-3-4-5.sha256`; run again, it only checks them
+and replaces any file missing or damaged (`--check` only reports). The same
+files power datagen adjudication.
 
 ## Transposition Table
 

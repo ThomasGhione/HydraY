@@ -6,6 +6,9 @@ table behind and the next one resumes from the files already there.
 
     fetch_syzygy.py --dir DIR --sums syzygy-3-4-5.sha256 [--check]
 
+download_syzygy.sh runs it on engine/syzygy/files; the Docker datagen runs
+it at every start.
+
 --check only reports: exit 0 if DIR is complete and sound, 1 if not.
 """
 import argparse
