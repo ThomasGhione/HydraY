@@ -166,6 +166,14 @@ just shows Elo and error bars from the PGN):
 watch -n 5 'ordo -q -s 1000 -J -p "$(ls -t tuning/sprt_*.pgn | head -1)"'
 ```
 
+Or in a window that redraws every minute (needs matplotlib): Elo per game with
+its 95% band, the pentanomial, LOS, the LLR against the SPRT bounds and the
+expected end. Without a pgn it takes the newest one in the current directory.
+
+```sh
+./tuning/match_watch.py tuning/sprt_20261030_152225.pgn
+```
+
 ### Gauntlet and calibration (absolute Elo)
 
 `tuning/runfastchess.sh` answers "how strong are we overall?" instead of
@@ -183,6 +191,7 @@ make prod && ./tuning/runfastchess.sh            # Stockfish calibration, defaul
 ./tuning/runfastchess.sh --sf-levels ../stockfish/stockfish-18:3000,3190 \
                          --opponent ../stockfish/stockfish-11 --anchor stockfish-11=-
 ./tuning/elo_watch.sh --loop                     # live dashboard, another terminal
+./tuning/match_watch.py tuning/<run>.pgn --anchor stockfish-11=3350   # live plot
 ```
 
 - **Stockfish calibration** (`--sf-levels PATH:ELO,...`): one opponent per
@@ -214,6 +223,10 @@ head and anchors next to the PGN (`*_ratings.txt`, `*_h2h.txt`,
 The dashboard also shows, per opponent, the implied Elo (anchor plus our Elo
 against that opponent alone): if it differs a lot between opponents, the
 anchors are not consistent. `--help` on either script lists every option.
+
+`match_watch.py` draws a gauntlet the same way: every engine on one rating
+scale fixed by `--anchor NAME=ELO` (by default the first opponent at 0), with
+its 95% band, a ladder and the standings, each engine's row against ours.
 
 ## NNUE Evaluation
 
