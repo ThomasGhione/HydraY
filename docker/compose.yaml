@@ -27,11 +27,10 @@ services:
       # The Syzygy 3-4-5 tables, fetched here (~1 GB) at the first start and
       # shared with the engine on the host.
       - ../engine/syzygy/files:/hydray/engine/syzygy/files
-      # Linux only: elsewhere remove these two and set --out below.
-      # The prefix (m + 8 hex of its hash) and the owner of the dataset folder
-      # come from the machine-id; the host name goes in the manifests.
+      # The prefix (m + 8 hex of its hash), the machine in the manifests and
+      # the owner of the dataset folder come from the machine-id. Linux only:
+      # elsewhere remove it and set --out below.
       - /etc/machine-id:/host/machine-id:ro
-      - /etc/hostname:/host/hostname:ro
     # The flags of ./chess datagen (--help), plus the upload ones. Threads
     # default to every CPU; --games does not fit a service that restarts.
     command:

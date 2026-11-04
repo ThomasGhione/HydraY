@@ -8,7 +8,7 @@ README, "Generating training data".
 ## Requirements
 
 - A Linux host: the prefix and the dataset owner come from `/etc/machine-id`.
-  On macOS or Windows remove the two `/host/...` mounts from `compose.yaml`
+  On macOS or Windows remove the `/host/machine-id` mount from `compose.yaml`
   and give `--out=/data/NAME` (and `--hf-subdir`) by hand.
 - Docker with Compose 2.24 or newer (`docker compose version`), for the
   optional `.env`.
@@ -76,7 +76,7 @@ Everything is in `compose.yaml`; `.env`, ignored by git, holds only the token.
 |---|---|
 | `command:` | the `./chess datagen` flags (`--nodes`, `--threads`, `--start`, ...) and the upload flags below |
 | `user:` | owner of the files written: `id -u`:`id -g` |
-| `volumes:` | `data/`, the tablebases, the host's machine-id and host name |
+| `volumes:` | `data/`, the tablebases, the host's machine-id |
 | `build.args` | `ARCH` (ISA, as in the makefile), `JOBS` (compile jobs), `GIT_COMMIT` |
 | `.env` | `HF_TOKEN`, a Hugging Face write token |
 
@@ -104,7 +104,7 @@ data/m956ee98b-v4.3.1.s0001.bin.part   the shard being written
 A new engine version starts new names, and every new net comes with a new
 version, so a series never mixes two labeler nets. Smaller changes without a
 version bump (a retuned search) are told apart by the manifests, which hold
-the host name and the build: version, a hash of the sources and net, the ISA,
+the machine hash and the build: version, a hash of the sources and net, the ISA,
 and the commit when the build gets `GIT_COMMIT=$(git rev-parse --short HEAD)`
 in the environment. `--out=/data/NAME` overrides the prefix.
 
@@ -116,8 +116,8 @@ one with write on the dataset). Then uncomment `--hf-repo=USER/NAME` in
 `command:` (`ORG/NAME` for a dataset of an organization the token can write;
 the dataset is created public if missing) and, to free the disk as it goes,
 `--delete-after-upload`. Public means everything uploaded can be read by
-anyone: shards, manifests (with the host name, from `/etc/hostname`), index
-and card. Public datasets have no storage quota to watch; a private one
+anyone: shards, manifests, index and card. They name a machine only by its
+hash (`m956ee98b`), never by its host name. Public datasets have no storage quota to watch; a private one
 counts against the account's (100 GB on a free account, ~60 shards). Upload
 flags: `--hf-repo`, `--hf-subdir` (default: the machine hash), `--hf-every`
 (seconds between passes, default 600), `--delete-after-upload`.
@@ -186,7 +186,7 @@ docker build -f docker/Dockerfile -t hydray-datagen .
 docker run -d --name datagen --init --user "$(id -u):$(id -g)" -e HF_TOKEN \
     -v "$PWD/data:/data" \
     -v "$PWD/engine/syzygy/files:/hydray/engine/syzygy/files" \
-    -v /etc/machine-id:/host/machine-id:ro -v /etc/hostname:/host/hostname:ro \
+    -v /etc/machine-id:/host/machine-id:ro \
     hydray-datagen --nodes 8000 --seal-on-exit \
     --hf-repo user/hydray-data --delete-after-upload
 docker stop -t 600 datagen
@@ -197,7 +197,8 @@ Without the machine-id mount the container needs `--out`.
 
 The uploader also runs without Docker:
 `nnue/tools/hf_upload.py --data data --repo user/hydray-data --once` (needs
-`pip install huggingface_hub`; `--help` for the rest).
+`pip install huggingface_hub`; `--help` for the rest). Outside Docker
+datagen writes the host name in the manifests unless it gets `--machine`.
 
 ## Messages
 

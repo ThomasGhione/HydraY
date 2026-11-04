@@ -52,12 +52,13 @@ def on_stop(signum, frame):
     stopping = True
 
 
+# A hash, never the host name: the dataset may be public.
 def default_owner():
     try:
         mid = Path("/etc/machine-id").read_text().strip()
         return "m" + hashlib.sha256(mid.encode()).hexdigest()[:8]
     except OSError:
-        return socket.gethostname()
+        return "h" + hashlib.sha256(socket.gethostname().encode()).hexdigest()[:8]
 
 
 def sha256_of(path):
@@ -113,7 +114,7 @@ class Uploader:
                          f"{' '.join(holder)}, not {self.args.owner}: give this machine another prefix")
             return
         local = self.args.data / ".hf_owner"
-        local.write_text(f"{self.args.owner} {self.args.host}\n")
+        local.write_text(f"{self.args.owner}\n")
         self.commit({remote: local}, f"Claim {self.args.subdir or 'the root'} for {self.args.owner}")
         local.unlink()
 
@@ -248,7 +249,6 @@ def main():
     ap.add_argument("--subdir", default="", help="folder in the dataset (default: its root)")
     ap.add_argument("--owner", default=default_owner(),
                     help="machine id written to <subdir>/OWNER (default: from /etc/machine-id)")
-    ap.add_argument("--host", default=socket.gethostname(), help="host name written next to the owner")
     ap.add_argument("--every", type=int, default=600, help="seconds between passes")
     ap.add_argument("--once", action="store_true", help="one pass, then exit")
     ap.add_argument("--delete-after-upload", action="store_true")

@@ -7,7 +7,8 @@
 #                          /host/machine-id (one stable prefix per machine),
 #                          and the engine version: a new version, new names
 #   --threads              the CPUs the container may use
-#   --machine, --build     the host name (/host/hostname) and the image's build
+#   --machine, --build     the machine hash (never the host name: the dataset
+#                          may be public) and the image's build
 #
 #   --tb                   the Syzygy 3-4-5 tables, mounted at
 #                          /hydray/engine/syzygy/files: missing or damaged
@@ -46,7 +47,6 @@ machine_hash=
 if [ -s /host/machine-id ]; then
     machine_hash=m$(tr -d '[:space:]' < /host/machine-id | sha256sum | cut -c1-8)
 fi
-host=$(cat /host/hostname 2>/dev/null || true)
 build=$(cat /hydray/BUILD_ID)
 version=${build%% *}
 version=${version#hydray-}
@@ -82,7 +82,7 @@ if [ -z "$out" ]; then
     }
     out=/data/$machine_hash-v$version
 fi
-set -- --out "$out" --threads "$cpus" --machine "${host:-${machine_hash:-unknown}}" \
+set -- --out "$out" --threads "$cpus" --machine "${machine_hash:-unknown}" \
     --build "$build" "$@"
 case $out in
     /data/*) ;;
@@ -119,7 +119,7 @@ fi
 upload() {
     python3 /hydray/hf_upload.py --data "$(dirname "$out")" --repo "$repo" \
         --prefix "$(basename "$out")" --subdir "${subdir:-${machine_hash:-$(basename "$out")}}" \
-        --owner "${machine_hash:-$(basename "$out")}" --host "${host:-unknown}" $delete "$@"
+        --owner "${machine_hash:-$(basename "$out")}" $delete "$@"
 }
 # Fails here, before hours of datagen, on a bad token, repo or OWNER. The
 # first free shard number upstream keeps a wiped /data from reusing names.
