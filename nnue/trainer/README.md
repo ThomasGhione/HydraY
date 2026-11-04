@@ -4,11 +4,11 @@ Rete v1: `(768 -> 256)x2 -> 1`, dual perspective, SCReLU, QA=255 QB=64, SCALE=40
 
 ## Pipeline
 
-1. **Dati** (laptop): `./chess datagen` → `nnue/data/hydray.t<N>.bin` (bulletformat).
+1. **Dati** (laptop): `./chess datagen` → `nnue/data/hydray.sNNNN.bin` (bulletformat, shard chiusi).
    Snapshot + merge:
    ```sh
-   # troncare a multipli di 32 B (il writer appende) e interleave
-   bullet-utils interleave t0.bin t1.bin t2.bin --output hydray_interleaved.bin
+   # gli shard chiusi sono completi: solo un .part va troncato a multipli di 32 B
+   bullet-utils interleave hydray.s0000.bin hydray.s0001.bin ... --output hydray_interleaved.bin
    bullet-utils validate --input hydray_interleaved.bin
    ```
 2. **Training** (Colab T4, gratis): apri `colab_v1.ipynb` su Colab,

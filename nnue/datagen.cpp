@@ -3,17 +3,21 @@
 #include <algorithm>
 #include <array>
 #include <atomic>
+#include <cerrno>
 #include <chrono>
 #include <cmath>
 #include <csignal>
 #include <cstdint>
+#include <cstdio>
 #include <cstdlib>
 #include <filesystem>
 #include <fstream>
 #include <iostream>
 #include <memory>
+#include <mutex>
 #include <random>
 #include <string>
+#include <string_view>
 #include <thread>
 #include <vector>
 
@@ -34,6 +38,8 @@ namespace {
 // promotes is skipped: its score hinges on unresolved tactics.
 constexpr int      DEFAULT_THREADS          = 3;
 constexpr uint64_t DEFAULT_NODES_PER_MOVE   = 8000;
+// 50M positions = 1.6 GB, about a day of a 12-thread machine.
+constexpr uint64_t DEFAULT_SHARD_POSITIONS  = 50'000'000;
 constexpr int      TARGET_DEPTH_CAP         = 32;
 constexpr int      OPENING_PLIES_MIN        = 8;   // +1 at random -> 8 or 9
 constexpr int32_t  OPENING_MAX_IMBALANCE_CP = 400;
@@ -45,7 +51,7 @@ constexpr int32_t  DRAW_ADJ_CP              = 10;
 constexpr int      DRAW_ADJ_PLIES           = 8;
 constexpr int      DRAW_ADJ_MIN_PLY         = 80;
 constexpr int      MAX_GAME_PLIES           = 400;
-// Only the ETA line reads this; CHESS_DATAGEN_TARGET sets it for a short batch.
+// Only the ETA line reads this; --target sets it for a short batch.
 constexpr uint64_t TARGET_POSITIONS_DEFAULT = 5'000'000'000;
 uint64_t           g_targetPositions        = TARGET_POSITIONS_DEFAULT;
 // WDL ignores the fifty-move counter: a decisive result counts only below this clock.
@@ -55,7 +61,7 @@ constexpr int      DECISIVE_TB_ADJ_MAX_HMC  = 60;
 // reaches: Syzygy adjudication ends the game first, a won ending scores past
 // MAX_RECORD_SCORE_CP, and seeded endings are decided before MIN_RECORD_PLY.
 // Seeded games record from ply 0, clamp their scores and skip adjudication.
-// One game in CHESS_DATAGEN_EG_EVERY is seeded; 1 makes a dedicated batch,
+// One game in --eg-every is seeded; 1 makes a dedicated batch,
 // which fills the bucket far faster than a mixed run.
 constexpr int      ENDGAME_SEED_EVERY_DEFAULT = 8;
 int                g_endgameSeedEvery = ENDGAME_SEED_EVERY_DEFAULT;
@@ -74,8 +80,12 @@ std::atomic<uint64_t> g_totalPositions{0};
 std::atomic<uint64_t> g_totalGames{0};
 std::atomic<uint64_t> g_totalTbAdjudications{0};
 std::atomic<uint64_t> g_totalEndgameSeeded{0};
+// Games started but never written: an opening past OPENING_MAX_IMBALANCE_CP,
+// or an endgame seed that found no legal position.
+std::atomic<uint64_t> g_discardedOpenings{0};
+std::atomic<uint64_t> g_discardedSeeds{0};
 
-// Benchmark mode (CHESS_DATAGEN_SEED, CHESS_DATAGEN_GAMES): each game starts
+// Benchmark mode (--seed, --games): each game starts
 // from its own RNG stream, an empty TT and empty histories, so a run replays
 // identically at any thread count.
 uint64_t              g_benchSeed = 0;   // 0 = off
@@ -96,16 +106,117 @@ syzygy::SyzygyProber g_syzygy;
 
 void onStopSignal(int) { g_stop.store(true, std::memory_order_release); }
 
+// All workers append whole games to one shard, <out>.sNNNN.bin.part. At
+// shardSize positions it is sealed (renamed to .bin) and the next one opened,
+// so a .bin file never grows again: only sealed shards get uploaded or
+// trained on. A restart appends to the open .part. shardSize 0 = one
+// unsealed <out>.bin, for short experiments.
+class ShardWriter {
+public:
+    bool open(const std::string& prefix, uint64_t shardSize) {
+        namespace fs = std::filesystem;
+        prefix_ = prefix;
+        shardSize_ = shardSize;
+        if (shardSize_ == 0) return openFile(prefix_ + ".bin");
+
+        const fs::path p(prefix_);
+        const fs::path dir = p.parent_path().empty() ? fs::path(".") : p.parent_path();
+        const std::string stem = p.filename().string() + ".s";
+        int nextIndex = 0;
+        int partIndex = -1;
+        std::error_code ec;
+        for (const auto& entry : fs::directory_iterator(dir, ec)) {
+            const std::string name = entry.path().filename().string();
+            if (!name.starts_with(stem)) continue;
+            const std::string_view rest = std::string_view(name).substr(stem.size());
+            const bool part = rest.ends_with(".bin.part");
+            if (!part && !rest.ends_with(".bin")) continue;
+            const std::string_view digits = rest.substr(0, rest.find('.'));
+            if (digits.empty() || digits.find_first_not_of("0123456789") != std::string_view::npos) continue;
+            const int index = std::atoi(std::string(digits).c_str());
+            nextIndex = std::max(nextIndex, index + 1);
+            if (part) partIndex = std::max(partIndex, index);
+        }
+        index_ = (partIndex >= 0) ? partIndex : nextIndex;
+        if (!openFile(partPath())) return false;
+        inShard_ = static_cast<uint64_t>(out_.tellp()) / sizeof(BulletRecord);
+        return inShard_ < shardSize_ || rotate();
+    }
+
+    // One game per call, so a game never straddles two shards.
+    bool write(const std::vector<BulletRecord>& records) {
+        std::lock_guard lock(mutex_);
+        out_.write(reinterpret_cast<const char*>(records.data()),
+                   static_cast<std::streamsize>(records.size() * sizeof(BulletRecord)));
+        out_.flush();
+        if (!out_) return false;
+        inShard_ += records.size();
+        return shardSize_ == 0 || inShard_ < shardSize_ || rotate();
+    }
+
+    // At exit: an empty .part is removed, a partial one sealed when asked.
+    void close(bool seal) {
+        std::lock_guard lock(mutex_);
+        out_.close();
+        if (shardSize_ == 0) return;
+        std::error_code ec;
+        if (inShard_ == 0) std::filesystem::remove(partPath(), ec);
+        else if (seal) std::filesystem::rename(partPath(), sealedPath(), ec);
+    }
+
+    std::string pattern() const {
+        return shardSize_ == 0 ? prefix_ + ".bin" : prefix_ + ".sNNNN.bin";
+    }
+    std::string currentPath() const {
+        return shardSize_ == 0 ? prefix_ + ".bin" : partPath();
+    }
+
+private:
+    bool openFile(const std::string& path) {
+        out_.open(path, std::ios::binary | std::ios::app);
+        if (!out_) std::cerr << "datagen: cannot open " << path << " for append.\n";
+        return static_cast<bool>(out_);
+    }
+
+    bool rotate() {
+        out_.close();
+        std::error_code ec;
+        std::filesystem::rename(partPath(), sealedPath(), ec);
+        if (ec) {
+            std::cerr << "datagen: cannot seal " << partPath() << ": " << ec.message() << "\n";
+            return false;
+        }
+        std::cout << "[datagen] sealed " << sealedPath() << "\n" << std::flush;
+        ++index_;
+        inShard_ = 0;
+        return openFile(partPath());
+    }
+
+    std::string sealedPath() const {
+        char index[16];
+        std::snprintf(index, sizeof(index), "%04d", index_);
+        return prefix_ + ".s" + index + ".bin";
+    }
+    std::string partPath() const { return sealedPath() + ".part"; }
+
+    std::mutex mutex_;
+    std::ofstream out_;
+    std::string prefix_;
+    uint64_t shardSize_ = 0;
+    int index_ = 0;
+    uint64_t inShard_ = 0;
+};
+
+ShardWriter g_writer;
+
 // Everything one worker owns.
 struct WorkerContext {
     engine::SearchRuntime runtime;
     TT tt;
     std::atomic<bool> interrupted{false};
     std::mt19937_64 rng;
-    std::ofstream out;
 
-    WorkerContext(uint64_t seed, const std::string& outPath)
-        : rng(seed), out(outPath, std::ios::binary | std::ios::app) {
+    explicit WorkerContext(uint64_t seed) : rng(seed) {
         runtime.transpositionTable = &tt;
         // The node cap reports a truncated iteration through this flag.
         runtime.searchInterrupted = &interrupted;
@@ -167,7 +278,7 @@ std::string randomEndgameFen(std::mt19937_64& rng) {
     return {};
 }
 
-// Set by CHESS_DATAGEN_START=chess324. A run holds one start regime, so pools
+// Set by --start chess324. A run holds one start regime, so pools
 // keep separate prefixes and are mixed at shuffle time.
 bool g_chess324 = false;
 
@@ -198,7 +309,10 @@ uint64_t playOneGame(WorkerContext& w, uint64_t nodesPerMove, bool endgameSeed) 
     std::string seedFen;
     if (endgameSeed) {
         seedFen = randomEndgameFen(w.rng);
-        if (seedFen.empty()) return 0;
+        if (seedFen.empty()) {
+            g_discardedSeeds.fetch_add(1, std::memory_order_relaxed);
+            return 0;
+        }
     } else if (g_chess324) {
         seedFen = randomChess324Fen(w.rng);
     }
@@ -277,6 +391,7 @@ uint64_t playOneGame(WorkerContext& w, uint64_t nodesPerMove, bool endgameSeed) 
         // Seeded endgames are lopsided by construction.
         if (!endgameSeed && ply == openingPlies
             && std::abs(whiteScore) > OPENING_MAX_IMBALANCE_CP) {
+            g_discardedOpenings.fetch_add(1, std::memory_order_relaxed);
             return 0;
         }
 
@@ -315,10 +430,7 @@ uint64_t playOneGame(WorkerContext& w, uint64_t nodesPerMove, bool endgameSeed) 
         flat.push_back(p.record);
     }
     if (!flat.empty()) {
-        w.out.write(reinterpret_cast<const char*>(flat.data()),
-                    static_cast<std::streamsize>(flat.size() * sizeof(BulletRecord)));
-        w.out.flush();
-        if (!w.out) {
+        if (!g_writer.write(flat)) {
             std::cerr << "datagen: write failed (disk full?) - stopping.\n";
             g_stop.store(true, std::memory_order_release);
             return 0;
@@ -331,18 +443,13 @@ uint64_t playOneGame(WorkerContext& w, uint64_t nodesPerMove, bool endgameSeed) 
     return flat.size();
 }
 
-void workerLoop(int threadId, const std::string& outPath, uint64_t nodesPerMove) {
+void workerLoop(int threadId, uint64_t nodesPerMove) {
     const uint64_t seed = std::random_device{}()
         ^ (static_cast<uint64_t>(
                std::chrono::steady_clock::now().time_since_epoch().count())
            << 16)
         ^ (static_cast<uint64_t>(threadId) << 56);
-    WorkerContext w(seed, outPath);
-    if (!w.out) {
-        std::cerr << "datagen: cannot open " << outPath << " for append.\n";
-        g_stop.store(true, std::memory_order_release);
-        return;
-    }
+    WorkerContext w(seed);
     while (!g_stop.load(std::memory_order_acquire)) {
         // One global counter: game N is the same game at any thread count.
         const uint64_t gameId = g_nextGameId.fetch_add(1, std::memory_order_relaxed);
@@ -358,22 +465,19 @@ void workerLoop(int threadId, const std::string& outPath, uint64_t nodesPerMove)
     g_activeWorkers.fetch_sub(1, std::memory_order_release);
 }
 
-std::string withThreadSuffix(const std::string& prefix, int threadId) {
-    return prefix + ".t" + std::to_string(threadId) + ".bin";
-}
-
-// Positions already on disk for this prefix (any thread count of past runs):
-// the counters resume from the true total instead of restarting at 0.
+// Positions already on disk for this prefix: shards, the open .part and the
+// <out>.t<N>.bin files of older runs. The counters resume from the true total
+// instead of restarting at 0.
 uint64_t countExistingPositions(const std::string& outPrefix) {
     namespace fs = std::filesystem;
     const fs::path p(outPrefix);
     const fs::path dir = p.parent_path().empty() ? fs::path(".") : p.parent_path();
-    const std::string stem = p.filename().string() + ".t";
+    const std::string stem = p.filename().string() + ".";
     uint64_t bytes = 0;
     std::error_code ec;
     for (const auto& entry : fs::directory_iterator(dir, ec)) {
         const std::string name = entry.path().filename().string();
-        if (name.starts_with(stem) && name.ends_with(".bin")) {
+        if (name.starts_with(stem) && (name.ends_with(".bin") || name.ends_with(".bin.part"))) {
             std::error_code sizeEc;
             const uint64_t sz = fs::file_size(entry.path(), sizeEc);
             if (!sizeEc) bytes += sz;
@@ -410,47 +514,140 @@ void saveMeta(const std::string& metaPath, const MetaCounters& m) {
     if (out) out << m.games << " " << m.tbAdjudications << "\n";
 }
 
+constexpr const char* DATAGEN_USAGE =
+    "usage: ./chess datagen [options]\n"
+    "  --out PREFIX     output prefix (default nnue/data/hydray)\n"
+    "  --threads N      worker threads, 1..32 (default 3)\n"
+    "  --nodes N        nodes per move, at least 256 (default 8000)\n"
+    "  --net FILE       labeler network (default: the embedded net)\n"
+    "  --tb DIR         Syzygy tablebases (default engine/syzygy/files)\n"
+    "  --shard N        positions per shard, 0 = one unsealed PREFIX.bin\n"
+    "                   (default 50000000)\n"
+    "  --seal-on-exit   seal the partial shard when the run stops\n"
+    "  --start MODE     standard or chess324 (default standard)\n"
+    "  --eg-every N     seed 1 game in N from a random ending, 1..1000 (default 8)\n"
+    "  --games N        stop after N games started, discarded openings included\n"
+    "                   (default: until Ctrl+C / SIGTERM)\n"
+    "  --target N       positions for the ETA line (default 5000000000)\n"
+    "  --seed N         benchmark mode: game N replays at any thread count\n";
+
+// Whole decimal strings only: "8k" or "-1" must not become 8 or 2^64-1.
+bool parseCount(const char* text, uint64_t& value) {
+    if (text == nullptr || *text < '0' || *text > '9') return false;
+    char* end = nullptr;
+    errno = 0;
+    value = std::strtoull(text, &end, 10);
+    return errno == 0 && *end == '\0';
+}
+
+struct DatagenOptions {
+    std::string outPrefix = "nnue/data/hydray";
+    int threads = DEFAULT_THREADS;
+    uint64_t nodesPerMove = DEFAULT_NODES_PER_MOVE;
+    const char* netPath = nullptr;
+    std::string tbPath = "engine/syzygy/files";
+    uint64_t shardSize = DEFAULT_SHARD_POSITIONS;
+    bool sealOnExit = false;
+    bool help = false;
+};
+
+// Sets the options and the g_* knobs; false after printing why it failed.
+bool parseDatagenArgs(int argc, char* argv[], DatagenOptions& o) {
+    for (int i = 2; i < argc; ++i) {
+        std::string flag = argv[i];
+        const char* value = nullptr;
+        if (const size_t eq = flag.find('='); flag.starts_with("--") && eq != std::string::npos) {
+            value = argv[i] + eq + 1;
+            flag.resize(eq);
+        }
+        if (flag == "--help" || flag == "-h") {
+            o.help = true;
+            return true;
+        }
+        if (flag == "--seal-on-exit") {
+            o.sealOnExit = true;
+            continue;
+        }
+        if (!flag.starts_with("--")) {
+            std::cerr << "datagen: unexpected argument '" << flag
+                      << "' (the positional form became flags)\n" << DATAGEN_USAGE;
+            return false;
+        }
+        if (value == nullptr) {
+            if (i + 1 >= argc) {
+                std::cerr << "datagen: " << flag << " needs a value\n";
+                return false;
+            }
+            value = argv[++i];
+        }
+
+        uint64_t n = 0;
+        const auto count = [&](uint64_t lo, uint64_t hi) {
+            if (parseCount(value, n) && n >= lo && n <= hi) return true;
+            std::cerr << "datagen: " << flag << " must be a whole number in "
+                      << lo << ".." << hi << ", got '" << value << "'\n";
+            return false;
+        };
+        constexpr uint64_t ANY = UINT64_MAX;
+        if (flag == "--out") {
+            o.outPrefix = value;
+        } else if (flag == "--threads") {
+            if (!count(1, 32)) return false;
+            o.threads = static_cast<int>(n);
+        } else if (flag == "--nodes") {
+            if (!count(256, ANY)) return false;
+            o.nodesPerMove = n;
+        } else if (flag == "--net") {
+            o.netPath = value;
+        } else if (flag == "--tb") {
+            o.tbPath = value;
+        } else if (flag == "--shard") {
+            if (!count(0, ANY)) return false;
+            o.shardSize = n;
+        } else if (flag == "--start") {
+            // Rejected, not ignored: a typo would fill a Chess324 pool with standard games.
+            const std::string mode = value;
+            if (mode != "standard" && mode != "chess324") {
+                std::cerr << "datagen: --start must be standard or chess324\n";
+                return false;
+            }
+            g_chess324 = (mode == "chess324");
+        } else if (flag == "--eg-every") {
+            if (!count(1, 1000)) return false;
+            g_endgameSeedEvery = static_cast<int>(n);
+        } else if (flag == "--games") {
+            if (!count(1, ANY)) return false;
+            g_gameLimit = n;
+        } else if (flag == "--target") {
+            if (!count(1, ANY)) return false;
+            g_targetPositions = n;
+        } else if (flag == "--seed") {
+            if (!count(1, ANY)) return false;
+            g_benchSeed = n;
+        } else {
+            std::cerr << "datagen: unknown option " << flag << "\n" << DATAGEN_USAGE;
+            return false;
+        }
+    }
+    return true;
+}
+
 } // namespace
 
 int runDatagen(int argc, char* argv[]) {
-    const std::string outPrefix = (argc >= 3) ? argv[2] : "nnue/data/hydray";
-    const int threads = (argc >= 4)
-        ? std::clamp(std::atoi(argv[3]), 1, 32) : DEFAULT_THREADS;
-    const uint64_t nodesPerMove = (argc >= 5)
-        ? std::max<uint64_t>(std::strtoull(argv[4], nullptr, 10), 256)
-        : DEFAULT_NODES_PER_MOVE;
-
-    if (const char* egEvery = std::getenv("CHESS_DATAGEN_EG_EVERY")) {
-        // Clamped, not rejected: a typo must not silently disable seeding.
-        g_endgameSeedEvery = std::clamp(std::atoi(egEvery), 1, 1000);
+    DatagenOptions opts;
+    if (!parseDatagenArgs(argc, argv, opts)) return 1;
+    if (opts.help) {
+        std::cout << DATAGEN_USAGE;
+        return 0;
     }
-
-    if (const char* start = std::getenv("CHESS_DATAGEN_START")) {
-        // Rejected, not ignored: a typo would fill a Chess324 pool with standard games.
-        const std::string mode = start;
-        if (mode != "standard" && mode != "chess324") {
-            std::cerr << "datagen: CHESS_DATAGEN_START must be standard or chess324\n";
-            return 1;
-        }
-        g_chess324 = (mode == "chess324");
-    }
-
-    if (const char* seed = std::getenv("CHESS_DATAGEN_SEED")) {
-        g_benchSeed = std::strtoull(seed, nullptr, 10);
-    }
-
-    if (const char* games = std::getenv("CHESS_DATAGEN_GAMES")) {
-        g_gameLimit = std::strtoull(games, nullptr, 10);
-    }
-
-    if (const char* target = std::getenv("CHESS_DATAGEN_TARGET")) {
-        const uint64_t parsed = std::strtoull(target, nullptr, 10);
-        if (parsed > 0) g_targetPositions = parsed;
-    }
+    const std::string& outPrefix = opts.outPrefix;
+    const int threads = opts.threads;
+    const uint64_t nodesPerMove = opts.nodesPerMove;
 
     // Labeler network: the given path, else the embedded net. A bad path fails
     // hard: falling back to another net would mislabel days of data.
-    const char* netPath = (argc >= 6) ? argv[5] : nullptr;
+    const char* netPath = opts.netPath;
     if (netPath != nullptr) {
         if (!loadNetwork(netPath)) {
             std::cerr << "datagen: cannot load network '" << netPath << "'\n";
@@ -477,15 +674,21 @@ int runDatagen(int argc, char* argv[]) {
     std::signal(SIGTERM, onStopSignal);
 
     // Without tables the endgames are simply played out.
-    const char* tbPath = (argc >= 7) ? argv[6] : "engine/syzygy/files";
+    const std::string& tbPath = opts.tbPath;
     const bool tbOn = g_syzygy.load(tbPath) && g_syzygy.maxPieces() >= 3;
 
     const uint64_t resumedPositions = countExistingPositions(outPrefix);
     const std::string metaPath = outPrefix + ".meta";
     const MetaCounters resumedMeta = loadMeta(metaPath);
+    if (!g_writer.open(outPrefix, opts.shardSize)) return 1;
 
     std::cout << "HydraY datagen - bulletformat self-play data\n"
-              << "  output : " << outPrefix << ".t<0.." << (threads - 1) << ">.bin (append)\n"
+              << "  output : " << g_writer.pattern()
+              << (opts.shardSize != 0
+                     ? ", sealed every " + fmtCount(opts.shardSize) + " positions"
+                       + (opts.sealOnExit ? " and at exit" : "")
+                     : std::string(" (never sealed)"))
+              << "\n           writing " << g_writer.currentPath() << " (append)\n"
               << "  resume : " << fmtCount(resumedPositions)
               << " positions already on disk for this prefix\n"
               << "  labels : NNUE (" << (netPath != nullptr ? netPath : "embedded")
@@ -494,10 +697,10 @@ int runDatagen(int argc, char* argv[]) {
               << "  filters: ply>=" << MIN_RECORD_PLY << ", not in check, quiet bestmove, |cp|<="
               << MAX_RECORD_SCORE_CP << "\n"
               << "  target : " << fmtCount(g_targetPositions)
-              << " positions (ETA line only; CHESS_DATAGEN_TARGET)\n"
+              << " positions (ETA line only; --target)\n"
               << "  start  : " << (g_chess324 ? "random Chess324 setup" : "standard position")
               << " + " << OPENING_PLIES_MIN << "-" << OPENING_PLIES_MIN + 1
-              << " random plies (CHESS_DATAGEN_START)\n"
+              << " random plies (--start)\n"
               << "  endgame: " << (g_endgameSeedEvery == 1
                      ? std::string("EVERY game")
                      : std::string("1 game in ") + std::to_string(g_endgameSeedEvery))
@@ -524,7 +727,7 @@ int runDatagen(int argc, char* argv[]) {
     workers.reserve(static_cast<size_t>(threads));
     g_activeWorkers.store(threads, std::memory_order_release);
     for (int t = 0; t < threads; ++t) {
-        workers.emplace_back(workerLoop, t, withThreadSuffix(outPrefix, t), nodesPerMove);
+        workers.emplace_back(workerLoop, t, nodesPerMove);
     }
 
     const auto start = std::chrono::steady_clock::now();
@@ -556,12 +759,15 @@ int runDatagen(int argc, char* argv[]) {
                   << "  tb-adj " << fmtCount(meta.tbAdjudications)
                   << "  eg-seed "
                   << fmtCount(g_totalEndgameSeeded.load(std::memory_order_relaxed))
+                  << "  discarded " << fmtCount(g_discardedOpenings.load(std::memory_order_relaxed)
+                                                + g_discardedSeeds.load(std::memory_order_relaxed))
                   << "  pos/s " << static_cast<uint64_t>(rate)
                   << "  ETA(" << fmtCount(g_targetPositions) << ") "
                   << std::round(etaDays * 10.0) / 10.0 << " days\n" << std::flush;
     }
 
     for (std::thread& t : workers) t.join();
+    g_writer.close(opts.sealOnExit);
     const MetaCounters finalMeta{resumedMeta.games + g_totalGames.load(),
                                  resumedMeta.tbAdjudications + g_totalTbAdjudications.load()};
     saveMeta(metaPath, finalMeta);
@@ -569,7 +775,10 @@ int runDatagen(int argc, char* argv[]) {
               << fmtCount(resumedPositions + g_totalPositions.load())
               << " (+" << fmtCount(g_totalPositions.load()) << " this run)"
               << "  games " << fmtCount(finalMeta.games)
-              << "  tb-adj " << fmtCount(finalMeta.tbAdjudications) << "\n";
+              << "  tb-adj " << fmtCount(finalMeta.tbAdjudications)
+              << "  discarded this run: " << g_discardedOpenings.load() << " openings past "
+              << OPENING_MAX_IMBALANCE_CP << " cp, " << g_discardedSeeds.load()
+              << " endgame seeds without a legal position\n";
     return 0;
 }
 

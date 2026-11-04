@@ -64,7 +64,7 @@ quit
 NNUE-specific modes (see the NNUE section below):
 
 ```sh
-./chess datagen [prefix] [threads] [nodes] [netPath] [tbPath]   # self-play training data
+./chess datagen [--out PREFIX] [--threads N] [--nodes N] ...    # self-play training data
 ./chess datagen-dump <file.bin> [count]                         # inspect a data file
 ./chess nnue-selftest <net.nnue>                                # verify accumulator correctness
 ```
@@ -254,17 +254,32 @@ previous release instead.
 ### Generating training data
 
 ```sh
-./chess datagen [prefix] [threads] [nodes] [netPath] [tbPath]
-# defaults: nnue/data/hydray, machine threads, 8000 nodes/move,
-#           embedded net for labeling, engine/syzygy/files
+./chess datagen --out nnue/data/pc1 --threads 8 --nodes 8000
+./chess datagen --help        # every option with its default
 ```
 
-Self-play games are written in bulletformat. When Syzygy tablebases are
-present (default path `engine/syzygy/files`, see below), games are adjudicated
-at <6 pieces with the exact WDL result; without tablebases the adjudication
-disables itself (the startup banner says which mode is active). Stop/resume
-with Ctrl+C is safe. Inspect a file with
-`./chess datagen-dump <file.bin> [count]`.
+Options: `--out` (prefix, default `nnue/data/hydray`), `--threads` (1..32,
+default 3), `--nodes` (per move, default 8000), `--net` (labeler, default the
+embedded net), `--tb` (Syzygy, default `engine/syzygy/files`), `--shard`,
+`--seal-on-exit`, `--start standard|chess324`, `--eg-every`, `--games` (games started: about
+1 in 4 is discarded at the first search, see below),
+`--target` (ETA line only) and `--seed` (benchmark mode). Both `--flag value`
+and `--flag=value` work; a wrong value stops the run instead of being guessed.
+
+Self-play games are written in bulletformat. All threads append whole games
+to one shard, `<prefix>.sNNNN.bin.part`; every `--shard` positions (default
+50M, 1.6 GB) it is sealed, renamed to `<prefix>.sNNNN.bin`, and the next one
+starts. A sealed shard never changes again, so it can be uploaded or trained
+on while the run goes on; `--shard 0` writes one unsealed `<prefix>.bin`, for
+short experiments. Stop/resume with Ctrl+C or SIGTERM is safe: a restart
+appends to the open `.part`, and `--seal-on-exit` seals it at the stop
+instead. When Syzygy tablebases are present (see below), games are
+adjudicated at <6 pieces with the exact WDL result; without tablebases the
+adjudication disables itself (the startup banner says which mode is active).
+A game whose random opening leaves one side more than 400 cp ahead at the
+first search is discarded (about 25% of the non-seeded games, at the cost of
+a single search each); the progress line counts them as `discarded`.
+Inspect a file with `./chess datagen-dump <file.bin> [count]`.
 
 ### Training
 

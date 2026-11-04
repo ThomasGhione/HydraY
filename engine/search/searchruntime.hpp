@@ -83,7 +83,7 @@ struct SearchRuntime {
     }
 
     // Full wipe. softResetHistory only halves, so a benchmark game would still
-    // inherit the previous one; see CHESS_DATAGEN_SEED in datagen.cpp.
+    // inherit the previous one; see --seed in datagen.cpp.
     inline void clearHistory() noexcept {
         for (auto& ply : killerMoves) ply[0] = ply[1] = chess::Move{};
         std::memset(history, 0, sizeof(history));
