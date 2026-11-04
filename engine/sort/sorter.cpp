@@ -64,8 +64,8 @@ Attacker leastValuableAttacker(const Board& b, int sq, uint64_t occ, int side) n
     mask = b.bb[Board::KNIGHT][side] & occ & pieces::KNIGHT_ATTACKS[sq];
     if (mask) return {std::countr_zero(mask), Board::KNIGHT};
     // Slider rays shared by bishop/queen and rook/queen.
-    const uint64_t bishopRays = pieces::getBishopAttacks(sq, occ);
-    const uint64_t rookRays   = pieces::getRookAttacks(sq, occ);
+    const uint64_t bishopRays = pieces::Bishop::attacks(sq, occ);
+    const uint64_t rookRays   = pieces::Rook::attacks(sq, occ);
     const uint64_t rays[4] = {bishopRays, rookRays, bishopRays | rookRays, pieces::KING_ATTACKS[sq]};
     for (int type = Board::BISHOP; type <= Board::KING; ++type) {
         mask = b.bb[type][side] & occ & rays[type - Board::BISHOP];
@@ -128,8 +128,8 @@ bool givesCheckAfterQuietMoveFast(const Board& b, const chess::Move& m,
     const uint64_t queens       = mine(Board::QUEEN);
     const uint64_t rookQueens   = mine(Board::ROOK)   | queens;
     const uint64_t bishopQueens = mine(Board::BISHOP) | queens;
-    if (rookQueens   && (pieces::getRookAttacks(oppKingSq, occAfter)   & rookQueens))   return true;
-    return bishopQueens && (pieces::getBishopAttacks(oppKingSq, occAfter) & bishopQueens);
+    if (rookQueens   && (pieces::Rook::attacks(oppKingSq, occAfter)   & rookQueens))   return true;
+    return bishopQueens && (pieces::Bishop::attacks(oppKingSq, occAfter) & bishopQueens);
 }
 
 MovePicker sortLegalMoves(MoveList moves, int ply, const Board& b, const SearchRuntime& runtime,

@@ -18,10 +18,10 @@ uint64_t hydray_tb_knight_attacks(int sq) {
     return std::byteswap(pieces::KNIGHT_ATTACKS[sq ^ 56]);
 }
 uint64_t hydray_tb_bishop_attacks(int sq, uint64_t occ) {
-    return std::byteswap(pieces::getBishopAttacks(static_cast<uint8_t>(sq ^ 56), std::byteswap(occ)));
+    return std::byteswap(pieces::Bishop::attacks(static_cast<uint8_t>(sq ^ 56), std::byteswap(occ)));
 }
 uint64_t hydray_tb_rook_attacks(int sq, uint64_t occ) {
-    return std::byteswap(pieces::getRookAttacks(static_cast<uint8_t>(sq ^ 56), std::byteswap(occ)));
+    return std::byteswap(pieces::Rook::attacks(static_cast<uint8_t>(sq ^ 56), std::byteswap(occ)));
 }
 uint64_t hydray_tb_king_attacks(int sq) {
     return std::byteswap(pieces::KING_ATTACKS[sq ^ 56]);

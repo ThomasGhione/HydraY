@@ -5,7 +5,7 @@
 namespace chess {
 
 // Slider attack tables, filled once before main.
-[[maybe_unused]] static const bool sliderTablesReady = (pieces::initMagicBitboards(), true);
+[[maybe_unused]] static const bool sliderTablesReady = (pieces::Rook::init(), pieces::Bishop::init(), true);
 
 void Board::copyFromBoard(const Board& other) noexcept {
     bb = other.bb;
@@ -151,8 +151,8 @@ uint64_t Board::attackersOf(uint8_t sq, uint8_t side, uint64_t occ) const noexce
     uint64_t attackers = (pieces::PAWN_ATTACKS[side ^ 1][sq] & bb[PAWN][side])
                        | (pieces::KNIGHT_ATTACKS[sq] & bb[KNIGHT][side])
                        | (pieces::KING_ATTACKS[sq] & bb[KING][side]);
-    if (const uint64_t rookLike = bb[ROOK][side] | bb[QUEEN][side]) attackers |= pieces::getRookAttacks(sq, occ) & rookLike;
-    if (const uint64_t bishopLike = bb[BISHOP][side] | bb[QUEEN][side]) attackers |= pieces::getBishopAttacks(sq, occ) & bishopLike;
+    if (const uint64_t rookLike = bb[ROOK][side] | bb[QUEEN][side]) attackers |= pieces::Rook::attacks(sq, occ) & rookLike;
+    if (const uint64_t bishopLike = bb[BISHOP][side] | bb[QUEEN][side]) attackers |= pieces::Bishop::attacks(sq, occ) & bishopLike;
     return attackers;
 }
 

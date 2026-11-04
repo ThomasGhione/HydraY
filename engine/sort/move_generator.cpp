@@ -123,9 +123,9 @@ inline uint64_t enemyAttacks(const Board& b, uint64_t occ) noexcept {
     uint64_t knights = b.bb[Board::KNIGHT][them];
     while (knights) att |= pieces::KNIGHT_ATTACKS[pieces::popLSB(knights)];
     uint64_t diag = b.bb[Board::BISHOP][them] | b.bb[Board::QUEEN][them];
-    while (diag) att |= pieces::getBishopAttacks(static_cast<uint8_t>(pieces::popLSB(diag)), occ);
+    while (diag) att |= pieces::Bishop::attacks(static_cast<uint8_t>(pieces::popLSB(diag)), occ);
     uint64_t line = b.bb[Board::ROOK][them] | b.bb[Board::QUEEN][them];
-    while (line) att |= pieces::getRookAttacks(static_cast<uint8_t>(pieces::popLSB(line)), occ);
+    while (line) att |= pieces::Rook::attacks(static_cast<uint8_t>(pieces::popLSB(line)), occ);
     if (b.bb[Board::KING][them]) att |= pieces::KING_ATTACKS[std::countr_zero(b.bb[Board::KING][them])];
     return att;
 }
@@ -139,8 +139,8 @@ uint64_t computePinRays(const Board& b, int kingSq, uint64_t pinRays[64]) noexce
     const uint64_t rookLikeEnemy = b.bb[Board::ROOK][them] | b.bb[Board::QUEEN][them];
     const uint64_t bishopLikeEnemy = b.bb[Board::BISHOP][them] | b.bb[Board::QUEEN][them];
     // No enemy slider on a line through the king, even on an empty board: no pins.
-    if (!(pieces::getRookAttacks(kingSq, 0ULL) & rookLikeEnemy) &&
-        !(pieces::getBishopAttacks(kingSq, 0ULL) & bishopLikeEnemy)) {
+    if (!(pieces::Rook::attacks(kingSq, 0ULL) & rookLikeEnemy) &&
+        !(pieces::Bishop::attacks(kingSq, 0ULL) & bishopLikeEnemy)) {
         return 0ULL;
     }
 
@@ -156,8 +156,8 @@ uint64_t computePinRays(const Board& b, int kingSq, uint64_t pinRays[64]) noexce
             }
         }
     };
-    addPins(pieces::getRookAttacks(kingSq, occWithoutOwn) & rookLikeEnemy);
-    addPins(pieces::getBishopAttacks(kingSq, occWithoutOwn) & bishopLikeEnemy);
+    addPins(pieces::Rook::attacks(kingSq, occWithoutOwn) & rookLikeEnemy);
+    addPins(pieces::Bishop::attacks(kingSq, occWithoutOwn) & bishopLikeEnemy);
     return pinnedMask;
 }
 
