@@ -179,6 +179,54 @@ leave the uploader room, and every uploaded shard it deletes frees 1.6 GB.
 Without it the datagen stays paused until space is freed by hand. A full disk
 never corrupts a shard, and the container log is capped at 30 MB.
 
+## Machines without internet
+
+Three things need the network: building the image, the tablebases and the
+upload. Each one is done on a connected machine and carried over (USB disk,
+`scp` on the local network).
+
+On a connected machine, from the repository root, with the tables already in
+`engine/syzygy/files` (`engine/syzygy/download_syzygy.sh`):
+
+```sh
+docker compose -f docker/compose.yaml build
+docker save hydray-datagen | gzip > hydray-datagen.tar.gz     # ~70 MB
+```
+
+Copy to the offline machine the repository folder, `engine/syzygy/files`
+included, and `hydray-datagen.tar.gz`. There, from the repository root:
+
+```sh
+docker load -i hydray-datagen.tar.gz
+mkdir -p data
+docker compose -f docker/compose.yaml up -d      # no --build: it uses the loaded image
+```
+
+`--hf-repo` stays commented out. The tables are checked at the start as
+usual, with no network needed when they are all there; if any is missing the
+container stops with `... unreachable ...: without internet copy the tables`.
+
+To bring the shards back, copy the sealed ones with their manifests (never
+the `.part`) from the offline machine:
+
+```sh
+mkdir -p /media/usb/shards
+cp data/m*.s[0-9][0-9][0-9][0-9].bin data/m*.s[0-9][0-9][0-9][0-9].json /media/usb/shards/
+```
+
+On a connected machine with this repository and the token in `docker/.env`,
+put them under `data/` (say `data/offline/`) and upload them:
+
+```sh
+docker compose -f docker/compose.yaml run --rm datagen upload /data/offline \
+    --hf-repo=USER/hydray-data --delete-after-upload
+```
+
+Each shard goes to the folder of the machine that made it (`m<hash>/`, from
+its name), with the same checks as the live upload. Once it says `uploaded`,
+delete the `.bin` on the offline machine and keep the `.json`: the manifests
+are what lets that machine number its next shards past the ones uploaded.
+
 ## Plain `docker run`
 
 ```sh
@@ -204,6 +252,7 @@ datagen writes the host name in the manifests unless it gets `--machine`.
 
 | Message | Meaning |
 |---|---|
+| `fetch_syzygy: ... unreachable` | no internet and tables missing: copy `engine/syzygy/files` from another machine ("Machines without internet") |
 | `... is not writable by uid ...` | `data/` or `engine/syzygy/files` missing when Docker started (so created as root) or owned by another user: `mkdir -p`, `chown`, or fix `user:` |
 | `fetch_syzygy: ... (attempt N/5)` | a table download failed and is retried; after 5 the container stops and retries at the restart |
 | `PAUSED: ... MB free` | under `--min-free-gb`; it resumes by itself once there is room |

@@ -27,11 +27,40 @@
 # second machine with the same prefix is refused instead of mixing shards.
 #
 #   docker run ... hydray-datagen dump /data/<file.bin> [count]
+#   docker run ... hydray-datagen upload /data/DIR --hf-repo USER/NAME
+#                          [--delete-after-upload]
+#     uploads shards made elsewhere (a machine without internet), each prefix
+#     m<hash>-v<version> into the folder of its own machine m<hash>
 set -e
 
 if [ "$1" = "dump" ]; then
     shift
     exec ./chess datagen-dump "$@"
+fi
+
+if [ "$1" = "upload" ]; then
+    shift
+    dir= repo= delete=
+    while [ $# -gt 0 ]; do
+        case $1 in
+            --hf-repo) repo=$2; shift ;;
+            --hf-repo=*) repo=${1#*=} ;;
+            --delete-after-upload) delete=$1 ;;
+            -*) echo "datagen.sh: upload: unknown option $1" >&2; exit 1 ;;
+            *) dir=$1 ;;
+        esac
+        shift
+    done
+    [ -d "$dir" ] && [ -n "$repo" ] \
+        || { echo "datagen.sh: upload /data/DIR --hf-repo USER/NAME [--delete-after-upload]" >&2; exit 1; }
+    prefixes=$(find "$dir" -maxdepth 1 -name 'm*-v*.s*.bin' -printf '%f\n' | sed 's/\.s[0-9]*\.bin$//' | sort -u)
+    [ -n "$prefixes" ] || { echo "datagen.sh: no sealed shards m<hash>-v<version>.sNNNN.bin in $dir" >&2; exit 1; }
+    for prefix in $prefixes; do
+        machine=${prefix%%-v*}
+        python3 /hydray/hf_upload.py --data "$dir" --repo "$repo" --prefix "$prefix" \
+            --subdir "$machine" --owner "$machine" --once $delete
+    done
+    exit 0
 fi
 
 # nproc sees --cpuset-cpus but not --cpus, which is a cgroup quota.

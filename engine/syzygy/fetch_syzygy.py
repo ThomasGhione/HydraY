@@ -70,6 +70,11 @@ def main():
         print(f"fetch_syzygy: {len(bad)} of {len(sums)} tables missing or damaged in {args.dir}",
               flush=True)
         sys.exit(1)
+    try:
+        urllib.request.urlopen(BASE, timeout=20).close()
+    except Exception as e:
+        sys.exit(f"fetch_syzygy: {BASE} unreachable ({e}): without internet copy the "
+                 f"tables from a machine that has them (engine/syzygy/files)")
     print(f"fetch_syzygy: fetching {len(bad)} of {len(sums)} tables (all 290: ~1 GB) "
           f"into {args.dir}", flush=True)
     for i, (name, want) in enumerate(bad, 1):
