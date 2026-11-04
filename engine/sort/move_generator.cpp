@@ -188,9 +188,8 @@ MoveList generateMovesFor(const Board& b, uint64_t checkers) noexcept {
         }
 
         if (!inCheck) { // castling: illegal when in check.
-            const int f = chess::file(kingFrom);
-            if (f <= 5 && b.isLegalPseudoMove(kingFrom, kingFrom + 2, kingPiece)) moves.emplace_back(kingFrom, kingFrom + 2);
-            if (f >= 2 && b.isLegalPseudoMove(kingFrom, kingFrom - 2, kingPiece)) moves.emplace_back(kingFrom, kingFrom - 2);
+            for (const int right : {2 * v.side, 2 * v.side + 1})
+                if (b.canCastle(right)) moves.emplace_back(Board::CASTLINGS[right].king, Board::CASTLINGS[right].kingTo);
         }
         if (inDoubleCheck) return moves; // only the king can move
     }

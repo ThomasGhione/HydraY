@@ -122,22 +122,23 @@ uint64_t Board::checkersTo(uint8_t color) const noexcept {
 
 [[nodiscard]] bool Board::isKingMoveLegal(uint8_t fromIndex, uint8_t toIndex, uint64_t toBit,
                                           uint8_t movingColor) const noexcept {
-    const uint8_t oppColor = oppositeColor(movingColor);
     const int diff = static_cast<int>(toIndex) - fromIndex;
     // Only castling moves the king two files: a one-step offset is 1, 7, 8 or 9.
     if (diff == 2 || diff == -2) [[unlikely]] {
-        const bool isWhite = (movingColor == WHITE), kingside = (diff == 2);
-        const int dir = kingside ? 1 : -1;
-        const uint8_t sq1 = fromIndex + dir, sq2 = fromIndex + 2 * dir;
-        const uint8_t rookIdx = kingside ? fromIndex + 3 : fromIndex - 4;
-        return fromIndex == (isWhite ? 60 : 4)
-            && ((castle >> ((!isWhite << 1) | !kingside)) & 1)
-            && get(sq1) == EMPTY && get(sq2) == EMPTY && (kingside || get(fromIndex - 3) == EMPTY)
-            && (bb[ROOK][!isWhite] & (1ULL << rookIdx))
-            && !isSquareAttacked(fromIndex, oppColor) && !isSquareAttacked(sq1, oppColor)
-            && !isSquareAttacked(sq2, oppColor);
+        const int right = 2 * colorToIndex(movingColor) + (diff < 0);
+        return fromIndex == CASTLINGS[right].king && canCastle(right);
     }
-    return (pieces::KING_ATTACKS[fromIndex] & toBit) && !isSquareAttacked(toIndex, oppColor, fromIndex);
+    return (pieces::KING_ATTACKS[fromIndex] & toBit) && !isSquareAttacked(toIndex, oppositeColor(movingColor), fromIndex);
+}
+
+bool Board::canCastle(int right) const noexcept {
+    const Castling& c = CASTLINGS[right];
+    const int side = right >> 1;
+    if (!((castle >> right) & 1) || !((bb[KING][side] >> c.king) & 1) || !((bb[ROOK][side] >> c.rook) & 1)
+        || (occupancy & c.between)) return false;
+    for (uint64_t path = c.kingPath; path; )
+        if (attackersOf(static_cast<uint8_t>(pieces::popLSB(path)), side ^ 1, occupancy)) return false;
+    return true;
 }
 
 // Whether byColor attacks targetIndex, with excludeSquare (if < 64) lifted off
@@ -146,17 +147,6 @@ bool Board::isSquareAttacked(uint8_t targetIndex, uint8_t byColor, uint8_t exclu
     const uint64_t occMinus = excludeSquare < 64 ? (occupancy & ~(1ULL << excludeSquare)) : occupancy;
     return attackersOf(targetIndex, colorToIndex(byColor), occMinus) != 0;
 }
-
-uint64_t Board::attackersOf(uint8_t sq, uint8_t side, uint64_t occ) const noexcept {
-    uint64_t attackers = (pieces::PAWN_ATTACKS[side ^ 1][sq] & bb[PAWN][side])
-                       | (pieces::KNIGHT_ATTACKS[sq] & bb[KNIGHT][side])
-                       | (pieces::KING_ATTACKS[sq] & bb[KING][side]);
-    if (const uint64_t rookLike = bb[ROOK][side] | bb[QUEEN][side]) attackers |= pieces::Rook::attacks(sq, occ) & rookLike;
-    if (const uint64_t bishopLike = bb[BISHOP][side] | bb[QUEEN][side]) attackers |= pieces::Bishop::attacks(sq, occ) & bishopLike;
-    return attackers;
-}
-
-
 
 void Board::recomputeHashAndEp() noexcept {
     currentHash = zobrist::computeHashKey(*this);

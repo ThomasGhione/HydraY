@@ -115,21 +115,12 @@ bool givesCheckAfterQuietMoveFast(const Board& b, const chess::Move& m,
     const int usSide = Board::colorToIndex(b.getActiveColor());
     const uint64_t fromBit = 1ULL << m.from;
     const uint64_t toBit   = 1ULL << m.to;
-    const uint64_t occAfter = (occ & ~fromBit) | toBit;
-    // Our pieces of a type after the move.
-    const auto mine = [&](int type) {
+    // Our pieces as they stand after the move.
+    const auto after = [&](int type) {
         const uint64_t bits = b.bb[type][usSide];
         return type == fromPieceType ? (bits & ~fromBit) | toBit : bits;
     };
-
-    if (pieces::PAWN_ATTACKS[usSide ^ 1][oppKingSq] & mine(Board::PAWN)) return true;
-    if (pieces::KNIGHT_ATTACKS[oppKingSq] & mine(Board::KNIGHT))         return true;
-
-    const uint64_t queens       = mine(Board::QUEEN);
-    const uint64_t rookQueens   = mine(Board::ROOK)   | queens;
-    const uint64_t bishopQueens = mine(Board::BISHOP) | queens;
-    if (rookQueens   && (pieces::Rook::attacks(oppKingSq, occAfter)   & rookQueens))   return true;
-    return bishopQueens && (pieces::Bishop::attacks(oppKingSq, occAfter) & bishopQueens);
+    return Board::attackersOf(static_cast<uint8_t>(oppKingSq), usSide, (occ & ~fromBit) | toBit, after) != 0;
 }
 
 MovePicker sortLegalMoves(MoveList moves, int ply, const Board& b, const SearchRuntime& runtime,

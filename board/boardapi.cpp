@@ -5,14 +5,16 @@ namespace chess {
 
 namespace {
 
-// The castling rights a move from or to each square keeps (KQkq = bits 0..3):
-// moving the king or a rook off its home square, or capturing on a rook's home
-// square, gives the matching rights up.
+// The castling rights a move from or to each square keeps: moving the king or
+// a rook off its home square, or capturing on a rook's home square, gives the
+// matching rights up.
 constexpr std::array<uint8_t, 64> CASTLING_KEEP = [] {
     std::array<uint8_t, 64> keep{};
-    keep.fill(0x0F);
-    keep[0]  = 0x07; keep[4]  = 0x03; keep[7]  = 0x0B;   // a8 q, e8 kq, h8 k
-    keep[56] = 0x0D; keep[60] = 0x0C; keep[63] = 0x0E;   // a1 Q, e1 KQ, h1 K
+    keep.fill(Board::CASTLING_RIGHTS_ALL);
+    for (int right = 0; right < 4; ++right) {
+        keep[Board::CASTLINGS[right].king] &= static_cast<uint8_t>(~(1 << right));
+        keep[Board::CASTLINGS[right].rook] &= static_cast<uint8_t>(~(1 << right));
+    }
     return keep;
 }();
 
@@ -155,12 +157,10 @@ inline void Board::doMoveByKind(MoveState& st, uint8_t moving, uint8_t destBefor
     }
     relocate<true>(moving, fromIndex, toIndex);
     if constexpr (Kind == MoveKind::Castling) {
-        const bool kingside = toIndex > fromIndex;
-        st.rookFromIndex = (toIndex & ~7) | (kingside ? 7 : 0);
-        st.rookToIndex   = (toIndex & ~7) | (kingside ? 5 : 3);
-        const uint8_t rook = get(st.rookFromIndex);
-        relocate<true>(rook, st.rookFromIndex, st.rookToIndex);
-        key ^= zobrist::TABLES.pieces[rook][st.rookFromIndex] ^ zobrist::TABLES.pieces[rook][st.rookToIndex];
+        const Castling& c = castlingTo(toIndex);
+        const uint8_t rook = get(c.rook);
+        relocate<true>(rook, c.rook, c.rookTo);
+        key ^= zobrist::TABLES.pieces[rook][c.rook] ^ zobrist::TABLES.pieces[rook][c.rookTo];
     }
     castle &= CASTLING_KEEP[fromIndex] & CASTLING_KEEP[toIndex];
     if constexpr (Kind == MoveKind::DoublePawnPush) enPassant = (fromIndex + toIndex) >> 1;
@@ -193,7 +193,10 @@ inline void Board::undoMoveByKind(const MoveState& st, uint8_t pieceOnTo, uint8_
         occupancy |= 1ULL << sq;
         addPieceToBB<false>(st.capturedPiece, sq);
     }
-    if constexpr (Kind == MoveKind::Castling) relocate<false>(get(st.rookToIndex), st.rookToIndex, st.rookFromIndex);
+    if constexpr (Kind == MoveKind::Castling) {
+        const Castling& c = castlingTo(toIndex);
+        relocate<false>(get(c.rookTo), c.rookTo, c.rook);
+    }
 }
 
 // --- Incremental do/undo, no legality checks ---

@@ -16,6 +16,9 @@
 
 namespace chess {
 
+// The FEN letter of each piece nibble (type | 0x8 for white), '.' for none.
+inline constexpr std::string_view PIECE_LETTERS = ".pnbrqk..PNBRQK.";
+
 struct Move {
     Square from = NO_SQUARE;
     Square to   = NO_SQUARE;
@@ -26,22 +29,12 @@ struct Move {
     constexpr bool operator==(const Move&) const noexcept = default;
     constexpr bool sameFromTo(const Move& other) const noexcept { return from == other.from && to == other.to; };
 
-    // Literal values mirror Board::piece_id (declared below Move); the
-    // static_asserts after the Board definition pin the coupling.
+    // KNIGHT..QUEEN are 2..5 (Board is declared below; static_asserts there pin it).
     static constexpr uint8_t promotionTypeFromChar(char c) noexcept {
-        switch (c) {
-            case 'q': case 'Q': return 5; // Board::QUEEN
-            case 'r': case 'R': return 4; // Board::ROOK
-            case 'b': case 'B': return 3; // Board::BISHOP
-            case 'n': case 'N': return 2; // Board::KNIGHT
-            default:            return 0;
-        }
+        const size_t type = PIECE_LETTERS.find(ascii::toLower(c));
+        return (type >= 2 && type <= 5) ? static_cast<uint8_t>(type) : 0;
     }
-
-    constexpr char promotionChar() const noexcept {
-        constexpr char CHARS[8] = {'\0', '\0', 'n', 'b', 'r', 'q', '\0', '\0'};
-        return CHARS[promotionType & 7];
-    }
+    constexpr char promotionChar() const noexcept { return PIECE_LETTERS[promotionType & 7]; }
 
     std::string toUCIString() const noexcept { return squareToString(from) + squareToString(to) + (promotionType ? std::string(1, promotionChar()) : std::string{}); }
 };
@@ -94,8 +87,6 @@ public:
 
         uint8_t capturedPiece;
         uint8_t enPassantCapturedIndex;
-        uint8_t rookFromIndex;
-        uint8_t rookToIndex;
         uint8_t prevPliesFromNull;
         MoveKind moveKind;
     };
@@ -108,6 +99,30 @@ public:
     static constexpr uint8_t  MASK_PIECE_TYPE         = 0x07;
     static constexpr uint8_t  CASTLING_RIGHTS_ALL     = 0x0F;
     static constexpr uint16_t REPETITION_HISTORY_CAPACITY = 255; // must be 255 instead of 100 due to the 8-bit prevHistorySize in MoveState
+
+    // Castling by right, KQkq = bits 0..3 of the rights: the king's and the
+    // rook's squares before and after, the squares between them, which must be
+    // empty, and the king's path, which no enemy piece may attack.
+    struct Castling {
+        Square king, kingTo, rook, rookTo;
+        uint64_t between, kingPath;
+    };
+    static constexpr std::array<Castling, 4> CASTLINGS = [] {
+        std::array<Castling, 4> all{};
+        for (int right = 0; right < 4; ++right) {
+            const int king = right < 2 ? 60 : 4, dir = (right & 1) ? -1 : 1;   // e1 or e8; queenside is west
+            const int rook = dir > 0 ? king + 3 : king - 4;
+            Castling& c = all[right];
+            c = {Square(king), Square(king + 2 * dir), Square(rook), Square(king + dir), 0, 0};
+            for (int sq = std::min(king, rook) + 1; sq < std::max(king, rook); ++sq) c.between |= 1ULL << sq;
+            for (int step = 0; step <= 2; ++step) c.kingPath |= 1ULL << (king + step * dir);
+        }
+        return all;
+    }();
+    // The castling whose king lands on kingTo: g1, c1, g8 or c8.
+    static constexpr const Castling& castlingTo(Square kingTo) noexcept {
+        return CASTLINGS[2 * (rank(kingTo) == 0) + (file(kingTo) == 2)];
+    }
 
     // --- Constructors ---
     Board() noexcept { fenToBoard(STARTING_FEN); }
@@ -139,7 +154,20 @@ public:
     // --- Legality & attack queries ---
     bool isLegalPseudoMove(uint8_t fromIndex, uint8_t toIndex, uint8_t fromPiece) const noexcept;
     bool isSquareAttacked(uint8_t targetIndex, uint8_t byColor, uint8_t excludeSquare = 64) const noexcept;
+    // Whether the side of `right` may castle that way now (CASTLINGS[right]).
+    bool canCastle(int right) const noexcept;
     bool inCheck(uint8_t color) const noexcept { return checkersTo(color) != 0; }
+    // The pieces of `side` that attack sq with `occ` as the blockers, where
+    // piecesOf(type) is that side's bitboard of a piece type.
+    template<typename PiecesOf>
+    static uint64_t attackersOf(uint8_t sq, int side, uint64_t occ, PiecesOf piecesOf) noexcept {
+        uint64_t attackers = (pieces::PAWN_ATTACKS[side ^ 1][sq] & piecesOf(PAWN))
+                           | (pieces::KNIGHT_ATTACKS[sq] & piecesOf(KNIGHT))
+                           | (pieces::KING_ATTACKS[sq] & piecesOf(KING));
+        if (const uint64_t rookLike = piecesOf(ROOK) | piecesOf(QUEEN)) attackers |= pieces::Rook::attacks(sq, occ) & rookLike;
+        if (const uint64_t bishopLike = piecesOf(BISHOP) | piecesOf(QUEEN)) attackers |= pieces::Bishop::attacks(sq, occ) & bishopLike;
+        return attackers;
+    }
     // Bitboard of enemy pieces giving check to `color`'s king (0 = no check).
     // One scan answers inCheck (!=0), double check (>1 bit) and, via the
     // checker square, the evasion mask - callers should reuse it.
@@ -212,8 +240,10 @@ private:
     template<uint8_t PieceType>
     [[nodiscard]] inline bool pseudoMoveLegalByType(uint8_t fromIndex, uint8_t toIndex, uint64_t toBit,
                                                     uint8_t movingColor, uint8_t destPiece) const noexcept;
-    // The pieces of `side` that attack sq with `occ` as the blockers.
-    uint64_t attackersOf(uint8_t sq, uint8_t side, uint64_t occ) const noexcept;
+    // The pieces of `side` on this board that attack sq with `occ` as the blockers.
+    uint64_t attackersOf(uint8_t sq, uint8_t side, uint64_t occ) const noexcept {
+        return attackersOf(sq, side, occ, [&](int type) { return bb[type][side]; });
+    }
 
     // --- Private helpers: move classification ---
     static constexpr bool isCaptureKind(MoveKind k) noexcept { return k == MoveKind::Capture || k == MoveKind::PromotionCapture; }
@@ -259,13 +289,11 @@ private:
     std::unique_ptr<NNUE::Accumulator[]> accFrames{new NNUE::Accumulator[NNUE::ACC_FRAMES]};
 };
 
-static_assert(Move::promotionTypeFromChar('q') == Board::QUEEN
-           && Move::promotionTypeFromChar('r') == Board::ROOK
-           && Move::promotionTypeFromChar('b') == Board::BISHOP
-           && Move::promotionTypeFromChar('n') == Board::KNIGHT
-           && Move{0, 0, Board::QUEEN}.promotionChar() == 'q'
-           && Move{0, 0, Board::KNIGHT}.promotionChar() == 'n',
-    "Move promotion helpers must mirror Board::piece_id");
+static_assert(Board::CASTLINGS[0].rookTo == 61 && Board::CASTLINGS[1].between == 0x0E00000000000000ULL
+           && Board::CASTLINGS[2].kingPath == 0x70ULL && Board::CASTLINGS[3].rook == 0, "castling geometry");
+static_assert(PIECE_LETTERS[Board::PAWN] == 'p' && PIECE_LETTERS[Board::KING | Board::WHITE] == 'K'
+           && Move::promotionTypeFromChar('N') == Board::KNIGHT && Move::promotionTypeFromChar('q') == Board::QUEEN
+           && Move::promotionTypeFromChar('k') == 0, "piece letters and promotion types follow Board::piece_id");
 
 // FEN piece placement of 64 squares (0 = a8), each a piece letter or '.'.
 std::string placementFen(const std::array<char, 64>& squares);
