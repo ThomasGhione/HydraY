@@ -13,6 +13,7 @@ services:
       args:
         ARCH: -march=x86-64-v3    # ISA, as in the makefile
         JOBS: "2"                 # parallel compile jobs
+        GIT_COMMIT: ${GIT_COMMIT:-}   # optional, for the manifests
     image: hydray-datagen
     init: true
     user: "1000:1000"             # owner of the files: `id -u`:`id -g`
@@ -22,10 +23,14 @@ services:
     volumes:
       - ../data:/data
       - ../engine/syzygy/files:/hydray/engine/syzygy/files:ro   # optional
+      # The prefix (m + 8 hex of its hash) and the owner of the dataset folder
+      # come from the machine-id; the host name goes in the manifests.
+      - /etc/machine-id:/host/machine-id:ro
+      - /etc/hostname:/host/hostname:ro
     # The flags of ./chess datagen (--help), plus the upload ones. Threads
     # default to every CPU; --games does not fit a service that restarts.
     command:
-      - --out=/data/pc1           # one prefix per machine
+      # - --out=/data/NAME        # default /data/m<machine-id hash>
       - --nodes=8000
       - --seal-on-exit
       # Upload of the sealed shards: uncomment and set the dataset.

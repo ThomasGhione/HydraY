@@ -1,7 +1,11 @@
 #!/bin/sh
 # Container entry point. The arguments are those of ./chess datagen (see
-# --help), after the container's defaults: --out /data/hydray, --threads = the
-# CPUs the container may use. A later flag wins, so both can be overridden.
+# --help), after the container's defaults; a later flag wins, so each can be
+# overridden:
+#   --out /data/m<8 hex>   the hash of the host's /etc/machine-id, mounted at
+#                          /host/machine-id: one stable prefix per machine
+#   --threads              the CPUs the container may use
+#   --machine, --build     the host name (/host/hostname) and the image's build
 #
 # Upload of the sealed shards to a Hugging Face dataset (HF_TOKEN in the
 # environment), handled here and not passed to datagen:
@@ -9,6 +13,8 @@
 #   --hf-subdir DIR         folder in the dataset (default: the --out name)
 #   --hf-every SECONDS      time between passes (default 600)
 #   --delete-after-upload   remove a shard once the Hub holds it
+# The dataset folder belongs to the machine (OWNER, the machine-id hash): a
+# second machine with the same prefix is refused instead of mixing shards.
 #
 #   docker run ... hydray-datagen dump /data/<file.bin> [count]
 set -e
@@ -26,9 +32,16 @@ if read -r quota period 2>/dev/null < /sys/fs/cgroup/cpu.max && [ "$quota" != ma
 fi
 [ "$cpus" -gt 32 ] && cpus=32
 
+# Never the container's own machine-id: every container of the image shares it.
+machine_hash=
+if [ -s /host/machine-id ]; then
+    machine_hash=m$(tr -d '[:space:]' < /host/machine-id | sha256sum | cut -c1-8)
+fi
+host=$(cat /host/hostname 2>/dev/null || true)
+
 # Splits the upload flags off and rebuilds the rest as datagen's arguments,
 # noting --out to know where the shards land.
-out=/data/hydray repo= subdir= every=600 delete=
+out= repo= subdir= every=600 delete=
 n=$#
 while [ "$n" -gt 0 ]; do
     a=$1; shift; n=$((n - 1))
@@ -49,7 +62,15 @@ while [ "$n" -gt 0 ]; do
         *) set -- "$@" "$a" ;;
     esac
 done
-set -- --out /data/hydray --threads "$cpus" "$@"
+if [ -z "$out" ]; then
+    [ -n "$machine_hash" ] || {
+        echo "datagen.sh: mount the host's /etc/machine-id at /host/machine-id, or give --out" >&2
+        exit 1
+    }
+    out=/data/$machine_hash
+fi
+set -- --out "$out" --threads "$cpus" --machine "${host:-${machine_hash:-unknown}}" \
+    --build "$(cat /hydray/BUILD_ID)" "$@"
 case $out in
     /data/*) ;;
     *) echo "datagen.sh: warning: --out $out is outside the /data volume" >&2 ;;
@@ -61,17 +82,14 @@ fi
 
 upload() {
     python3 /hydray/hf_upload.py --data "$(dirname "$out")" --repo "$repo" \
-        --prefix "$(basename "$out")" --subdir "${subdir:-$(basename "$out")}" $delete "$@"
+        --prefix "$(basename "$out")" --subdir "${subdir:-$(basename "$out")}" \
+        --owner "${machine_hash:-$(basename "$out")}" --host "${host:-unknown}" $delete "$@"
 }
-# Fails here, before hours of datagen, on a bad token or repo.
-python3 - <<'EOF' || exit 1
-import sys
-from huggingface_hub import HfApi
-try:
-    HfApi().whoami()
-except Exception as e:
-    sys.exit(f"datagen.sh: Hugging Face login failed (HF_TOKEN?): {type(e).__name__}")
-EOF
+# Fails here, before hours of datagen, on a bad token, repo or OWNER. The
+# first free shard number upstream keeps a wiped /data from reusing names.
+first=$(upload --check --next-shard) \
+    || { echo "datagen.sh: the upload cannot start (HF_TOKEN? dataset? OWNER?)" >&2; exit 1; }
+set -- "$@" --first-shard "$first"
 
 upload --every "$every" &
 uploader=$!
