@@ -1,6 +1,7 @@
 # HydraY datagen with Docker Compose: edit the settings below; docker/.env
-# holds only HF_TOKEN. README, "In Docker", has the walkthrough.
+# holds only HF_TOKEN. docker/README.md has the walkthrough.
 #
+#   mkdir -p data                                     # before the first start
 #   docker compose -f docker/compose.yaml up -d --build
 #   docker compose -f docker/compose.yaml logs -f
 #   docker compose -f docker/compose.yaml down        # seals and uploads the shard
@@ -16,13 +17,15 @@ services:
         GIT_COMMIT: ${GIT_COMMIT:-}   # optional, for the manifests
     image: hydray-datagen
     init: true
-    user: "1000:1000"             # owner of the files: `id -u`:`id -g`
+    # Must own data/: put here what `id -u`:`id -g` prints on the host.
+    user: "1000:1000"
     env_file:
       - path: .env                # HF_TOKEN=...
         required: false
     volumes:
       - ../data:/data
-      - ../engine/syzygy/files:/hydray/engine/syzygy/files:ro   # optional
+      - ../engine/syzygy/files:/hydray/engine/syzygy/files:ro   # optional, main README "Syzygy"
+      # Linux only: elsewhere remove these two and set --out below.
       # The prefix (m + 8 hex of its hash) and the owner of the dataset folder
       # come from the machine-id; the host name goes in the manifests.
       - /etc/machine-id:/host/machine-id:ro

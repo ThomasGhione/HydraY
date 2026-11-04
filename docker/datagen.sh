@@ -81,6 +81,14 @@ case $out in
     /data/*) ;;
     *) echo "datagen.sh: warning: --out $out is outside the /data volume" >&2 ;;
 esac
+# The usual first-run trap: a data/ that Docker created as root, or a user:
+# that is not the owner of data/.
+outdir=$(dirname "$out")
+if ! { mkdir -p "$outdir" && [ -w "$outdir" ]; } 2>/dev/null; then
+    echo "datagen.sh: $outdir is not writable by uid $(id -u): create data/ before the" \
+         "first start (mkdir -p data) and set user: in compose.yaml to \`id -u\`:\`id -g\`" >&2
+    exit 1
+fi
 
 if [ -z "$repo" ]; then
     exec ./chess datagen "$@"

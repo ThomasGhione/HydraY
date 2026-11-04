@@ -5,11 +5,25 @@ CPU, and can upload the sealed shards to a Hugging Face dataset as they come.
 The datagen itself (flags, shards, manifests) is described in the main
 README, "Generating training data".
 
+## Requirements
+
+- A Linux host: the prefix and the dataset owner come from `/etc/machine-id`.
+  On macOS or Windows remove the two `/host/...` mounts from `compose.yaml`
+  and give `--out=/data/NAME` (and `--hf-subdir`) by hand.
+- Docker with Compose 2.24 or newer (`docker compose version`), for the
+  optional `.env`.
+- An x86-64 CPU with AVX2 + BMI2 (`ARCH` in `compose.yaml` for another ISA).
+- Optional: the Syzygy tablebases in `engine/syzygy/files`
+  (`engine/syzygy/download_syzygy.sh`, main README "Syzygy Tablebases"): with
+  them the datagen adjudicates and labels endgames exactly.
+
 ## Quick start
 
 From the repository root:
 
 ```sh
+mkdir -p data                          # before the first start, see below
+id -u; id -g                           # into user: in compose.yaml if not 1000:1000
 cp docker/.env.example docker/.env     # HF_TOKEN=..., only for the upload
 docker compose -f docker/compose.yaml up -d --build
 docker compose -f docker/compose.yaml logs -f      # progress, seals, uploads
@@ -19,6 +33,27 @@ docker compose -f docker/compose.yaml down         # stop: shard sealed and uplo
 The shards land in `data/` at the repository root. The service restarts by
 itself after a crash or a reboot and resumes where it stopped; `down` stops it
 for good.
+
+`data/` must exist and belong to the `user:` of `compose.yaml` before the
+first start: a missing `data/` is created by Docker as root, and the container
+cannot write it. The container then stops at once with `... is not writable
+by uid ...`; the fix is `sudo chown "$(id -u):$(id -g)" data` or the right
+`user:`. The same holds for `engine/syzygy/files`, which Docker creates empty
+when the tablebases are missing (harmless: datagen runs without them).
+
+The datagen uses every CPU of the container; `--threads=N` in `command:`, or
+`cpus:` in the service, leaves room for other work.
+
+## Updating
+
+```sh
+git pull
+docker compose -f docker/compose.yaml up -d --build
+```
+
+The rebuilt image stops the old container (shard sealed and uploaded) and
+starts the new one. A new engine version writes under a new prefix; the old
+shards stay where they are.
 
 ## Settings
 
@@ -62,8 +97,12 @@ in the environment. `--out=/data/NAME` overrides the prefix.
 
 ## Upload to Hugging Face
 
-Uncomment `--hf-repo=USER/NAME` in `command:` (the dataset is created private
-if missing) and, to free the disk as it goes, `--delete-after-upload`. Upload
+The token goes in `docker/.env` as `HF_TOKEN=hf_...`: a token with write
+access (huggingface.co, Settings, Access Tokens, "Write", or a fine-grained
+one with write on the dataset). Then uncomment `--hf-repo=USER/NAME` in
+`command:` (`ORG/NAME` for a dataset of an organization the token can write;
+the dataset is created private if missing) and, to free the disk as it goes,
+`--delete-after-upload`. Upload
 flags: `--hf-repo`, `--hf-subdir` (default: the machine hash), `--hf-every`
 (seconds between passes, default 600), `--delete-after-upload`.
 
@@ -88,6 +127,32 @@ flags: `--hf-repo`, `--hf-subdir` (default: the machine hash), `--hf-every`
   starts. At the stop a last pass uploads the shard sealed at exit
   (`stop_grace_period` gives it 10 minutes); anything left goes up at the next
   start.
+
+### First run with a new token
+
+Before the long run, a short one on a throwaway dataset checks token, upload
+and deletion end to end in a couple of minutes:
+
+```sh
+docker compose -f docker/compose.yaml run --rm datagen --games=200 --seal-on-exit \
+    --shard=2000 --out=/data/test --hf-repo=USER/hydray-test \
+    --hf-subdir=test --hf-every=30 --delete-after-upload
+```
+
+The log must show `sealed`, `uploaded ... (SHA-256 checked)` and `deleted`; the dataset must hold
+`test/` with shards, manifests, `index.jsonl` and `OWNER`, and `data/` only
+the manifests. Then delete the test dataset on the Hub and `data/test*`.
+
+### Downloading for training
+
+```sh
+pip install huggingface_hub
+hf download USER/hydray-data --repo-type dataset --local-dir ~/hydray-data
+```
+
+`--include "m956ee98b/*-v4.3.1.*"` takes one machine and version only;
+`index.jsonl` and the manifests tell which shards were made with which net
+and settings.
 
 ## Disk space
 
@@ -122,6 +187,7 @@ The uploader also runs without Docker:
 
 | Message | Meaning |
 |---|---|
+| `... is not writable by uid ...` | `data/` missing when Docker started (so created as root) or owned by another user: `mkdir -p data`, `chown`, or fix `user:` |
 | `PAUSED: ... MB free` | under `--min-free-gb`; it resumes by itself once there is room |
 | `CONFLICT ... on the Hub with other content` | a name taken upstream with other data: nothing was uploaded or deleted; check the prefixes |
 | `... belongs to mXXXXXXXX ...` | the dataset folder is another machine's: give this one another `--out` and `--hf-subdir` |
