@@ -7,7 +7,6 @@
 #include <utility>
 #include <vector>
 
-#include "../../debug.hpp"
 #include "../../nnue/nnue.hpp"
 #include "../../uci/output.hpp"
 #include "../engine.hpp"
@@ -146,12 +145,6 @@ bool skipToLosingCaptures(MovePicker& picker, const Board& b,
     }
     picker.currentIndex = start;
     return true;
-}
-
-// delta > 0 is a bonus, delta < 0 a malus; the decay scales with |delta|.
-void applyHistoryGravity(int16_t& cell, int32_t delta, int32_t maxValue) noexcept {
-    const int32_t value = cell + delta - cell * std::abs(delta) / maxValue;
-    cell = static_cast<int16_t>(std::clamp<int32_t>(value, INT16_MIN, INT16_MAX));
 }
 
 // Per-node entry shared by searchPosition and quiescenceSearch: count the node,
@@ -521,6 +514,12 @@ SearchMoveResult searchMoves(Board& b, MovePicker& movePicker, const SearchConte
 
         if (allowHeuristicUpdates) {
             const int32_t bonus = (ctx.depth + 1) * (ctx.depth + 1) * HIST_BONUS_PCT / 100;
+            // A quiet move's butterfly and continuation history, for the bonus and the malus alike.
+            const auto quietHistory = [&](int from, int to, int pieceType, int32_t delta) {
+                applyHistoryGravity(runtime.history[usSide][from][to], delta, MAX_HISTORY);
+                if (ctx.contHistEntry != nullptr)
+                    applyHistoryGravity(ctx.contHistEntry[contHistIndex(pieceType, to)], delta, MAX_HISTORY);
+            };
             if (t.isCapture) {
                 int16_t* cell = runtime.captureHistory[usSide][m.to][t.victimType];
                 applyHistoryGravity(cell[0], bonus, MAX_CAPTURE_HISTORY);
@@ -535,21 +534,12 @@ SearchMoveResult searchMoves(Board& b, MovePicker& movePicker, const SearchConte
                     killers[1] = killers[0];
                     killers[0] = m;
                 }
-                applyHistoryGravity(runtime.history[usSide][m.from][m.to], bonus, MAX_HISTORY);
-                if (ctx.contHistEntry != nullptr) {
-                    applyHistoryGravity(ctx.contHistEntry[contHistIndex(t.fromType, m.to)], bonus, MAX_HISTORY);
-                }
+                quietHistory(m.from, m.to, t.fromType, bonus);
             }
             // Malus to the moves searched before the cutoff; the cutoff move
             // itself is the last tracked entry of its kind and is spared.
-            for (int i = 0; i < numSearchedQuiets - isQuietMove; ++i) {
-                applyHistoryGravity(runtime.history[usSide][searchedQuiets[i].from][searchedQuiets[i].to],
-                                    -bonus, MAX_HISTORY);
-                if (ctx.contHistEntry != nullptr) {
-                    applyHistoryGravity(ctx.contHistEntry[contHistIndex(searchedQuiets[i].pieceType, searchedQuiets[i].to)],
-                                        -bonus, MAX_HISTORY);
-                }
-            }
+            for (int i = 0; i < numSearchedQuiets - isQuietMove; ++i)
+                quietHistory(searchedQuiets[i].from, searchedQuiets[i].to, searchedQuiets[i].pieceType, -bonus);
             for (int i = 0; i < numSearchedCaptures - t.isCapture; ++i) {
                 int16_t* cell = runtime.captureHistory[usSide][searchedCaptures[i].to][searchedCaptures[i].victimType];
                 applyHistoryGravity(cell[0], -bonus, MAX_CAPTURE_HISTORY);
@@ -742,11 +732,9 @@ int32_t searchPosition(Board& b, SearchRuntime& runtime, int depth, int32_t alph
     int16_t* contHistEntry = nullptr;
     if (previousMove != nullptr && previousMove->to < 64) {
         const int prevPiece = b.get(previousMove->to) & Board::MASK_PIECE_TYPE;
-        DBG_ONLY(
-            if (prevPiece == 0) {
-                DBG_LOG_STREAM("contHist: EMPTY square under previousMove->to\n");
-            }
-        );
+        if constexpr (kDebugChecks) {
+            if (prevPiece == 0) std::cout << "contHist: EMPTY square under previousMove->to\n";
+        }
         contHistEntry = &runtime.contHist[side ^ 1][prevPiece - 1][previousMove->to][0][0];
     }
 
@@ -786,11 +774,7 @@ int32_t searchPosition(Board& b, SearchRuntime& runtime, int depth, int32_t alph
             const int64_t step = int64_t{target - eval.corrected} * depth
                                * (raisedAlpha ? CORR_BONUS_RATE_RAISED : CORR_BONUS_RATE) / 1280;
             const int32_t bonus = static_cast<int32_t>(std::clamp<int64_t>(step, -CORR_BONUS_CAP, CORR_BONUS_CAP));
-            const CorrectionHistory::Cells cells = runtime.corrHist.cellsFor(b);
-            applyHistoryGravity(*cells.pawn, bonus, CORR_HIST_LIMIT);
-            applyHistoryGravity(*cells.minor, bonus * CORR_UPDATE_MINOR / 128, CORR_HIST_LIMIT);
-            applyHistoryGravity(*cells.nonPawnWhite, bonus * CORR_UPDATE_NON_PAWN / 128, CORR_HIST_LIMIT);
-            applyHistoryGravity(*cells.nonPawnBlack, bonus * CORR_UPDATE_NON_PAWN / 128, CORR_HIST_LIMIT);
+            runtime.corrHist.update(b, bonus);
         }
     }
 

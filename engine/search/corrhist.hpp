@@ -7,8 +7,10 @@
 // residual * depth * CORR_BONUS_RATE / 1280 units, and a full cell reads as
 // CORR_HIST_LIMIT * weight / CORR_HIST_SCALE eval units.
 
+#include <algorithm>
 #include <cstddef>
 #include <cstdint>
+#include <cstdlib>
 #include <cstring>
 
 #include "../../board/board.hpp"
@@ -16,12 +18,46 @@
 
 namespace engine {
 
+// The update of every history table: delta > 0 is a bonus, delta < 0 a malus,
+// and the decay scales with |delta|.
+inline void applyHistoryGravity(int16_t& cell, int32_t delta, int32_t maxValue) noexcept {
+    const int32_t value = cell + delta - cell * std::abs(delta) / maxValue;
+    cell = static_cast<int16_t>(std::clamp<int32_t>(value, INT16_MIN, INT16_MAX));
+}
+
 struct CorrectionHistory {
     // [side to move][key]; nonPawn adds the colour whose pieces form the key.
     int16_t pawn[2][CORR_HIST_SIZE] {};
     int16_t minor[2][CORR_HIST_SIZE] {};
     int16_t nonPawn[2][2][CORR_HIST_SIZE] {};
 
+    // Correction to add to the raw static eval (side-to-move relative).
+    int32_t correction(const chess::Board& b) noexcept {
+        const Cells c = cellsFor(b);
+        const int64_t sum = int64_t{CORR_WEIGHT_PAWN} * *c.pawn
+                          + int64_t{CORR_WEIGHT_MINOR} * *c.minor
+                          + int64_t{CORR_WEIGHT_NON_PAWN} * (*c.nonPawnWhite + *c.nonPawnBlack);
+        return static_cast<int32_t>(sum * CORR_HIST_WEIGHT_PCT / (int64_t{CORR_HIST_SCALE} * 100));
+    }
+
+    // Moves b's cells towards the search score: the pawn cell by bonus, the
+    // others by their share of it in 128ths. Forced inline: as a call it
+    // reshaped searchPosition and cost 1%.
+    __attribute__((always_inline)) void update(const chess::Board& b, int32_t bonus) noexcept {
+        const Cells c = cellsFor(b);
+        applyHistoryGravity(*c.pawn, bonus, CORR_HIST_LIMIT);
+        applyHistoryGravity(*c.minor, bonus * CORR_UPDATE_MINOR / 128, CORR_HIST_LIMIT);
+        applyHistoryGravity(*c.nonPawnWhite, bonus * CORR_UPDATE_NON_PAWN / 128, CORR_HIST_LIMIT);
+        applyHistoryGravity(*c.nonPawnBlack, bonus * CORR_UPDATE_NON_PAWN / 128, CORR_HIST_LIMIT);
+    }
+
+    void clear() noexcept {
+        std::memset(pawn, 0, sizeof(pawn));
+        std::memset(minor, 0, sizeof(minor));
+        std::memset(nonPawn, 0, sizeof(nonPawn));
+    }
+
+private:
     struct Cells {
         int16_t* pawn;
         int16_t* minor;
@@ -35,22 +71,6 @@ struct CorrectionHistory {
                 &nonPawn[stm][0][nonPawnIndex(b, 0)], &nonPawn[stm][1][nonPawnIndex(b, 1)]};
     }
 
-    // Correction to add to the raw static eval (side-to-move relative).
-    int32_t correction(const chess::Board& b) noexcept {
-        const Cells c = cellsFor(b);
-        const int64_t sum = int64_t{CORR_WEIGHT_PAWN} * *c.pawn
-                          + int64_t{CORR_WEIGHT_MINOR} * *c.minor
-                          + int64_t{CORR_WEIGHT_NON_PAWN} * (*c.nonPawnWhite + *c.nonPawnBlack);
-        return static_cast<int32_t>(sum * CORR_HIST_WEIGHT_PCT / (int64_t{CORR_HIST_SCALE} * 100));
-    }
-
-    void clear() noexcept {
-        std::memset(pawn, 0, sizeof(pawn));
-        std::memset(minor, 0, sizeof(minor));
-        std::memset(nonPawn, 0, sizeof(nonPawn));
-    }
-
-private:
     // Multiply-shift: the top bits of each product depend on every bit of its
     // bitboard, and distinct odd multipliers keep piece types from aliasing.
     static constexpr int SHIFT = 64 - CORR_HIST_BITS;
