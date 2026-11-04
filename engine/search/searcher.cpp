@@ -39,7 +39,7 @@ void rebuildSearchDerivedTables() noexcept {
     }
 }
 
-// Built once at startup; the UCI layer rebuilds after writing LMR_C_PERCENT.
+// Built once at startup; the UCI layer rebuilds after writing a spin.
 [[maybe_unused]] static const bool searchTablesBuilt = (rebuildSearchDerivedTables(), true);
 
 namespace Searcher {
@@ -694,7 +694,7 @@ int32_t searchPosition(Board& b, SearchRuntime& runtime, int depth, int32_t alph
             | b.bb[Board::ROOK][side] | b.bb[Board::QUEEN][side]) != 0ULL) {
         // The further the eval sits above beta, the deeper the reduction.
         if constexpr (kSearchStats) ++gSearchStats.nmpTries;
-        const int reduction = NMP_BASE_R + depth / 3 + std::clamp((staticEval - beta) / NMP_EVAL_DIV, 0, NMP_EVAL_MAX);
+        const int reduction = NMP_BASE_R + depth / 3 + std::clamp<int32_t>((staticEval - beta) / NMP_EVAL_DIV, 0, NMP_EVAL_MAX);
         Board::MoveState nullState;
         b.doNullMove(nullState);
         const int32_t nullScore = -searchPosition<false>(b, runtime, depth - reduction, -beta, -alpha, ply + 1,
