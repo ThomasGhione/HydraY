@@ -278,7 +278,6 @@ struct SearchContext {
     Move     excludedMove    {};
     uint8_t  activeColor;
     bool     inCheck         {};
-    bool     isPVNode        {};
     bool     iirActive       {};
     bool     improving       {};
     // Expected cut node: a null-window child whose parent hopes it fails
@@ -294,9 +293,17 @@ struct SearchMoveResult {
     bool    pruned {};
 };
 
+// PV: the window is wider than a null window (searchNode picks it from the window).
+template<bool PV>
 int32_t searchPosition(Board& b, SearchRuntime& runtime, int depth, int32_t alpha, int32_t beta,
                        int ply, bool allowHeuristicUpdates = true, const Move* previousMove = nullptr,
                        bool allowNullMove = true, Move excludedMove = {}, bool cutNode = false) noexcept;
+
+template<typename... Args>
+int32_t searchNode(Board& b, SearchRuntime& runtime, int depth, int32_t alpha, int32_t beta, Args... args) noexcept {
+    return beta - alpha > 1 ? searchPosition<true>(b, runtime, depth, alpha, beta, args...)
+                            : searchPosition<false>(b, runtime, depth, alpha, beta, args...);
+}
 
 // atRoot restricts terminals to forced draws (third repetition, fifty moves,
 // insufficient material): scoring the second repetition as 0 is an interior
@@ -337,6 +344,7 @@ bool checkDrawTerminalConditions(const Board& b, int ply, int32_t& outScore, boo
     return false;
 }
 
+template<bool PV>
 SearchMoveResult searchMoves(Board& b, MovePicker& movePicker, const SearchContext& ctx,
                              int32_t alpha, int32_t beta, SearchRuntime& runtime,
                              bool allowHeuristicUpdates) noexcept {
@@ -355,7 +363,7 @@ SearchMoveResult searchMoves(Board& b, MovePicker& movePicker, const SearchConte
     int numSearchedCaptures = 0;
 
     // Interior non-PV node past the root: the gate for futility, LMP, history and SEE pruning.
-    const bool interiorNonPv = !ctx.isPVNode && !ctx.inCheck && ctx.ply > 0;
+    const bool interiorNonPv = !PV && !ctx.inCheck && ctx.ply > 0;
     const bool canFutilityPrune = interiorNonPv && ctx.depth >= 1 && ctx.depth <= FUTILITY_MAX_DEPTH;
     const int32_t futilityMargin = canFutilityPrune ? FUTILITY_MID_STEP * ctx.depth : 0;
     const bool canLMP = interiorNonPv && ctx.depth >= 1 && ctx.depth <= LMP_MAX_DEPTH;
@@ -435,13 +443,13 @@ SearchMoveResult searchMoves(Board& b, MovePicker& movePicker, const SearchConte
         // PVS: the full window for the first move, a null window for the rest.
         const int32_t scoutBeta = isFirstMove ? beta : alpha + 1;
         const auto search = [&](int d, int32_t lo, int32_t hi, bool cut) {
-            return -searchPosition(b, runtime, d, -hi, -lo, ctx.ply + 1, allowHeuristicUpdates, &m,
-                                   true, Move{}, cut);
+            return -searchNode(b, runtime, d, -hi, -lo, ctx.ply + 1, allowHeuristicUpdates, &m,
+                               true, Move{}, cut);
         };
 
         int32_t score;
         // Late captures are reduced too: ordering puts the good ones early.
-        const int lmrMinIndex = (!ctx.isPVNode && !ctx.cutNode) ? LMR_MIN_INDEX_ALL : 4;
+        const int lmrMinIndex = (!PV && !ctx.cutNode) ? LMR_MIN_INDEX_ALL : 4;
         // Below index 4 only plain quiets may be reduced: captures, killers and
         // the countermove fail high there several times as often.
         const bool earlyReducible = moveIndex >= 4 || !LMR_EARLY_QUIET_ONLY
@@ -451,7 +459,7 @@ SearchMoveResult searchMoves(Board& b, MovePicker& movePicker, const SearchConte
                      && runtime.counterMoves[ctx.previousMove->from][ctx.previousMove->to] == TT::Entry::encodeMove(m)));
         if (ctx.depth >= 3 && moveIndex >= lmrMinIndex && earlyReducible && !t.isPromotion) {
             int reduction = LMR_REDUCTIONS[std::min(ctx.depth, LMR_MAX_DEPTH - 1)][moveIndex];
-            if (ctx.isPVNode) reduction = std::max(1, reduction - 1);
+            if (PV) reduction = std::max(1, reduction - 1);
             if (ctx.iirActive) reduction = std::min(reduction + 1, childDepth - 1);
             // More when the eval is falling, and at an expected cut node.
             reduction += !ctx.improving + (ctx.cutNode ? LMR_CUT_BONUS : 0);
@@ -483,10 +491,10 @@ SearchMoveResult searchMoves(Board& b, MovePicker& movePicker, const SearchConte
             }
         } else {
             // The first move of a PV node is a PV child; every other first search is a null window.
-            score = search(childDepth, alpha, scoutBeta, !(ctx.isPVNode && isFirstMove) && !ctx.cutNode);
+            score = search(childDepth, alpha, scoutBeta, !(PV && isFirstMove) && !ctx.cutNode);
         }
         // Only a PV node's full window is wider than the scout's.
-        if (ctx.isPVNode && !isFirstMove && score > alpha) score = search(childDepth, alpha, beta, false);
+        if (PV && !isFirstMove && score > alpha) score = search(childDepth, alpha, beta, false);
 
         b.undoMove(m, state);
         searchedAnyMove = true;
@@ -558,6 +566,7 @@ SearchMoveResult searchMoves(Board& b, MovePicker& movePicker, const SearchConte
     return {bestMove, (!searchedAnyMove && runtime.isInterrupted()) ? ctx.staticEval : best, prunedAny};
 }
 
+template<bool PV>
 int32_t searchPosition(Board& b, SearchRuntime& runtime, int depth, int32_t alpha, int32_t beta,
                        int ply, bool allowHeuristicUpdates, const Move* previousMove,
                        bool allowNullMove, Move excludedMove, bool cutNode) noexcept {
@@ -565,7 +574,7 @@ int32_t searchPosition(Board& b, SearchRuntime& runtime, int depth, int32_t alph
     int32_t early = 0;
     if (enterNode(b, runtime, ply, early)) return early;
 
-    const bool isPVNode = beta - alpha > 1;
+    constexpr bool isPVNode = PV;
     // Mate-distance pruning; it never demotes a PV node to a null window.
     if (ply > 0) {
         alpha = std::max(alpha, -MATE_VALUE + ply);
@@ -663,7 +672,7 @@ int32_t searchPosition(Board& b, SearchRuntime& runtime, int depth, int32_t alph
         const int32_t seBeta = ttSeScore - SE_BETA_MARGIN * depth;
         // Only this node's own store is suppressed (by the excluded move); the
         // probe's descendants store normally.
-        const int32_t seScore = searchPosition(b, runtime, depth / 2 - 1, seBeta - 1, seBeta, ply,
+        const int32_t seScore = searchPosition<false>(b, runtime, depth / 2 - 1, seBeta - 1, seBeta, ply,
                                                allowHeuristicUpdates, previousMove, false,
                                                TT::Entry::decodeMove(tte.move), cutNode);
         if (seScore < seBeta) {
@@ -688,7 +697,7 @@ int32_t searchPosition(Board& b, SearchRuntime& runtime, int depth, int32_t alph
         const int reduction = NMP_BASE_R + depth / 3 + std::clamp((staticEval - beta) / NMP_EVAL_DIV, 0, NMP_EVAL_MAX);
         Board::MoveState nullState;
         b.doNullMove(nullState);
-        const int32_t nullScore = -searchPosition(b, runtime, depth - reduction, -beta, -alpha, ply + 1,
+        const int32_t nullScore = -searchPosition<false>(b, runtime, depth - reduction, -beta, -alpha, ply + 1,
                                                   allowHeuristicUpdates, nullptr, false);
         b.undoNullMove(nullState);
         // Fail-soft, but a mate or TB win found behind a null move is unproven.
@@ -719,7 +728,7 @@ int32_t searchPosition(Board& b, SearchRuntime& runtime, int depth, int32_t alph
             int32_t pcScore = probcutBound;
             if (depth > 4) pcScore = -quiescenceSearch(b, runtime, -probcutBound, -probcutBound + 1, ply + 1);
             if (pcScore >= probcutBound) {
-                pcScore = -searchPosition(b, runtime, depth - 4, -probcutBound, -probcutBound + 1, ply + 1,
+                pcScore = -searchPosition<false>(b, runtime, depth - 4, -probcutBound, -probcutBound + 1, ply + 1,
                                           false, &mc, false, Move{}, !cutNode);
             }
             b.undoMove(mc, pcState);
@@ -755,11 +764,11 @@ int32_t searchPosition(Board& b, SearchRuntime& runtime, int depth, int32_t alph
     if (iirDepth) --depth;
     const SearchContext ctx{
         previousMove, contHistEntry, depth, ply, staticEval,
-        hasHashMove ? singularExtension : 0, excludedMove, activeColor, inCheck, isPVNode,
+        hasHashMove ? singularExtension : 0, excludedMove, activeColor, inCheck,
         iirNode && !iirDepth, improving, cutNode && !isPVNode
     };
 
-    const SearchMoveResult result = searchMoves(b, movePicker, ctx, alpha, beta, runtime, allowHeuristicUpdates);
+    const SearchMoveResult result = searchMoves<PV>(b, movePicker, ctx, alpha, beta, runtime, allowHeuristicUpdates);
     const int32_t best = result.score;
     if (runtime.isInterrupted()) return evaluate(b);
 
@@ -877,8 +886,8 @@ Move getBestMove(Board& rootBoard, const MoveList& moves, SearchRuntime& runtime
     const auto scoreMove = [&](const Move& m, int32_t lo, int32_t hi, bool cut) {
         Board::MoveState state;
         rootBoard.doMove(m, state);
-        const int32_t score = -searchPosition(rootBoard, runtime, std::max(0, runtime.depth - 1), -hi, -lo, 1,
-                                              true, nullptr, true, Move{}, cut);
+        const int32_t score = -searchNode(rootBoard, runtime, std::max(0, runtime.depth - 1), -hi, -lo, 1,
+                                          true, nullptr, true, Move{}, cut);
         rootBoard.undoMove(m, state);
         return score;
     };
