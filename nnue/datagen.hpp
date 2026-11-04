@@ -8,11 +8,13 @@ namespace NNUE {
 // ./chess datagen [--out PREFIX] [--threads N] [--nodes N] [--net FILE]
 //                 [--tb DIR] [--shard N] [--seal-on-exit] [--start MODE]
 //                 [--eg-every N] [--games N] [--target N] [--seed N]
+//                 [--first-shard N] [--machine NAME] [--build ID]
 // (./chess datagen --help lists the defaults.) Positions are labeled by an
 // NNUE search with the given or embedded net; with tablebases a game is
 // adjudicated on entering their range. All threads append bulletformat
 // records to <PREFIX>.sNNNN.bin.part, sealed to .bin every --shard positions,
-// so a run can stop (Ctrl+C, SIGTERM) and resume.
+// each with a <PREFIX>.sNNNN.json manifest of its settings, so a run can stop
+// (Ctrl+C, SIGTERM) and resume.
 int runDatagen(int argc, char* argv[]);
 
 // ./chess datagen-dump <file.bin> [count]

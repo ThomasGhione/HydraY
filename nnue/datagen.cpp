@@ -10,6 +10,7 @@
 #include <cstdint>
 #include <cstdio>
 #include <cstdlib>
+#include <ctime>
 #include <filesystem>
 #include <fstream>
 #include <iostream>
@@ -21,6 +22,12 @@
 #include <thread>
 #include <vector>
 
+#ifndef _WIN32
+#include <fcntl.h>
+#include <sys/file.h>
+#include <unistd.h>
+#endif
+
 #include "../board/board.hpp"
 #include "../board/piece.hpp"
 #include "../engine/search/searcher.hpp"
@@ -29,6 +36,9 @@
 #include "../tt/tt.hpp"
 #include "bulletformat.hpp"
 #include "nnue.hpp"
+
+extern "C" const unsigned char g_hydrayEmbeddedNetStart[];
+extern "C" const unsigned char g_hydrayEmbeddedNetEnd[];
 
 namespace NNUE {
 
@@ -106,17 +116,63 @@ syzygy::SyzygyProber g_syzygy;
 
 void onStopSignal(int) { g_stop.store(true, std::memory_order_release); }
 
+// Text for a JSON string value: quotes, backslashes and control characters escaped.
+std::string jsonString(std::string_view text) {
+    std::string out = "\"";
+    for (const char c : text) {
+        if (c == '"' || c == '\\') {
+            out += '\\';
+            out += c;
+        } else if (static_cast<unsigned char>(c) < 0x20) {
+            char esc[8];
+            std::snprintf(esc, sizeof(esc), "\\u%04x", static_cast<unsigned char>(c));
+            out += esc;
+        } else {
+            out += c;
+        }
+    }
+    return out + "\"";
+}
+
+std::string readWholeFile(const std::string& path) {
+    std::ifstream in(path, std::ios::binary);
+    return {std::istreambuf_iterator<char>(in), std::istreambuf_iterator<char>()};
+}
+
+// Written to path.tmp and renamed, so a reader never sees half a file.
+bool writeWholeFile(const std::string& path, const std::string& text) {
+    const std::string tmp = path + ".tmp";
+    {
+        std::ofstream out(tmp, std::ios::binary | std::ios::trunc);
+        out << text;
+        if (!out.flush()) return false;
+    }
+    std::error_code ec;
+    std::filesystem::rename(tmp, path, ec);
+    return !ec;
+}
+
 // All workers append whole games to one shard, <out>.sNNNN.bin.part. At
 // shardSize positions it is sealed (renamed to .bin) and the next one opened,
 // so a .bin file never grows again: only sealed shards get uploaded or
 // trained on. A restart appends to the open .part. shardSize 0 = one
-// unsealed <out>.bin, for short experiments.
+// unsealed <out>.bin, for short experiments, without manifests.
+//
+// Each sealed shard gets a manifest, <out>.sNNNN.json: the run settings
+// (build, machine, net, nodes, start, ...) plus its positions and seal time.
+// The open .part keeps the settings it was started with in .part.json; a
+// restart with other settings seals that shard first, so a shard never mixes
+// two configurations.
 class ShardWriter {
 public:
-    bool open(const std::string& prefix, uint64_t shardSize) {
+    // firstIndex: the lowest index a new shard may take (shards already
+    // uploaded and deleted here); the local files and manifests also count.
+    bool open(const std::string& prefix, uint64_t shardSize, const std::string& settings,
+              int firstIndex) {
         namespace fs = std::filesystem;
         prefix_ = prefix;
         shardSize_ = shardSize;
+        settings_ = settings;
         if (shardSize_ == 0) return openFile(prefix_ + ".bin");
 
         const fs::path p(prefix_);
@@ -130,17 +186,41 @@ public:
             if (!name.starts_with(stem)) continue;
             const std::string_view rest = std::string_view(name).substr(stem.size());
             const bool part = rest.ends_with(".bin.part");
-            if (!part && !rest.ends_with(".bin")) continue;
+            // .json: the manifest outlives an uploaded and deleted shard.
+            if (!part && !rest.ends_with(".bin") && !rest.ends_with(".json")) continue;
             const std::string_view digits = rest.substr(0, rest.find('.'));
             if (digits.empty() || digits.find_first_not_of("0123456789") != std::string_view::npos) continue;
             const int index = std::atoi(std::string(digits).c_str());
             nextIndex = std::max(nextIndex, index + 1);
             if (part) partIndex = std::max(partIndex, index);
         }
-        index_ = (partIndex >= 0) ? partIndex : nextIndex;
+        nextIndex = std::max(nextIndex, firstIndex);
+        if (partIndex >= 0 && partIndex < firstIndex) {
+            // Its name is taken upstream: the open shard moves past it.
+            const std::string from = partPath(partIndex);
+            index_ = nextIndex;
+            fs::rename(from, partPath(), ec);
+            if (!ec) fs::rename(from + ".json", partSidecarPath(), ec);
+            if (ec && fs::exists(from)) {
+                std::cerr << "datagen: cannot move " << from << " to " << partPath() << "\n";
+                return false;
+            }
+            std::cout << "[datagen] " << from << " renumbered to " << partPath() << "\n";
+        } else {
+            index_ = (partIndex >= 0) ? partIndex : nextIndex;
+        }
         if (!openFile(partPath())) return false;
         inShard_ = static_cast<uint64_t>(out_.tellp()) / sizeof(BulletRecord);
-        return inShard_ < shardSize_ || rotate();
+
+        const std::string partSettings = readWholeFile(partSidecarPath());
+        if (inShard_ > 0 && partSettings != sidecarText()) {
+            std::cout << "[datagen] " << partPath() << " was started with other settings: sealing it\n";
+            if (!seal(partSettings.empty() ? std::string("{}") : partSettings) || !openNext()) return false;
+        } else if (!writeWholeFile(partSidecarPath(), sidecarText())) {
+            std::cerr << "datagen: cannot write " << partSidecarPath() << "\n";
+            return false;
+        }
+        return inShard_ < shardSize_ || (seal(sidecarText()) && openNext());
     }
 
     // One game per call, so a game never straddles two shards.
@@ -151,17 +231,26 @@ public:
         out_.flush();
         if (!out_) return false;
         inShard_ += records.size();
-        return shardSize_ == 0 || inShard_ < shardSize_ || rotate();
+        return shardSize_ == 0 || inShard_ < shardSize_ || (seal(sidecarText()) && openNext());
     }
 
     // At exit: an empty .part is removed, a partial one sealed when asked.
-    void close(bool seal) {
+    void close(bool sealPartial) {
         std::lock_guard lock(mutex_);
-        out_.close();
-        if (shardSize_ == 0) return;
-        std::error_code ec;
-        if (inShard_ == 0) std::filesystem::remove(partPath(), ec);
-        else if (seal) std::filesystem::rename(partPath(), sealedPath(), ec);
+        if (shardSize_ == 0) {
+            out_.close();
+            return;
+        }
+        if (inShard_ == 0) {
+            out_.close();
+            std::error_code ec;
+            std::filesystem::remove(partPath(), ec);
+            std::filesystem::remove(partSidecarPath(), ec);
+        } else if (sealPartial) {
+            seal(sidecarText());
+        } else {
+            out_.close();
+        }
     }
 
     std::string pattern() const {
@@ -178,30 +267,65 @@ private:
         return static_cast<bool>(out_);
     }
 
-    bool rotate() {
+    // The manifest goes down before the rename: a sealed .bin always has one.
+    bool seal(const std::string& settingsObject) {
         out_.close();
+        char sealedAt[32];
+        const std::time_t now = std::time(nullptr);
+        std::strftime(sealedAt, sizeof(sealedAt), "%Y-%m-%dT%H:%M:%SZ", std::gmtime(&now));
+        // settingsObject is "{...}": the shard fields go in front of its keys.
+        const std::string body = settingsObject.size() > 2
+            ? "," + settingsObject.substr(1, settingsObject.find_last_of('}') - 1)
+            : std::string();
+        const std::string manifest = "{\n  \"shard\": "
+            + jsonString(std::filesystem::path(sealedPath()).filename().string())
+            + ",\n  \"positions\": " + std::to_string(inShard_)
+            + ",\n  \"bytes\": " + std::to_string(inShard_ * sizeof(BulletRecord))
+            + ",\n  \"format\": \"bulletformat\""
+            + ",\n  \"sealed_utc\": " + jsonString(sealedAt)
+            + (settingsObject.size() > 2 ? body : ",\n  \"settings\": \"unknown\"\n") + "}\n";
         std::error_code ec;
+        if (!writeWholeFile(manifestPath(), manifest)) {
+            std::cerr << "datagen: cannot write " << manifestPath() << "\n";
+            return false;
+        }
         std::filesystem::rename(partPath(), sealedPath(), ec);
         if (ec) {
             std::cerr << "datagen: cannot seal " << partPath() << ": " << ec.message() << "\n";
             return false;
         }
+        std::filesystem::remove(partSidecarPath(), ec);
         std::cout << "[datagen] sealed " << sealedPath() << "\n" << std::flush;
+        return true;
+    }
+
+    bool openNext() {
         ++index_;
         inShard_ = 0;
+        if (!writeWholeFile(partSidecarPath(), sidecarText())) {
+            std::cerr << "datagen: cannot write " << partSidecarPath() << "\n";
+            return false;
+        }
         return openFile(partPath());
     }
 
-    std::string sealedPath() const {
-        char index[16];
-        std::snprintf(index, sizeof(index), "%04d", index_);
-        return prefix_ + ".s" + index + ".bin";
+    std::string stemPath(int index) const {
+        char digits[16];
+        std::snprintf(digits, sizeof(digits), "%04d", index);
+        return prefix_ + ".s" + digits;
     }
-    std::string partPath() const { return sealedPath() + ".part"; }
+    std::string stemPath() const { return stemPath(index_); }
+    std::string sealedPath() const { return stemPath() + ".bin"; }
+    std::string partPath(int index) const { return stemPath(index) + ".bin.part"; }
+    std::string partPath() const { return partPath(index_); }
+    std::string partSidecarPath() const { return partPath() + ".json"; }
+    std::string manifestPath() const { return stemPath() + ".json"; }
+    std::string sidecarText() const { return "{\n" + settings_ + "\n}\n"; }
 
     std::mutex mutex_;
     std::ofstream out_;
     std::string prefix_;
+    std::string settings_;   // "  \"key\": value" lines, comma-separated
     uint64_t shardSize_ = 0;
     int index_ = 0;
     uint64_t inShard_ = 0;
@@ -514,6 +638,52 @@ void saveMeta(const std::string& metaPath, const MetaCounters& m) {
     if (out) out << m.games << " " << m.tbAdjudications << "\n";
 }
 
+std::string hostName() {
+#ifdef _WIN32
+    const char* name = std::getenv("COMPUTERNAME");
+    return name != nullptr ? name : "unknown";
+#else
+    char name[256] = {};
+    return gethostname(name, sizeof(name) - 1) == 0 ? name : "unknown";
+#endif
+}
+
+// FNV-1a 64 of the labeler net: tells two nets apart in the manifests.
+std::string netFingerprint(const char* netPath) {
+    const std::string file = netPath != nullptr ? readWholeFile(netPath) : std::string();
+    const unsigned char* data = netPath != nullptr
+        ? reinterpret_cast<const unsigned char*>(file.data()) : g_hydrayEmbeddedNetStart;
+    const size_t size = netPath != nullptr
+        ? file.size() : static_cast<size_t>(g_hydrayEmbeddedNetEnd - g_hydrayEmbeddedNetStart);
+    uint64_t h = 0xcbf29ce484222325ULL;
+    for (size_t i = 0; i < size; ++i) h = (h ^ data[i]) * 0x100000001b3ULL;
+    char hex[17];
+    std::snprintf(hex, sizeof(hex), "%016llx", static_cast<unsigned long long>(h));
+    return hex;
+}
+
+// Held for the whole run: a second datagen on the same --out would write
+// into the same .part. The kernel drops the lock when the process dies.
+bool lockPrefix(const std::string& prefix) {
+#ifdef _WIN32
+    (void)prefix;
+    return true;
+#else
+    const std::string path = prefix + ".lock";
+    const int fd = ::open(path.c_str(), O_RDWR | O_CREAT, 0644);
+    if (fd < 0) {
+        std::cerr << "datagen: cannot open " << path << "\n";
+        return false;
+    }
+    if (flock(fd, LOCK_EX | LOCK_NB) != 0) {
+        std::cerr << "datagen: " << prefix << " is in use by another datagen (" << path << ")\n";
+        ::close(fd);
+        return false;
+    }
+    return true;   // fd stays open until exit
+#endif
+}
+
 constexpr const char* DATAGEN_USAGE =
     "usage: ./chess datagen [options]\n"
     "  --out PREFIX     output prefix (default nnue/data/hydray)\n"
@@ -524,12 +694,16 @@ constexpr const char* DATAGEN_USAGE =
     "  --shard N        positions per shard, 0 = one unsealed PREFIX.bin\n"
     "                   (default 50000000)\n"
     "  --seal-on-exit   seal the partial shard when the run stops\n"
+    "  --first-shard N  lowest index for a new shard, past the ones uploaded and\n"
+    "                   deleted here (default 0; local files and manifests count too)\n"
     "  --start MODE     standard or chess324 (default standard)\n"
     "  --eg-every N     seed 1 game in N from a random ending, 1..1000 (default 8)\n"
     "  --games N        stop after N games started, discarded openings included\n"
     "                   (default: until Ctrl+C / SIGTERM)\n"
     "  --target N       positions for the ETA line (default 5000000000)\n"
-    "  --seed N         benchmark mode: game N replays at any thread count\n";
+    "  --seed N         benchmark mode: game N replays at any thread count\n"
+    "  --machine NAME   recorded in the shard manifests (default: the host name)\n"
+    "  --build ID       recorded in the shard manifests (default unknown)\n";
 
 // Whole decimal strings only: "8k" or "-1" must not become 8 or 2^64-1.
 bool parseCount(const char* text, uint64_t& value) {
@@ -547,7 +721,10 @@ struct DatagenOptions {
     const char* netPath = nullptr;
     std::string tbPath = "engine/syzygy/files";
     uint64_t shardSize = DEFAULT_SHARD_POSITIONS;
+    int firstShard = 0;
     bool sealOnExit = false;
+    std::string machine;
+    std::string build = "unknown";
     bool help = false;
 };
 
@@ -601,9 +778,16 @@ bool parseDatagenArgs(int argc, char* argv[], DatagenOptions& o) {
             o.netPath = value;
         } else if (flag == "--tb") {
             o.tbPath = value;
+        } else if (flag == "--machine") {
+            o.machine = value;
+        } else if (flag == "--build") {
+            o.build = value;
         } else if (flag == "--shard") {
             if (!count(0, ANY)) return false;
             o.shardSize = n;
+        } else if (flag == "--first-shard") {
+            if (!count(0, 9999)) return false;
+            o.firstShard = static_cast<int>(n);
         } else if (flag == "--start") {
             // Rejected, not ignored: a typo would fill a Chess324 pool with standard games.
             const std::string mode = value;
@@ -680,7 +864,21 @@ int runDatagen(int argc, char* argv[]) {
     const uint64_t resumedPositions = countExistingPositions(outPrefix);
     const std::string metaPath = outPrefix + ".meta";
     const MetaCounters resumedMeta = loadMeta(metaPath);
-    if (!g_writer.open(outPrefix, opts.shardSize)) return 1;
+    if (!lockPrefix(outPrefix)) return 1;
+    const std::string machine = opts.machine.empty() ? hostName() : opts.machine;
+    // One "key": value per line; the shard fields are added at the seal.
+    const std::string settings =
+          "  \"prefix\": " + jsonString(std::filesystem::path(outPrefix).filename().string())
+        + ",\n  \"machine\": " + jsonString(machine)
+        + ",\n  \"build\": " + jsonString(opts.build)
+        + ",\n  \"net\": " + jsonString(netPath != nullptr ? netPath : "embedded")
+        + ",\n  \"net_fnv1a64\": " + jsonString(netFingerprint(netPath))
+        + ",\n  \"nodes_per_move\": " + std::to_string(nodesPerMove)
+        + ",\n  \"start\": " + jsonString(g_chess324 ? "chess324" : "standard")
+        + ",\n  \"eg_every\": " + std::to_string(g_endgameSeedEvery)
+        + ",\n  \"syzygy_men\": " + std::to_string(tbOn ? g_syzygy.maxPieces() : 0)
+        + ",\n  \"seed\": " + std::to_string(g_benchSeed);
+    if (!g_writer.open(outPrefix, opts.shardSize, settings, opts.firstShard)) return 1;
 
     std::cout << "HydraY datagen - bulletformat self-play data\n"
               << "  output : " << g_writer.pattern()
@@ -689,6 +887,7 @@ int runDatagen(int argc, char* argv[]) {
                        + (opts.sealOnExit ? " and at exit" : "")
                      : std::string(" (never sealed)"))
               << "\n           writing " << g_writer.currentPath() << " (append)\n"
+              << "  machine: " << machine << "  build: " << opts.build << "\n"
               << "  resume : " << fmtCount(resumedPositions)
               << " positions already on disk for this prefix\n"
               << "  labels : NNUE (" << (netPath != nullptr ? netPath : "embedded")

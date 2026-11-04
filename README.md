@@ -263,8 +263,9 @@ default 3), `--nodes` (per move, default 8000), `--net` (labeler, default the
 embedded net), `--tb` (Syzygy, default `engine/syzygy/files`), `--shard`,
 `--seal-on-exit`, `--start standard|chess324`, `--eg-every`, `--games` (games started: about
 1 in 4 is discarded at the first search, see below),
-`--target` (ETA line only) and `--seed` (benchmark mode). Both `--flag value`
-and `--flag=value` work; a wrong value stops the run instead of being guessed.
+`--target` (ETA line only), `--seed` (benchmark mode), `--first-shard` and
+`--machine`/`--build` (recorded in the manifests). Both `--flag value` and
+`--flag=value` work; a wrong value stops the run instead of being guessed.
 
 Self-play games are written in bulletformat. All threads append whole games
 to one shard, `<prefix>.sNNNN.bin.part`; every `--shard` positions (default
@@ -273,7 +274,13 @@ starts. A sealed shard never changes again, so it can be uploaded or trained
 on while the run goes on; `--shard 0` writes one unsealed `<prefix>.bin`, for
 short experiments. Stop/resume with Ctrl+C or SIGTERM is safe: a restart
 appends to the open `.part`, and `--seal-on-exit` seals it at the stop
-instead. When Syzygy tablebases are present (see below), games are
+instead. Every sealed shard gets a manifest, `<prefix>.sNNNN.json`: positions,
+seal time, machine, build, labeler net (FNV-1a fingerprint), nodes, start,
+endgame seeding, tablebases and seed. A restart with other settings seals the
+open shard first, so a shard never mixes two configurations. A new shard
+takes the number after every local shard and manifest, and after
+`--first-shard`; `<prefix>.lock` stops a second datagen on the same prefix.
+When Syzygy tablebases are present (see below), games are
 adjudicated at <6 pieces with the exact WDL result; without tablebases the
 adjudication disables itself (the startup banner says which mode is active).
 A game whose random opening leaves one side more than 400 cp ahead at the
