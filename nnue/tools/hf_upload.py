@@ -20,7 +20,7 @@ After a pass that uploaded something, <subdir>/index.jsonl lists the manifests
 of the folder and README.md, the dataset card, sums up every folder.
 
 The token comes from HF_TOKEN (or `hf auth login`); the dataset is created
-private if missing.
+public if missing (an existing one keeps its visibility).
 
 Usage:  hf_upload.py --data data --repo user/hydray-data [--prefix pc1] [--subdir pc1]
                      [--owner ID] [--every 600] [--once] [--delete-after-upload] [--dry-run]
@@ -267,7 +267,7 @@ def main():
     up = Uploader(api, args)
     if not args.dry_run:
         user = api.whoami()["name"]  # fails fast on a missing or bad token
-        api.create_repo(args.repo, repo_type=REPO_TYPE, private=True, exist_ok=True)
+        api.create_repo(args.repo, repo_type=REPO_TYPE, private=False, exist_ok=True)
         up.check_owner()
         if args.check:
             print(f"hf_upload: datasets/{args.repo}/{args.subdir} ready for {args.owner} ({user})",

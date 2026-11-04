@@ -114,8 +114,11 @@ The token goes in `docker/.env` as `HF_TOKEN=hf_...`: a token with write
 access (huggingface.co, Settings, Access Tokens, "Write", or a fine-grained
 one with write on the dataset). Then uncomment `--hf-repo=USER/NAME` in
 `command:` (`ORG/NAME` for a dataset of an organization the token can write;
-the dataset is created private if missing) and, to free the disk as it goes,
-`--delete-after-upload`. Upload
+the dataset is created public if missing) and, to free the disk as it goes,
+`--delete-after-upload`. Public means everything uploaded can be read by
+anyone: shards, manifests (with the host name, from `/etc/hostname`), index
+and card. Public datasets have no storage quota to watch; a private one
+counts against the account's (100 GB on a free account, ~60 shards). Upload
 flags: `--hf-repo`, `--hf-subdir` (default: the machine hash), `--hf-every`
 (seconds between passes, default 600), `--delete-after-upload`.
 
