@@ -69,25 +69,27 @@ public:
 
     // --- Public structs ---
 
+    // What a move changes and undoMove cannot work back out: doMove saves it
+    // whole in the MoveState and undoMove puts it back whole.
+    struct PlyState {
+        uint64_t hash;
+        uint8_t  halfMoveClock;
+        uint8_t  fullMoveClock;
+        uint8_t  castle;
+        Square   enPassant;
+        uint8_t  epHashFile;     // the en passant file in the hash, 0xFF = none
+        uint8_t  historySize;
+        uint8_t  pliesFromNull;  // since the last null move, saturating; 255 = none within reach
+    };
+
     // Members are intentionally NOT default-initialised: skips a full zero-fill per node.
     // Value-init sites (`MoveState st{}`) still zero everything.
     struct MoveState {
-        uint64_t prevHistoryHead;
+        PlyState prev;
         // The repetitionHistory slot this move overwrites: an irreversible move
         // restarts the history at slot 0, and undo must give the entry back.
         uint64_t prevHistorySlotValue;
-
-        uint8_t prevHalfMoveClock;
-        uint8_t prevFullMoveClock;
-        uint8_t prevHistorySize;
-
-        Square  prevEnPassant;
-        uint8_t prevEpHashFile;
-        uint8_t prevCastle;
-
-        uint8_t capturedPiece;
-        uint8_t enPassantCapturedIndex;
-        uint8_t prevPliesFromNull;
+        uint8_t  capturedPiece;
         MoveKind moveKind;
     };
 
@@ -98,7 +100,7 @@ public:
     static constexpr uint8_t  MASK_COLOR              = 0x08;
     static constexpr uint8_t  MASK_PIECE_TYPE         = 0x07;
     static constexpr uint8_t  CASTLING_RIGHTS_ALL     = 0x0F;
-    static constexpr uint16_t REPETITION_HISTORY_CAPACITY = 255; // must be 255 instead of 100 due to the 8-bit prevHistorySize in MoveState
+    static constexpr uint16_t REPETITION_HISTORY_CAPACITY = 255; // must be 255 instead of 100 due to the 8-bit PlyState::historySize
 
     // Castling by right, KQkq = bits 0..3 of the rights: the king's and the
     // rook's squares before and after, the squares between them, which must be
@@ -145,10 +147,10 @@ public:
     __attribute__((hot, always_inline)) constexpr uint8_t get(uint8_t index) const noexcept { return chessboard[index]; }
 
     // --- Move execution ---
-    void doMove(const Move& m, MoveState& state) noexcept;
-    void undoMove(const Move& m, const MoveState& state) noexcept;
-    void doNullMove(MoveState& state) noexcept;
-    void undoNullMove(const MoveState& state) noexcept;
+    void doMove(const Move& m, MoveState& st) noexcept;
+    void undoMove(const Move& m, const MoveState& st) noexcept;
+    void doNullMove(MoveState& st) noexcept;
+    void undoNullMove(const MoveState& st) noexcept;
     bool move(Move move) noexcept;
 
     // --- Legality & attack queries ---
@@ -174,18 +176,18 @@ public:
     uint64_t checkersTo(uint8_t color) const noexcept;
 
     // --- Game state queries ---
-    bool isFiftyMoveRule() const noexcept { return halfMoveClock >= 100; }
+    bool isFiftyMoveRule() const noexcept { return state.halfMoveClock >= 100; }
     bool isThreefoldRepetition() const noexcept { return countRepetitions() >= 3; }
     int  countRepetitions() const noexcept;
     bool hasInsufficientMaterialDraw() const noexcept;
 
     // --- State accessors ---
     constexpr uint8_t  getActiveColor() const noexcept   { return activeColor; }
-    constexpr uint8_t  castlingRights() const noexcept   { return castle; }
-    constexpr uint16_t getFullMoveClock() const noexcept { return fullMoveClock; }
-    constexpr uint8_t  getHalfMoveClock() const noexcept { return halfMoveClock; }
-    Square             getEnPassant() const noexcept     { return enPassant; }
-    constexpr uint64_t getHash() const noexcept          { return currentHash; }
+    constexpr uint8_t  castlingRights() const noexcept   { return state.castle; }
+    constexpr uint16_t getFullMoveClock() const noexcept { return state.fullMoveClock; }
+    constexpr uint8_t  getHalfMoveClock() const noexcept { return state.halfMoveClock; }
+    Square             getEnPassant() const noexcept     { return state.enPassant; }
+    constexpr uint64_t getHash() const noexcept          { return state.hash; }
     uint64_t           getPiecesBitMap() const noexcept  { return occupancy; }
     void               rebuildBitboardsFromSquares() noexcept;
     // From-scratch NNUE accumulator recompute (no-op when no net is loaded).
@@ -248,6 +250,10 @@ private:
     // --- Private helpers: move classification ---
     static constexpr bool isCaptureKind(MoveKind k) noexcept { return k == MoveKind::Capture || k == MoveKind::PromotionCapture; }
     static constexpr bool isPromotionKind(MoveKind k) noexcept { return k == MoveKind::PromotionQuiet || k == MoveKind::PromotionCapture; }
+    // The square of the pawn that `pawn` takes en passant on toIndex.
+    static constexpr uint8_t enPassantVictim(uint8_t pawn, uint8_t toIndex) noexcept {
+        return static_cast<uint8_t>(toIndex + ((pawn & MASK_COLOR) == WHITE ? 8 : -8));
+    }
     [[nodiscard]] static inline MoveKind    classifyMoveKind(uint8_t movingType, uint8_t movingColor,
                                                               uint8_t fromIndex, uint8_t toIndex,
                                                               uint8_t destBefore, const Square& prevEnPassant) noexcept;
@@ -263,19 +269,10 @@ private:
     // One byte per square, engine index (a8 = 0, h1 = 63): a read is a single
     // load, where nibble packing cost a shift and a mask on every access.
     std::array<uint8_t, 64> chessboard;
-    uint64_t currentHash = 0ULL;
+    PlyState state{0ULL, 0, 1, CASTLING_RIGHTS_ALL, NO_SQUARE, 0xFF, 0, 255};
     std::array<uint64_t, REPETITION_HISTORY_CAPACITY> repetitionHistory{};
     uint64_t occupancy   = 0ULL;
-
-    uint8_t  halfMoveClock       = 0;
-    uint8_t  fullMoveClock       = 1;
-    uint8_t  castle              = CASTLING_RIGHTS_ALL;
-    Square   enPassant           = NO_SQUARE;
-    uint8_t  epHashFile          = 0xFF;
-    uint8_t  activeColor         = WHITE;
-    uint8_t  historySize         = 0;
-    // Plies since the last null move, saturating; 255 = none within reach.
-    uint8_t  pliesFromNull       = 255;
+    uint8_t  activeColor = WHITE;
 
     // Accumulator stack, a ring of frames: frame(accTop) is the current
     // position, each frame one move after the previous one. doMove pushes the

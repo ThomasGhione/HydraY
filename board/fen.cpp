@@ -41,14 +41,14 @@ void Board::fenToBoard(const std::string& fen) {
     chessboard = parsedBoard;
     activeColor = (!active.empty() && (active[0] == 'b' || active[0] == 'B')) ? BLACK : WHITE;
 
-    castle = 0;
+    state.castle = 0;
     for (char c : castling)
         if (const auto i = std::string_view("KQkq").find(c); i != std::string_view::npos)
-            castle |= uint8_t(1 << i);
+            state.castle |= uint8_t(1 << i);
 
-    enPassant = parseSquare(ep);
-    halfMoveClock = safeParseInt(half, 0, 255, 0);
-    fullMoveClock = safeParseInt(full, 1, 255, 1);
+    state.enPassant = parseSquare(ep);
+    state.halfMoveClock = safeParseInt(half, 0, 255, 0);
+    state.fullMoveClock = safeParseInt(full, 1, 255, 1);
 
     rebuildBitboardsFromSquares();
     rebuildRepetitionHistory();
@@ -72,14 +72,14 @@ std::string Board::boardToFen() const {
     fen += activeColor == WHITE ? " w " : " b ";
     const size_t castleStart = fen.size();
     for (int i = 0; i < 4; ++i)
-        if (castle & (1 << i)) fen += "KQkq"[i];
+        if (state.castle & (1 << i)) fen += "KQkq"[i];
     if (fen.size() == castleStart) fen += '-';
-    if (!isValidSquare(enPassant)) fen += " -";
-    else { fen += ' '; fen += squareToString(enPassant); }
+    if (!isValidSquare(state.enPassant)) fen += " -";
+    else { fen += ' '; fen += squareToString(state.enPassant); }
     fen += ' ';
-    fen += std::to_string(halfMoveClock);
+    fen += std::to_string(state.halfMoveClock);
     fen += ' ';
-    fen += std::to_string(fullMoveClock);
+    fen += std::to_string(state.fullMoveClock);
     return fen;
 }
 

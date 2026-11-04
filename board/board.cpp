@@ -11,11 +11,9 @@ void Board::copyFromBoard(const Board& other) noexcept {
     bb = other.bb;
 
     chessboard = other.chessboard;
-    currentHash = other.currentHash;
-
-    historySize = other.historySize;
-    if (historySize > 0) {
-        std::memcpy(repetitionHistory.data(), other.repetitionHistory.data(), historySize * sizeof(uint64_t));
+    state = other.state;
+    if (state.historySize > 0) {
+        std::memcpy(repetitionHistory.data(), other.repetitionHistory.data(), state.historySize * sizeof(uint64_t));
     }
 
     occupancy = other.occupancy;
@@ -23,13 +21,7 @@ void Board::copyFromBoard(const Board& other) noexcept {
     other.ensureNnueAccumulatorClean();
     accTop = accFloor = other.accTop;
     frame(accTop) = other.frame(other.accTop);
-    halfMoveClock = other.halfMoveClock;
-    fullMoveClock = other.fullMoveClock;
-    castle = other.castle;
-    enPassant = other.enPassant;
-    epHashFile = other.epHashFile;
     activeColor = other.activeColor;
-    pliesFromNull = other.pliesFromNull;
 }
 
 void Board::rebuildBitboardsFromSquares() noexcept {
@@ -82,11 +74,8 @@ bool Board::isLegalPseudoMove(uint8_t fromIndex, uint8_t toIndex, uint8_t fromPi
             if (pieces::PAWN_ATTACKS[colorToIndex(movingColor)][fromIndex] & toBit) {
                 // En-passant: diagonal to empty square that matches EP target
                 if (destPiece == EMPTY) {
-                    if (isValidSquare(enPassant) && toIndex == enPassant) {
-                        const int8_t epDir = isWhite ? 8 : -8;
-                        const uint8_t capturedPawnIdx = toIndex + epDir;
-                        return isKingSafeAfterMove(movingColor, fromIndex, toIndex, (1ULL << capturedPawnIdx));
-                    }
+                    if (isValidSquare(state.enPassant) && toIndex == state.enPassant)
+                        return isKingSafeAfterMove(movingColor, fromIndex, toIndex, 1ULL << enPassantVictim(fromPiece, toIndex));
                     return false; // diagonal to empty square but not en-passant
                 }
                 // Normal capture (destPiece is enemy)
@@ -134,7 +123,7 @@ uint64_t Board::checkersTo(uint8_t color) const noexcept {
 bool Board::canCastle(int right) const noexcept {
     const Castling& c = CASTLINGS[right];
     const int side = right >> 1;
-    if (!((castle >> right) & 1) || !((bb[KING][side] >> c.king) & 1) || !((bb[ROOK][side] >> c.rook) & 1)
+    if (!((state.castle >> right) & 1) || !((bb[KING][side] >> c.king) & 1) || !((bb[ROOK][side] >> c.rook) & 1)
         || (occupancy & c.between)) return false;
     for (uint64_t path = c.kingPath; path; )
         if (attackersOf(static_cast<uint8_t>(pieces::popLSB(path)), side ^ 1, occupancy)) return false;
@@ -149,33 +138,33 @@ bool Board::isSquareAttacked(uint8_t targetIndex, uint8_t byColor, uint8_t exclu
 }
 
 void Board::recomputeHashAndEp() noexcept {
-    currentHash = zobrist::computeHashKey(*this);
-    epHashFile = 0xFF;
+    state.hash = zobrist::computeHashKey(*this);
+    state.epHashFile = 0xFF;
     if (zobrist::hasPseudoLegalEnPassantCapture(*this, getEnPassant()))
-        epHashFile = chess::file(getEnPassant());
+        state.epHashFile = chess::file(getEnPassant());
 }
 
 void Board::rebuildRepetitionHistory() noexcept {
     recomputeHashAndEp();
-    historySize = 0;
-    pliesFromNull = 255;
-    repetitionHistory[historySize++] = currentHash;
+    state.historySize = 0;
+    state.pliesFromNull = 255;
+    repetitionHistory[state.historySize++] = state.hash;
 }
 
 void Board::updateRepetitionAfterMove(bool resetHistory, MoveState& st) noexcept {
     if (resetHistory)
-        historySize = 0;
+        state.historySize = 0;
 
-    if (historySize >= repetitionHistory.size()) {
+    if (state.historySize >= repetitionHistory.size()) {
         std::memmove(repetitionHistory.data(), repetitionHistory.data() + 1, (repetitionHistory.size() - 1) * sizeof(uint64_t));
-        historySize = static_cast<uint8_t>(repetitionHistory.size() - 1);
+        state.historySize = static_cast<uint8_t>(repetitionHistory.size() - 1);
     }
     // Remember the slot we are about to overwrite so undoMove can restore it
     // (writeIndex == historySize here; on undo historySize-1 recovers it). This
     // is what keeps a reset-to-0 on an irreversible move from corrupting earlier
     // entries in the parent line.
-    st.prevHistorySlotValue = repetitionHistory[historySize];
-    repetitionHistory[historySize++] = currentHash;
+    st.prevHistorySlotValue = repetitionHistory[state.historySize];
+    repetitionHistory[state.historySize++] = state.hash;
 }
 
 // Occurrences of the current position, itself included. Only the same side to
@@ -183,11 +172,11 @@ void Board::updateRepetitionAfterMove(bool resetHistory, MoveState& st) noexcept
 // steps by two. It stops at the last null move: no game can repeat a position
 // across one, the same bound Stockfish applies (pliesFromNull).
 int Board::countRepetitions() const noexcept {
-    const int last = static_cast<int>(historySize) - 1;
-    const int stop = std::max(0, last - static_cast<int>(pliesFromNull));
+    const int last = static_cast<int>(state.historySize) - 1;
+    const int stop = std::max(0, last - static_cast<int>(state.pliesFromNull));
     int count = 0;
     for (int i = last; i >= stop; i -= 2) {
-        count += (repetitionHistory[static_cast<size_t>(i)] == currentHash);
+        count += (repetitionHistory[static_cast<size_t>(i)] == state.hash);
     }
     return count;
 }
