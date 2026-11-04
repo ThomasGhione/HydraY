@@ -308,7 +308,10 @@ docker compose -f docker/compose.yaml down         # stop: shard sealed and uplo
 
 The prefix needs no setting: it is `m` plus 8 hex digits of the hash of the
 host's `/etc/machine-id`, stable across restarts and different on every
-machine (`--out=/data/NAME` overrides it). The host name and the build
+machine, and the engine version, as in `m956ee98b-v4.3.1.s0000.bin`: a new
+version starts new names (`--out=/data/NAME` overrides it). Data that changes
+without a version bump (a retuned search, a new net) is told apart by the
+manifests. The host name and the build
 (version, a hash of the sources, the ISA; the commit when the build gets
 `GIT_COMMIT=$(git rev-parse --short HEAD)` in the environment) go in every
 manifest.
@@ -321,17 +324,19 @@ for a fixed batch use `docker compose -f docker/compose.yaml run --rm datagen
 
 **Upload.** Uncomment `--hf-repo=USER/NAME` in `command:` (the dataset is
 created private if missing) and, to free the disk, `--delete-after-upload`.
-Every sealed shard goes with its manifest, in one commit, to the dataset
-folder `<prefix>/`, and counts as uploaded only once the Hub reports its
+Every sealed shard goes with its manifest, in one commit, to the machine's
+folder in the dataset (`m956ee98b/`, every version inside), and counts as uploaded only once the Hub reports its
 SHA-256; only then is the local shard deleted. The manifest stays (a few
 hundred bytes), and at the start the datagen continues the numbering after
 the last shard in the dataset, so even an emptied `data/` never reuses a
 name. Nothing on the Hub is overwritten: a name already there with other
 content is reported as `CONFLICT` and left alone on both sides.
 
-`<prefix>/OWNER` names the machine that writes the folder: a second machine
-with the same prefix is refused at the start, before it generates anything.
-After each upload `<prefix>/index.jsonl` lists the folder's manifests and
+`OWNER` in the folder names the machine that writes it: a second machine on
+the same folder is refused at the start, before it generates anything. Run
+one datagen per machine: a second one, from another `data/`, needs its own
+`--out` and `--hf-subdir`. After each upload `index.jsonl` lists the folder's
+manifests and
 `README.md`, the dataset card, sums up every folder: machine, shards,
 positions, nodes, start, net, build and dates. The token, the dataset and
 the owner are checked before the datagen starts. At the stop a last pass
@@ -342,7 +347,7 @@ anything left goes up at the next start.
 after its defaults, the machine-id prefix (mount `/etc/machine-id` at
 `/host/machine-id`, or give `--out`) and `--threads` = the CPUs it may use
 (`--cpus` included), plus the upload flags `--hf-repo USER/NAME`,
-`--hf-subdir DIR` (default: the `--out` name), `--hf-every SECONDS` (600) and
+`--hf-subdir DIR` (default: the machine hash, else the `--out` name), `--hf-every SECONDS` (600) and
 `--delete-after-upload`:
 
 ```sh

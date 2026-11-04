@@ -30,7 +30,7 @@ services:
     # The flags of ./chess datagen (--help), plus the upload ones. Threads
     # default to every CPU; --games does not fit a service that restarts.
     command:
-      # - --out=/data/NAME        # default /data/m<machine-id hash>
+      # - --out=/data/NAME        # default /data/m<machine-id hash>-v<version>
       - --nodes=8000
       - --seal-on-exit
       # Upload of the sealed shards: uncomment and set the dataset.

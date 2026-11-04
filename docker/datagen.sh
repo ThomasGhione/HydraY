@@ -2,15 +2,18 @@
 # Container entry point. The arguments are those of ./chess datagen (see
 # --help), after the container's defaults; a later flag wins, so each can be
 # overridden:
-#   --out /data/m<8 hex>   the hash of the host's /etc/machine-id, mounted at
-#                          /host/machine-id: one stable prefix per machine
+#   --out /data/m<8 hex>-v<version>
+#                          the hash of the host's /etc/machine-id, mounted at
+#                          /host/machine-id (one stable prefix per machine),
+#                          and the engine version: a new version, new names
 #   --threads              the CPUs the container may use
 #   --machine, --build     the host name (/host/hostname) and the image's build
 #
 # Upload of the sealed shards to a Hugging Face dataset (HF_TOKEN in the
 # environment), handled here and not passed to datagen:
 #   --hf-repo USER/NAME     turns the upload on
-#   --hf-subdir DIR         folder in the dataset (default: the --out name)
+#   --hf-subdir DIR         folder in the dataset (default: the machine hash,
+#                           else the --out name)
 #   --hf-every SECONDS      time between passes (default 600)
 #   --delete-after-upload   remove a shard once the Hub holds it
 # The dataset folder belongs to the machine (OWNER, the machine-id hash): a
@@ -38,6 +41,9 @@ if [ -s /host/machine-id ]; then
     machine_hash=m$(tr -d '[:space:]' < /host/machine-id | sha256sum | cut -c1-8)
 fi
 host=$(cat /host/hostname 2>/dev/null || true)
+build=$(cat /hydray/BUILD_ID)
+version=${build%% *}
+version=${version#hydray-}
 
 # Splits the upload flags off and rebuilds the rest as datagen's arguments,
 # noting --out to know where the shards land.
@@ -67,10 +73,10 @@ if [ -z "$out" ]; then
         echo "datagen.sh: mount the host's /etc/machine-id at /host/machine-id, or give --out" >&2
         exit 1
     }
-    out=/data/$machine_hash
+    out=/data/$machine_hash-v$version
 fi
 set -- --out "$out" --threads "$cpus" --machine "${host:-${machine_hash:-unknown}}" \
-    --build "$(cat /hydray/BUILD_ID)" "$@"
+    --build "$build" "$@"
 case $out in
     /data/*) ;;
     *) echo "datagen.sh: warning: --out $out is outside the /data volume" >&2 ;;
@@ -82,7 +88,7 @@ fi
 
 upload() {
     python3 /hydray/hf_upload.py --data "$(dirname "$out")" --repo "$repo" \
-        --prefix "$(basename "$out")" --subdir "${subdir:-$(basename "$out")}" \
+        --prefix "$(basename "$out")" --subdir "${subdir:-${machine_hash:-$(basename "$out")}}" \
         --owner "${machine_hash:-$(basename "$out")}" --host "${host:-unknown}" $delete "$@"
 }
 # Fails here, before hours of datagen, on a bad token, repo or OWNER. The
