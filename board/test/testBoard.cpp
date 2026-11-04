@@ -42,11 +42,7 @@ const auto boardSuite = [] {
 
     expect(b.inCheck(chess::Board::WHITE));
 
-    expect(b.isLegalPseudoMove(
-      kingFrom,
-      escapeSq,
-      b.get(kingFrom)
-    )) << "White can answer the knight check with Kd1\n";
+    expect(b.isLegalPseudoMove(kingFrom, escapeSq, b.get(kingFrom))) << "White can answer the knight check with Kd1\n";
   };
 
   "repetition_inside_null_move_subtree"_test = []{
