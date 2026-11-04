@@ -53,8 +53,9 @@ data/m956ee98b-v4.3.1.s0000.json   its manifest
 data/m956ee98b-v4.3.1.s0001.bin.part   the shard being written
 ```
 
-A new engine version starts new names. Data that changes without a version
-bump (a retuned search, a new net) is told apart by the manifests, which hold
+A new engine version starts new names, and every new net comes with a new
+version, so a series never mixes two labeler nets. Smaller changes without a
+version bump (a retuned search) are told apart by the manifests, which hold
 the host name and the build: version, a hash of the sources and net, the ISA,
 and the commit when the build gets `GIT_COMMIT=$(git rev-parse --short HEAD)`
 in the environment. `--out=/data/NAME` overrides the prefix.
