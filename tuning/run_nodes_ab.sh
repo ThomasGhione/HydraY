@@ -61,11 +61,11 @@ cmd_datagen() {
         tag="$(arm_tag "${nodes}")"
         prefix="${data_dir}/${tag}_${host}"
         echo
-        echo "-- braccio ${tag} (${nodes} nodi/mossa) → ${prefix}.t*.bin, ${hours}h --"
+        echo "-- braccio ${tag} (${nodes} nodi/mossa) → ${prefix}.s*.bin, ${hours}h --"
         # datagen gestisce SIGTERM in modo pulito (flush e stop); -k è la rete
         # di sicurezza. timeout esce 124 a scadenza: non è un errore.
         timeout --foreground --signal=TERM -k 120 "${hours}h" \
-            "${chess_bin}" datagen "${prefix}" "${THREADS}" "${nodes}" \
+            "${chess_bin}" datagen --out "${prefix}" --threads "${THREADS}" --nodes "${nodes}" --seal-on-exit \
             || [[ $? -eq 124 ]]
     done
     echo
@@ -79,7 +79,7 @@ cmd_status() {
         local tag total f sz
         tag="$(arm_tag "${nodes}")"
         total=0
-        for f in "${data_dir}/${tag}"_*.t*.bin; do
+        for f in "${data_dir}/${tag}"_*.[st]*.bin; do
             [[ -e "${f}" ]] || continue
             sz=$(stat -c%s "${f}")
             total=$(( total + sz / 32 ))
@@ -95,7 +95,7 @@ cmd_prep() {
         tag="$(arm_tag "${nodes}")"
         out="${data_dir}/${tag}_shuffled.bin"
         echo "== prep ${tag} → ${out} =="
-        python3 - "${out}" "${data_dir}/${tag}"_*.t*.bin <<'PYEOF'
+        python3 - "${out}" "${data_dir}/${tag}"_*.[st]*.bin <<'PYEOF'
 import random, sys, struct
 
 out_path, in_paths = sys.argv[1], sys.argv[2:]

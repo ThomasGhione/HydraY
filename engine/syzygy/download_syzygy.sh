@@ -1,24 +1,6 @@
-#!/bin/bash
-
-BASE_URL="http://tablebase.sesse.net/syzygy/3-4-5/"
-DEST_DIR="$(dirname "$(realpath "$0")")"
-
-echo "Downloading Syzygy 3-4-5 tablebases to: $DEST_DIR"
-echo "Press Ctrl+C to pause - re-run to resume."
-
-# Fetch the file list directly and download each file with -c (resume)
-wget -q -O - "$BASE_URL" \
-    | grep -o 'href="[^"]*\.rtb[wz]"' \
-    | sed 's/href="//;s/"//' \
-    | while read -r file; do
-        wget \
-            --continue \
-            --tries=10 \
-            --wait=1 \
-            --timeout=60 \
-            --progress=bar:force \
-            --directory-prefix="$DEST_DIR" \
-            "${BASE_URL}${file}"
-    done
-
-echo "Done."
+#!/bin/sh
+# Downloads the Syzygy 3-4-5 tables (~1 GB) into engine/syzygy/files, each
+# checked by SHA-256. Interrupted, it resumes where it stopped; run again, it
+# only checks the files and replaces any that is missing or damaged.
+dir=$(dirname "$(realpath "$0")")
+exec python3 "$dir/fetch_syzygy.py" --dir "$dir/files" --sums "$dir/syzygy-3-4-5.sha256" "$@"

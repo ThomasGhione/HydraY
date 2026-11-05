@@ -64,7 +64,7 @@ quit
 NNUE-specific modes (see the NNUE section below):
 
 ```sh
-./chess datagen [prefix] [threads] [nodes] [netPath] [tbPath]   # self-play training data
+./chess datagen [--out PREFIX] [--threads N] [--nodes N] ...    # self-play training data
 ./chess datagen-dump <file.bin> [count]                         # inspect a data file
 ./chess nnue-selftest <net.nnue>                                # verify accumulator correctness
 ```
@@ -254,17 +254,54 @@ previous release instead.
 ### Generating training data
 
 ```sh
-./chess datagen [prefix] [threads] [nodes] [netPath] [tbPath]
-# defaults: nnue/data/hydray, machine threads, 8000 nodes/move,
-#           embedded net for labeling, engine/syzygy/files
+./chess datagen --out nnue/data/pc1 --threads 8 --nodes 8000
+./chess datagen --help        # every option with its default
 ```
 
-Self-play games are written in bulletformat. When Syzygy tablebases are
-present (default path `engine/syzygy/files`, see below), games are adjudicated
-at <6 pieces with the exact WDL result; without tablebases the adjudication
-disables itself (the startup banner says which mode is active). Stop/resume
-with Ctrl+C is safe. Inspect a file with
-`./chess datagen-dump <file.bin> [count]`.
+Options: `--out` (prefix, default `nnue/data/hydray`), `--threads` (1..32,
+default 3), `--nodes` (per move, default 8000), `--net` (labeler, default the
+embedded net), `--tb` (Syzygy, default `engine/syzygy/files`), `--shard`,
+`--seal-on-exit`, `--start standard|chess324`, `--eg-every`, `--games` (games started: about
+1 in 4 is discarded at the first search, see below),
+`--target` (ETA line only), `--seed` (benchmark mode), `--first-shard`,
+`--min-free-gb` and `--machine`/`--build` (recorded in the manifests). Both `--flag value` and
+`--flag=value` work; a wrong value stops the run instead of being guessed.
+
+Self-play games are written in bulletformat. All threads append whole games
+to one shard, `<prefix>.sNNNN.bin.part`; every `--shard` positions (default
+50M, 1.6 GB) it is sealed, renamed to `<prefix>.sNNNN.bin`, and the next one
+starts. A sealed shard never changes again, so it can be uploaded or trained
+on while the run goes on; `--shard 0` writes one unsealed `<prefix>.bin`, for
+short experiments. Stop/resume with Ctrl+C or SIGTERM is safe: a restart
+appends to the open `.part`, and `--seal-on-exit` seals it at the stop
+instead. Every sealed shard gets a manifest, `<prefix>.sNNNN.json`: positions,
+seal time, machine, build, labeler net (FNV-1a fingerprint), nodes, start,
+endgame seeding, tablebases and seed. A restart with other settings seals the
+open shard first, so a shard never mixes two configurations. A new shard
+takes the number after every local shard and manifest, and after
+`--first-shard`; `<prefix>.lock` stops a second datagen on the same prefix.
+
+**A full disk** never corrupts a shard. Below `--min-free-gb` free (default
+4) the threads finish their game and wait, and resume past it plus 1 GB, for
+instance once the uploader has deleted an uploaded shard; the progress line
+says `PAUSED`. A write that fails anyway is cut back to the last whole game
+and pauses too, while a failure with room on the disk stops the run with an
+error. At the start a `.part` that ends in a partial record, after a crash,
+loses those bytes instead of shifting every record appended after them.
+When Syzygy tablebases are present (see below), games are
+adjudicated at <6 pieces with the exact WDL result; without tablebases the
+adjudication disables itself (the startup banner says which mode is active).
+A game whose random opening leaves one side more than 400 cp ahead at the
+first search is discarded (about 25% of the non-seeded games, at the cost of
+a single search each); the progress line counts them as `discarded`.
+Inspect a file with `./chess datagen-dump <file.bin> [count]`.
+
+#### In Docker
+
+The dataset is on Hugging Face:
+[ThomasGhione/hydray](https://huggingface.co/datasets/ThomasGhione/hydray).
+[docker/README.md](docker/README.md) explains how to generate and upload it
+with Docker.
 
 ### Training
 
@@ -300,8 +337,10 @@ SyzygyProbeDepth  minimum depth to probe at internal nodes (default 1)
 ```
 
 `engine/syzygy/download_syzygy.sh` downloads the 3-4-5 piece files (~1 GB,
-not tracked in git) into `engine/syzygy/files`. The same files power datagen
-adjudication.
+not tracked in git) from Lichess into `engine/syzygy/files`, each checked
+against `engine/syzygy/syzygy-3-4-5.sha256`; run again, it only checks them
+and replaces any file missing or damaged (`--check` only reports). The same
+files power datagen adjudication.
 
 ## Transposition Table
 
@@ -426,6 +465,7 @@ engine/search/ iterative deepening, alpha-beta/PVS, pruning, search constants
 engine/sort/   move generation, move ordering, SEE
 engine/syzygy/ Syzygy tablebase probing (fathom-based)
 nnue/          NNUE net, accumulator, datagen, selftest, trainer
+docker/        datagen image, Compose service, Hugging Face upload
 tt/            Zobrist hashing and transposition table
 uci/           UCI protocol interface
 tests/         functional, performance, and benchmark programs

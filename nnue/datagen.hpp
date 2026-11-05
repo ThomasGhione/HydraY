@@ -5,11 +5,15 @@
 
 namespace NNUE {
 
-// ./chess datagen [outPrefix] [threads] [nodesPerMove] [netPath] [tbPath]
-//   defaults: nnue/data/hydray  3  8000  <embedded net>  engine/syzygy/files
-// Positions are labeled by an NNUE search with the given or embedded net; with
-// tablebases a game is adjudicated on entering their range. Each thread
-// appends bulletformat records to <outPrefix>.t<N>.bin, so a run can stop
+// ./chess datagen [--out PREFIX] [--threads N] [--nodes N] [--net FILE]
+//                 [--tb DIR] [--shard N] [--seal-on-exit] [--start MODE]
+//                 [--eg-every N] [--games N] [--target N] [--seed N]
+//                 [--first-shard N] [--machine NAME] [--build ID]
+// (./chess datagen --help lists the defaults.) Positions are labeled by an
+// NNUE search with the given or embedded net; with tablebases a game is
+// adjudicated on entering their range. All threads append bulletformat
+// records to <PREFIX>.sNNNN.bin.part, sealed to .bin every --shard positions,
+// each with a <PREFIX>.sNNNN.json manifest of its settings, so a run can stop
 // (Ctrl+C, SIGTERM) and resume.
 int runDatagen(int argc, char* argv[]);
 
