@@ -38,9 +38,10 @@ services:
       - --nodes=8000
       - --seal-on-exit
       - --min-free-gb=4           # pause below 4 GB free, room left for the upload
-      # Upload of the sealed shards: uncomment and set the dataset.
-      # - --hf-repo=USER/hydray-data
-      # - --delete-after-upload
+      # Upload of the sealed shards (HF_TOKEN in .env); without a token or
+      # connection comment these two out.
+      - --hf-repo=ThomasGhione/hydray
+      - --delete-after-upload     # a shard leaves the disk once the Hub holds it
     # The default json-file log has no size limit.
     logging:
       driver: json-file

@@ -299,7 +299,8 @@ Inspect a file with `./chess datagen-dump <file.bin> [count]`.
 #### In Docker
 
 `docker/` runs the datagen in a container on any machine with an AVX2 + BMI2
-CPU, and can upload the sealed shards to a Hugging Face dataset as they come
+CPU, and can upload the sealed shards to the Hugging Face dataset
+[ThomasGhione/hydray](https://huggingface.co/datasets/ThomasGhione/hydray) as they come
 (checked by SHA-256, never overwriting, one folder per machine). The Syzygy
 tables are fetched and checked at the first start. From the repository root:
 

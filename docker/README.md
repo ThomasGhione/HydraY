@@ -110,15 +110,17 @@ in the environment. `--out=/data/NAME` overrides the prefix.
 
 ## Upload to Hugging Face
 
-The token goes in `docker/.env` as `HF_TOKEN=hf_...`: a token with write
-access (huggingface.co, Settings, Access Tokens, "Write", or a fine-grained
-one with write on the dataset). Then uncomment `--hf-repo=USER/NAME` in
-`command:` (`ORG/NAME` for a dataset of an organization the token can write;
-the dataset is created public if missing) and, to free the disk as it goes,
-`--delete-after-upload`. Public means everything uploaded can be read by
-anyone: shards, manifests, index and card. They name a machine only by its
-hash (`m956ee98b`), never by its host name. Public datasets have no storage quota to watch; a private one
-counts against the account's (100 GB on a free account, ~60 shards). Upload
+The shards go to the public dataset
+[ThomasGhione/hydray](https://huggingface.co/datasets/ThomasGhione/hydray),
+set in `command:` with `--delete-after-upload` (a shard leaves the disk once
+the Hub holds it). The token goes in `docker/.env` as `HF_TOKEN=hf_...`, one
+with write access to that dataset (ask for it); without a token or a
+connection comment the two flags out, and the shards stay in `data/`.
+Everything uploaded can be read by anyone: shards, manifests, index and card.
+They name a machine only by its hash (`m956ee98b`), never by its host name.
+Another dataset: `--hf-repo=USER/NAME` (`ORG/NAME` for an organization), created
+public if missing; a private one counts against the account's quota (100 GB
+on a free account, ~60 shards). Upload
 flags: `--hf-repo`, `--hf-subdir` (default: the machine hash), `--hf-every`
 (seconds between passes, default 600), `--delete-after-upload`.
 
@@ -163,7 +165,7 @@ the manifests. Then delete the test dataset on the Hub and `data/test*`.
 
 ```sh
 pip install huggingface_hub
-hf download USER/hydray-data --repo-type dataset --local-dir ~/hydray-data
+hf download ThomasGhione/hydray --repo-type dataset --local-dir ~/hydray-data
 ```
 
 `--include "m956ee98b/*-v4.3.1.*"` takes one machine and version only;
@@ -219,7 +221,7 @@ put them under `data/` (say `data/offline/`) and upload them:
 
 ```sh
 docker compose -f docker/compose.yaml run --rm datagen upload /data/offline \
-    --hf-repo=USER/hydray-data --delete-after-upload
+    --hf-repo=ThomasGhione/hydray --delete-after-upload
 ```
 
 Each shard goes to the folder of the machine that made it (`m<hash>/`, from
@@ -236,7 +238,7 @@ docker run -d --name datagen --init --user "$(id -u):$(id -g)" -e HF_TOKEN \
     -v "$PWD/engine/syzygy/files:/hydray/engine/syzygy/files" \
     -v /etc/machine-id:/host/machine-id:ro \
     hydray-datagen --nodes 8000 --seal-on-exit \
-    --hf-repo user/hydray-data --delete-after-upload
+    --hf-repo ThomasGhione/hydray --delete-after-upload
 docker stop -t 600 datagen
 docker run --rm -v "$PWD/data:/data" hydray-datagen dump /data/<prefix>.s0000.bin 5
 ```
@@ -244,7 +246,7 @@ docker run --rm -v "$PWD/data:/data" hydray-datagen dump /data/<prefix>.s0000.bi
 Without the machine-id mount the container needs `--out`.
 
 The uploader also runs without Docker:
-`nnue/tools/hf_upload.py --data data --repo user/hydray-data --once` (needs
+`nnue/tools/hf_upload.py --data data --repo ThomasGhione/hydray --once` (needs
 `pip install huggingface_hub`; `--help` for the rest). Outside Docker
 datagen writes the host name in the manifests unless it gets `--machine`.
 
