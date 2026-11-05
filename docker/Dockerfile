@@ -27,7 +27,8 @@ RUN echo "hydray-$(sed -n 's/.*id name HydraY \([0-9.]*\).*/\1/p' uci/uci.cpp)" 
 FROM python:3.13-slim
 RUN pip install --no-cache-dir --root-user-action=ignore huggingface_hub==2.3.0
 # Any --user works: the Hub client keeps its cache out of the missing $HOME.
-ENV HF_HOME=/tmp/hf PYTHONUNBUFFERED=1
+# No progress bars: in docker logs they are pages of carriage returns.
+ENV HF_HOME=/tmp/hf PYTHONUNBUFFERED=1 HF_HUB_DISABLE_PROGRESS_BARS=1
 COPY --from=build /src/chess /src/BUILD_ID /hydray/
 COPY nnue/tools/hf_upload.py /hydray/hf_upload.py
 COPY docker/datagen.sh engine/syzygy/fetch_syzygy.py engine/syzygy/syzygy-3-4-5.sha256 /hydray/
