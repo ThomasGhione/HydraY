@@ -65,8 +65,8 @@ docker compose -f docker/compose.yaml up -d --build
 ```
 
 The rebuilt image stops the old container (shard sealed and uploaded) and
-starts the new one. A new engine version writes under a new prefix; the old
-shards stay where they are.
+starts the new one. A new engine version, or another `--nodes`, writes under a
+new prefix; the old shards stay where they are.
 
 ## Settings
 
@@ -81,7 +81,8 @@ Everything is in `compose.yaml`; `.env`, ignored by git, holds only the token.
 | `.env` | `HF_TOKEN`, a Hugging Face write token |
 
 The container puts its defaults before `command:`, and a later flag wins:
-`--threads` = the CPUs it may use (`--cpus` included), and `--out`,
+`--threads` = the CPUs it may use (`--cpus` included), `--nodes=8000` (the
+default of `./chess datagen`, which the prefix names), and `--out`,
 `--machine` and `--build` as below. `command:` adds `--seal-on-exit` and
 `--min-free-gb=4`.
 
@@ -92,17 +93,20 @@ arguments of `run` replace `command:`).
 ## Names and folders
 
 The prefix needs no setting: `m` plus 8 hex digits of the hash of the host's
-`/etc/machine-id` (stable across restarts, different on every machine) and the
-engine version:
+`/etc/machine-id` (stable across restarts, different on every machine), the
+engine version and the nodes per move (`--nodes`):
 
 ```txt
-data/m956ee98b-v4.3.1.s0000.bin    sealed shard
-data/m956ee98b-v4.3.1.s0000.json   its manifest
-data/m956ee98b-v4.3.1.s0001.bin.part   the shard being written
+data/m956ee98b-v4.3.1-n8000.s0000.bin    sealed shard
+data/m956ee98b-v4.3.1-n8000.s0000.json   its manifest
+data/m956ee98b-v4.3.1-n8000.s0001.bin.part   the shard being written
 ```
 
-A new engine version starts new names, and every new net comes with a new
-version, so a series never mixes two labeler nets. Smaller changes without a
+A new engine version or another `--nodes` starts new names, and every new net
+comes with a new version, so a series never mixes two labeler nets or two node
+counts: an 8000-node and a 24000-node run of the same machine are two series,
+side by side in its folder. Series made before the nodes were in the name
+(`m956ee98b-v4.3.1.s0000.bin`) keep their names. Smaller changes without a
 version bump (a retuned search) are told apart by the manifests, which hold
 the machine hash and the build: version, a hash of the sources and net, the ISA,
 and the commit when the build gets `GIT_COMMIT=$(git rev-parse --short HEAD)`

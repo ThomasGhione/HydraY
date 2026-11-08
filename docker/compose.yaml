@@ -34,7 +34,7 @@ services:
     # The flags of ./chess datagen (--help), plus the upload ones. Threads
     # default to every CPU; --games does not fit a service that restarts.
     command:
-      # - --out=/data/NAME        # default /data/m<machine-id hash>-v<version>
+      # - --out=/data/NAME        # default /data/m<machine-id hash>-v<version>-n<nodes>
       - --nodes=8000
       - --seal-on-exit
       - --min-free-gb=4           # pause below 4 GB free, room left for the upload
