@@ -7,6 +7,7 @@ release
 nnue/data
 nnue/trainer
 engine/syzygy/files
+stockfish
 tuning
 tests
 *.bin
