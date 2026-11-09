@@ -154,7 +154,8 @@ flags: `--hf-repo`, `--hf-subdir` (default: the machine hash), `--hf-every`
   as they are, so they can be edited on the Hub;
   `nnue/tools/hf_upload.py --data DIR --repo ThomasGhione/hydray --card`
   rewrites the card alone (`--notes FILE` replaces the notes, `--dry-run`
-  prints the card).
+  prints the card). The viewer cannot read bulletformat: it shows
+  `preview/*.parquet`, a decoded sample (`pool`, `fen`, `score`, `result`).
 - **Start and stop.** Token, dataset and owner are checked before the datagen
   starts. At the stop a last pass uploads the shard sealed at exit
   (`stop_grace_period` gives it 10 minutes); anything left goes up at the next
