@@ -17,14 +17,18 @@ the machine that writes the folder: another owner stops the upload, so two
 machines with the same prefix cannot mix their shards.
 
 After a pass that uploaded something, <subdir>/index.jsonl lists the manifests
-of the folder and README.md, the dataset card, sums up every folder.
+of the folder and README.md, the dataset card, sums up every folder: the sealed
+shards from their manifests, the raw pools (whole runs uploaded as
+<prefix>.t<N>.bin) from their sizes and .provenance. The card's hand-written
+notes, between the two notes comments, are kept; --card rewrites the card
+alone, --notes FILE replaces the notes, --dry-run prints it instead.
 
 The token comes from HF_TOKEN (or `hf auth login`); the dataset is created
 public if missing (an existing one keeps its visibility).
 
 Usage:  hf_upload.py --data data --repo user/hydray-data [--prefix pc1] [--subdir pc1]
                      [--owner ID] [--every 600] [--once] [--delete-after-upload] [--dry-run]
-                     [--check [--next-shard]]
+                     [--check [--next-shard]] [--card [--notes FILE]]
 """
 import argparse
 import hashlib
@@ -42,6 +46,10 @@ from huggingface_hub import CommitOperationAdd, HfApi
 
 SEALED_RE = re.compile(r".+\.s\d{4,}\.bin")
 MANIFEST_RE = re.compile(r".+\.s\d{4,}\.json")
+RAW_RE = re.compile(r".+\.t\d+\.bin")
+NODES_RE = re.compile(r"(\d+) nodes/move|nodes/move:\s*(\d+)")
+NOTES_BEGIN = "<!-- notes: hand-written, kept by hf_upload.py -->"
+NOTES_END = "<!-- /notes -->"
 REPO_TYPE = "dataset"
 
 stopping = False
@@ -204,40 +212,80 @@ class Uploader:
         self.publish_card()
 
     def publish_card(self):
-        files = self.api.list_repo_files(self.args.repo, repo_type=REPO_TYPE)
-        folders = {}
-        for f in sorted(files):
-            if f == "index.jsonl" or f.endswith("/index.jsonl"):
-                path = self.api.hf_hub_download(self.args.repo, f, repo_type=REPO_TYPE,
-                                                force_download=True)
-                folders[f.rpartition("/")[0] or "."] = [json.loads(l) for l in open(path) if l.strip()]
+        def text(path):
+            return Path(self.api.hf_hub_download(self.args.repo, path, repo_type=REPO_TYPE,
+                                                 force_download=True)).read_text()
+
+        tree = sorted((f for f in self.api.list_repo_tree(self.args.repo, repo_type=REPO_TYPE, recursive=True)
+                       if hasattr(f, "blob_id")), key=lambda f: f.path)
+        folders, pools, notes = {}, defaultdict(lambda: {"shards": 0, "bytes": 0, "nodes": "?"}), ""
+        for f in tree:
+            folder, _, name = f.path.rpartition("/")
+            folder = folder or "."
+            if name == "index.jsonl":
+                folders[folder] = [json.loads(l) for l in text(f.path).splitlines() if l.strip()]
+            elif RAW_RE.fullmatch(name):
+                pools[folder]["shards"] += 1
+                pools[folder]["bytes"] += f.size
+            elif name.endswith(".provenance") and (m := NODES_RE.search(text(f.path))):
+                pools[folder]["nodes"] = m.group(1) or m.group(2)
+            elif f.path == "README.md":
+                old = text(f.path)
+                if NOTES_BEGIN in old and NOTES_END in old:
+                    notes = old.split(NOTES_BEGIN, 1)[1].split(NOTES_END, 1)[0].strip()
+        if self.args.notes:
+            notes = self.args.notes.read_text().strip()
+        rendered = render_card(self.args.repo, folders, {k: v for k, v in pools.items() if v["shards"]}, notes)
+        if self.args.dry_run:
+            print(rendered, end="")
+            return
         card = self.args.data / ".hf_README.md"
-        card.write_text(render_card(self.args.repo, folders))
+        card.write_text(rendered)
         self.commit({"README.md": card}, "Dataset card")
         card.unlink()
 
 
-def render_card(repo, folders):
+def render_card(repo, folders, pools, notes):
     def values(rows, key):
         return ", ".join(sorted({str(r.get(key, "?")) for r in rows}))
 
-    total = sum(r.get("positions", 0) for rows in folders.values() for r in rows)
+    def count(n, what):
+        return f"{n:,} {what}{'' if n == 1 else 's'}"
+
+    sealed = sum(r.get("positions", 0) for rows in folders.values() for r in rows)
+    raw = sum(p["bytes"] // 32 for p in pools.values())
     lines = ["---", "tags: [chess, nnue, hydray, bulletformat]", f"pretty_name: {repo.split('/')[-1]}",
              "---", "", f"# {repo}", "",
              "HydraY self-play positions in bulletformat (32 bytes per record), labeled by "
-             "an NNUE search. Each folder is one machine; each shard `<prefix>.sNNNN.bin` "
-             "has its manifest `<prefix>.sNNNN.json` with the settings it was generated with, "
-             "and `index.jsonl` lists the manifests of the folder.", "",
-             f"**{total:,} positions** in {sum(len(r) for r in folders.values())} shards.", "",
-             "| folder | machine | shards | positions | nodes/move | start | eg-every | syzygy | net | build | sealed |",
-             "|---|---|---|---|---|---|---|---|---|---|---|"]
+             f"an NNUE search. **{count(raw + sealed, 'position')}**: {raw:,} in raw pools and "
+             f"{sealed:,} in sealed shards.", ""]
+    if pools:
+        lines += ["## Raw pools (`<prefix>.t<N>.bin`)", "",
+                  "Whole datagen runs uploaded as written on disk: one `.bin` per datagen thread, "
+                  "plus the run's `.meta`, `.log` and `.provenance` (the full generation details). "
+                  f"**{count(raw, 'position')}** in {count(len(pools), 'pool')}.", "",
+                  "| folder | shards | positions | bytes (`.bin`) | nodes/move |",
+                  "|---|---|---|---|---|"]
+        for folder, p in pools.items():
+            lines.append(f"| `{folder}` | {p['shards']} | {p['bytes'] // 32:,} | {p['bytes']:,} | {p['nodes']} |")
+        lines.append("")
+    lines += [NOTES_BEGIN, notes, NOTES_END, ""] if notes else [NOTES_BEGIN, NOTES_END, ""]
+    if not folders:
+        return "\n".join(lines)
+    lines += ["## Sealed shards (`<prefix>.sNNNN.bin`)", "",
+              "Written by `hf_upload.py`: each folder is one machine; each shard `<prefix>.sNNNN.bin` "
+              "has its manifest `<prefix>.sNNNN.json` with the settings it was generated with, "
+              "and `index.jsonl` lists the manifests of the folder. "
+              f"**{count(sealed, 'position')}** in {count(sum(len(r) for r in folders.values()), 'shard')}.", "",
+              "| folder | machine | shards | positions | nodes/move | start | eg-every | syzygy | net | build | sealed |",
+              "|---|---|---|---|---|---|---|---|---|---|---|"]
     for folder, rows in folders.items():
-        sealed = sorted(r.get("sealed_utc", "") for r in rows)
+        dates = sorted(r.get("sealed_utc", "") for r in rows)
         lines.append(f"| {folder} | {values(rows, 'machine')} | {len(rows)} | "
                      f"{sum(r.get('positions', 0) for r in rows):,} | {values(rows, 'nodes_per_move')} | "
                      f"{values(rows, 'start')} | {values(rows, 'eg_every')} | {values(rows, 'syzygy_men')} | "
                      f"{values(rows, 'net_fnv1a64')} | {values(rows, 'build')} | "
-                     f"{sealed[0][:10] if sealed else ''} - {sealed[-1][:10] if sealed else ''} |")
+                     f"{dates[0][:10] if dates else ''} - {dates[-1][:10] if dates else ''} |")
     return "\n".join(lines) + "\n"
 
 
@@ -256,6 +304,10 @@ def main():
     ap.add_argument("--check", action="store_true", help="token, dataset and OWNER only, then exit")
     ap.add_argument("--next-shard", action="store_true",
                     help="with --check: print the first shard index free in the dataset")
+    ap.add_argument("--card", action="store_true",
+                    help="rewrite the dataset card only, then exit (with --dry-run: print it)")
+    ap.add_argument("--notes", type=Path,
+                    help="with --card: a file with the card's new hand-written notes")
     args = ap.parse_args()
     args.subdir = args.subdir.strip("/")
     if not args.data.is_dir():
@@ -265,6 +317,11 @@ def main():
     signal.signal(signal.SIGINT, on_stop)
     api = HfApi()
     up = Uploader(api, args)
+    if args.card:
+        if not args.dry_run:
+            api.whoami()
+        up.publish_card()
+        return
     if not args.dry_run:
         user = api.whoami()["name"]  # fails fast on a missing or bad token
         api.create_repo(args.repo, repo_type=REPO_TYPE, private=False, exist_ok=True)

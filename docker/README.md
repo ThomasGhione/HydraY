@@ -148,7 +148,13 @@ flags: `--hf-repo`, `--hf-subdir` (default: the machine hash), `--hf-every`
   needs its own `--out` and `--hf-subdir`.
 - **Index and card.** After each upload `index.jsonl` lists the folder's
   manifests, and `README.md`, the dataset card, sums up every folder: machine,
-  shards, positions, nodes, start, net, build, dates.
+  shards, positions, nodes, start, net, build, dates; the raw pools (whole old
+  runs, `<prefix>.t<N>.bin`) from their sizes and `.provenance`. The
+  hand-written notes between `<!-- notes: ... -->` and `<!-- /notes -->` stay
+  as they are, so they can be edited on the Hub;
+  `nnue/tools/hf_upload.py --data DIR --repo ThomasGhione/hydray --card`
+  rewrites the card alone (`--notes FILE` replaces the notes, `--dry-run`
+  prints the card).
 - **Start and stop.** Token, dataset and owner are checked before the datagen
   starts. At the stop a last pass uploads the shard sealed at exit
   (`stop_grace_period` gives it 10 minutes); anything left goes up at the next
