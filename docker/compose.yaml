@@ -12,7 +12,10 @@ services:
       context: ..
       dockerfile: docker/Dockerfile
       args:
-        ARCH: -march=x86-64-v3    # ISA, as in the makefile
+        # ISA, as in the makefile. AVX-VNNI (Intel 12th gen+, Zen 5) is ~30%
+        # faster; where it does not run the container uses FALLBACK_ARCH.
+        ARCH: -march=x86-64-v3 -mavxvnni
+        FALLBACK_ARCH: -march=x86-64-v3   # "" builds ARCH only
         JOBS: "2"                 # parallel compile jobs
         GIT_COMMIT: ${GIT_COMMIT:-}   # optional, for the manifests
     image: hydray-datagen

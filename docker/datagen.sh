@@ -36,9 +36,20 @@
 #     m<hash>-v<version>-n<nodes> into the folder of its own machine m<hash>
 set -e
 
+# bin/main is the fast build (AVX-VNNI by default), bin/fallback the one for
+# CPUs it does not run on: a UCI start evaluates the net, so a missing
+# instruction kills it there, in milliseconds.
+chess=/hydray/bin/main
+# The subshell keeps the shell's own "Illegal instruction" out of the log.
+if [ -x /hydray/bin/fallback ] && ! (printf 'quit\n' | "$chess") >/dev/null 2>&1; then
+    echo "datagen.sh: the $(cat "$chess.arch") build does not run on this CPU," \
+         "using $(cat /hydray/bin/fallback.arch)" >&2
+    chess=/hydray/bin/fallback
+fi
+
 if [ "$1" = "dump" ]; then
     shift
-    exec ./chess datagen-dump "$@"
+    exec "$chess" datagen-dump "$@"
 fi
 
 if [ "$1" = "upload" ]; then
@@ -79,7 +90,7 @@ machine_hash=
 if [ -s /host/machine-id ]; then
     machine_hash=m$(tr -d '[:space:]' < /host/machine-id | sha256sum | cut -c1-8)
 fi
-build=$(cat /hydray/BUILD_ID)
+build="$(cat /hydray/BUILD_ID) $(cat "$chess.arch")"
 version=${build%% *}
 version=${version#hydray-}
 
@@ -150,7 +161,7 @@ elif ! python3 /hydray/fetch_syzygy.py --dir "$tb" --sums "$sums" --check; then
 fi
 
 if [ -z "$repo" ]; then
-    exec ./chess datagen "$@"
+    exec "$chess" datagen "$@"
 fi
 
 upload() {
@@ -166,7 +177,7 @@ set -- "$@" --first-shard "$first"
 
 upload --every "$every" &
 uploader=$!
-./chess datagen "$@" &
+"$chess" datagen "$@" &
 gen=$!
 trap 'kill -TERM "$gen" "$uploader" 2>/dev/null' TERM INT
 

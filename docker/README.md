@@ -12,7 +12,11 @@ README, "Generating training data".
   and give `--out=/data/NAME` (and `--hf-subdir`) by hand.
 - Docker with Compose 2.24 or newer (`docker compose version`), for the
   optional `.env`.
-- An x86-64 CPU with AVX2 + BMI2 (`ARCH` in `compose.yaml` for another ISA).
+- An x86-64 CPU with AVX2 + BMI2. The image holds two builds: AVX-VNNI
+  (Intel 12th gen and later, AMD Zen 5, ~30% faster) and plain AVX2 + BMI2;
+  at the start the container tries the first and, where it does not run,
+  says `the ... build does not run on this CPU, using ...` and takes the
+  second. `ARCH` and `FALLBACK_ARCH` in `compose.yaml` choose them.
 - About 1 GB of disk and an internet connection at the first start, for the
   Syzygy tables (next section).
 
@@ -77,7 +81,7 @@ Everything is in `compose.yaml`; `.env`, ignored by git, holds only the token.
 | `command:` | the `./chess datagen` flags (`--nodes`, `--threads`, `--start`, ...) and the upload flags below |
 | `user:` | owner of the files written: `id -u`:`id -g` |
 | `volumes:` | `data/`, the tablebases, the host's machine-id |
-| `build.args` | `ARCH` (ISA, as in the makefile), `JOBS` (compile jobs), `GIT_COMMIT` |
+| `build.args` | `ARCH` (ISA, as in the makefile), `FALLBACK_ARCH` (the build for CPUs where `ARCH` does not run, `""` for none), `JOBS` (compile jobs), `GIT_COMMIT` |
 | `.env` | `HF_TOKEN`, a Hugging Face write token |
 
 The container puts its defaults before `command:`, and a later flag wins:
@@ -274,7 +278,7 @@ datagen writes the host name in the manifests unless it gets `--machine`.
 |---|---|
 | `compose.yaml` | the service and its settings |
 | `.env.example` | template of `.env` (token only) |
-| `Dockerfile` | static build (`make prod`, `HYDRAY_RELEASE`) into a `python:3.13-slim` image with `huggingface_hub` |
+| `Dockerfile` | two static builds (`make prod`, `HYDRAY_RELEASE`; `ARCH` and `FALLBACK_ARCH`) into a `python:3.13-slim` image with `huggingface_hub` |
 | `Dockerfile.dockerignore` | only the sources reach the build |
 | `datagen.sh` | entry point: defaults, upload flags, datagen and uploader side by side |
 | `../nnue/tools/hf_upload.py` | the uploader |
