@@ -19,7 +19,8 @@ machines with the same prefix cannot mix their shards.
 After a pass that uploaded something, <subdir>/index.jsonl lists the manifests
 of the folder and README.md, the dataset card, sums up every folder: the sealed
 shards from their manifests, the raw pools (whole runs uploaded as
-<prefix>.t<N>.bin) from their sizes and .provenance, and preview/*.parquet (a
+<prefix>.t<N>.bin) from their sizes and .provenance, the shuffled pools
+(<name>.pNN.bin parts) from their manifest.json, and preview/*.parquet (a
 decoded sample) becomes the dataset viewer's table. The card's hand-written
 notes, between the two notes comments, are kept; --card rewrites the card
 alone, --notes FILE replaces the notes, --dry-run prints it instead.
@@ -48,6 +49,7 @@ from huggingface_hub import CommitOperationAdd, HfApi
 SEALED_RE = re.compile(r".+\.s\d{4,}\.bin")
 MANIFEST_RE = re.compile(r".+\.s\d{4,}\.json")
 RAW_RE = re.compile(r".+\.t\d+\.bin")
+PACKED_RE = re.compile(r".+\.p\d+\.bin")
 NODES_RE = re.compile(r"(\d+) nodes/move|nodes/move:\s*(\d+)")
 NOTES_BEGIN = "<!-- notes: hand-written, kept by hf_upload.py -->"
 NOTES_END = "<!-- /notes -->"
@@ -220,12 +222,15 @@ class Uploader:
         tree = sorted((f for f in self.api.list_repo_tree(self.args.repo, repo_type=REPO_TYPE, recursive=True)
                        if hasattr(f, "blob_id")), key=lambda f: f.path)
         folders, pools, notes = {}, defaultdict(lambda: {"shards": 0, "bytes": 0, "nodes": "?"}), ""
+        packed = {}
         preview = any(f.path.startswith("preview/") and f.path.endswith(".parquet") for f in tree)
         for f in tree:
             folder, _, name = f.path.rpartition("/")
             folder = folder or "."
             if name == "index.jsonl":
                 folders[folder] = [json.loads(l) for l in text(f.path).splitlines() if l.strip()]
+            elif name == "manifest.json":
+                packed[folder] = json.loads(text(f.path))
             elif RAW_RE.fullmatch(name):
                 pools[folder]["shards"] += 1
                 pools[folder]["bytes"] += f.size
@@ -238,7 +243,7 @@ class Uploader:
         if self.args.notes:
             notes = self.args.notes.read_text().strip()
         rendered = render_card(self.args.repo, folders, {k: v for k, v in pools.items() if v["shards"]},
-                               notes, preview)
+                               notes, preview, packed)
         if self.args.dry_run:
             print(rendered, end="")
             return
@@ -248,7 +253,7 @@ class Uploader:
         card.unlink()
 
 
-def render_card(repo, folders, pools, notes, preview=False):
+def render_card(repo, folders, pools, notes, preview=False, packed=None):
     def values(rows, key):
         return ", ".join(sorted({str(r.get(key, "?")) for r in rows}))
 
@@ -257,14 +262,19 @@ def render_card(repo, folders, pools, notes, preview=False):
 
     sealed = sum(r.get("positions", 0) for rows in folders.values() for r in rows)
     raw = sum(p["bytes"] // 32 for p in pools.values())
+    packed = {k: m for k, m in (packed or {}).items() if m.get("parts")}
+    shuffled = sum(m["records"] for m in packed.values())
+    parts = [(n, what) for n, what in ((shuffled, "shuffled pools"), (raw, "raw pools"),
+                                       (sealed, "sealed shards")) if n]
     lines = ["---", "tags: [chess, nnue, hydray, bulletformat]", f"pretty_name: {repo.split('/')[-1]}"]
     # The viewer cannot read bulletformat: it shows the decoded sample instead.
     if preview:
         lines += ["configs:", "- config_name: preview", '  data_files: "preview/*.parquet"']
     lines += ["---", "", f"# {repo}", "",
               "HydraY self-play positions in bulletformat (32 bytes per record), labeled by "
-              f"an NNUE search. **{count(raw + sealed, 'position')}**: {raw:,} in raw pools and "
-              f"{sealed:,} in sealed shards.", ""]
+              f"an NNUE search. **{count(shuffled + raw + sealed, 'position')}**"
+              + (": " + ", ".join(f"{n:,} in {what}" for n, what in parts) if len(parts) > 1 else "")
+              + ".", ""]
     if preview:
         lines += ["The dataset viewer shows `preview/`, a small sample of positions decoded from "
                   "the `.bin` files and spread evenly across them; training reads the `.bin` files. "
@@ -272,6 +282,17 @@ def render_card(repo, folders, pools, notes, preview=False):
                   "side to move is always shown as White, and bulletformat keeps no castling rights "
                   "or move counters); `score`, the search score in HydraY's eval unit for the side "
                   "to move; `result`, the game result for the side to move (1 win, 0.5 draw, 0 loss).", ""]
+    if packed:
+        lines += ["## Shuffled pools (`<name>.pNN.bin`)", "",
+                  "Ready to train on: one uniform permutation of their sources, split in parts that "
+                  "a sequential loader reads in any order, plus a holdout kept apart. `manifest.json` "
+                  "has the sources, the seed and the sha256 of every part.", "",
+                  "| folder | parts | positions | holdout | sources |", "|---|---|---|---|---|"]
+        for folder, m in packed.items():
+            hold = m.get("holdout") or {}
+            lines.append(f"| `{folder}` | {len(m['parts'])} | {m['records']:,} | "
+                         f"{hold.get('records', 0):,} | {', '.join(m.get('sources', {}))} |")
+        lines.append("")
     if pools:
         lines += ["## Raw pools (`<prefix>.t<N>.bin`)", "",
                   "Whole datagen runs uploaded as written on disk: one `.bin` per datagen thread, "
