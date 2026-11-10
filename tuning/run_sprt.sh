@@ -98,9 +98,8 @@ ALPHA="${ALPHA:-0.05}"
 BETA="${BETA:-0.05}"
 HASH="${HASH:-64}"
 THREADS="${THREADS:-1}"
-# The engine honours the UCI "Threads" option (Lazy SMP); its auto default is
-# omp_get_max_threads(). Pin the env too, as a belt-and-braces cap in case a
-# tool ever launches the engine without sending setoption Threads.
+# The engine honours the UCI "Threads" option (Lazy SMP), up to
+# omp_get_max_threads(). Pin the env too, as a belt-and-braces cap.
 export OMP_NUM_THREADS="${THREADS}"
 BOOK="${BOOK:-books/openings.pgn}"
 MAXGAMES="${MAXGAMES:-4000}"

@@ -10,6 +10,13 @@ inline constexpr bool kSearchStats = true;
 inline constexpr bool kSearchStats = false;
 #endif
 
+// Sanity reports of a debug build (bare `make`, `make debug`, the tests).
+#ifdef DEBUG
+inline constexpr bool kDebugChecks = true;
+#else
+inline constexpr bool kDebugChecks = false;
+#endif
+
 struct SearchStats {
     uint64_t mainNodes, qNodes;
     uint64_t ttProbes, ttHits, ttCuts;

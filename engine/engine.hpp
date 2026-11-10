@@ -24,8 +24,8 @@ public:
 
     chess::Board board;
     SearchRuntime searchRuntime{};
-    // UCI `Threads` (0 = omp_get_max_threads()); survives reset().
-    int requestedThreads = 0;
+    // UCI `Threads`; survives reset().
+    int requestedThreads = 1;
     syzygy::SyzygyProber syzygyProber;
     TT tt;
     time::TimeManager timeManager;

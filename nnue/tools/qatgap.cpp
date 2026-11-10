@@ -30,33 +30,13 @@
 
 #include "fen_accumulator.hpp"
 
-#include <algorithm>
-#include <bit>
-#include <charconv>
-#include <cmath>
-#include <cstdint>
 #include <cstdio>
-#include <cstring>
-#include <fstream>
 #include <iterator>
-#include <string>
-#include <vector>
 
 using namespace NNUE::Deep;
+using namespace NNUE::Deep::tools;
 
 namespace {
-
-// bulletformat::ChessBoard, as in holdoutloss.cpp.
-struct Record {
-    uint64_t occ;
-    uint8_t  pcs[16];
-    int16_t  score;
-    uint8_t  result;
-    uint8_t  ksq;
-    uint8_t  oppKsq;
-    uint8_t  extra[3];
-};
-static_assert(sizeof(Record) == 32, "must match bulletformat::ChessBoard");
 
 // The float net in the quantised file's order: l0w with the factoriser folded in,
 // row-major [feature][hidden]; l1w [bucket][out][in]; l2w [bucket][out].
@@ -117,13 +97,6 @@ float screlu(float x) noexcept {
     return x * x;
 }
 
-double sigmoid(double x) noexcept { return 1.0 / (1.0 + std::exp(-x)); }
-
-bool parseU64(const char* s, uint64_t& out) {
-    const char* end = s + std::strlen(s);
-    return std::from_chars(s, end, out).ec == std::errc{};
-}
-
 } // namespace
 
 int main(int argc, char** argv) {
@@ -164,13 +137,9 @@ int main(int argc, char** argv) {
     std::printf("same net: %ld l0w and %ld l1w values differ from round(float * Q)\n", bad0, bad1);
     if (bad0 > 100 || bad1 > 100) { std::fprintf(stderr, "not the same net\n"); return 1; }
 
-    std::ifstream in(argv[3], std::ios::binary);
-    if (!in) { std::fprintf(stderr, "cannot open %s\n", argv[3]); return 1; }
-    in.seekg(static_cast<std::streamoff>(offset * sizeof(Record)));
-    std::vector<Record> recs(count);
-    in.read(reinterpret_cast<char*>(recs.data()), static_cast<std::streamsize>(count * sizeof(Record)));
-    const auto got = static_cast<long>(in.gcount() / static_cast<std::streamsize>(sizeof(Record)));
-    if (got == 0) { std::fprintf(stderr, "no records\n"); return 1; }
+    const std::vector<Record> recs = readRecords(argv[3], offset, count);
+    const auto got = static_cast<long>(recs.size());
+    if (got == 0) { std::fprintf(stderr, "no records in %s at %llu\n", argv[3], static_cast<unsigned long long>(offset)); return 1; }
 
     enum { A, D, B, C, N };
     double loss[N] = {}, sq[N] = {}, mean[N] = {}, worst = 0.0;
@@ -182,34 +151,19 @@ int main(int argc, char** argv) {
 
     for (long n = 0; n < got; ++n) {
         const Record& r = recs[n];
-        // Features as holdoutloss.cpp's accumulateRecord, on both nets at once.
-        const int usFlip   = (r.ksq & 7) > 3 ? 7 : 0;
-        const int usBase   = INPUTS * tools::kingBucket(r.ksq);
-        const int themFlip = (r.oppKsq & 7) > 3 ? 7 : 0;
-        const int themBase = INPUTS * tools::kingBucket(r.oppKsq);
+        // The record's features on both nets at once.
         for (int h = 0; h < HIDDEN; ++h) {
             fUs[h] = fThem[h] = fl.l0b[h];
             iUs[h] = iThem[h] = q.l0b[h];
         }
-        uint64_t occ = r.occ;
-        int idx = 0;
-        while (occ != 0) {
-            const int sq = std::countr_zero(occ);
-            occ &= occ - 1;
-            const uint8_t nibble = (r.pcs[idx / 2] >> (4 * (idx & 1))) & 0xF;
-            ++idx;
-            const bool isOpp = (nibble & 8) != 0;
-            const int  type  = nibble & 7;
-            const size_t us   = usBase + (((isOpp ? 384 : 0) + type * 64 + sq) ^ usFlip);
-            const size_t them = themBase + (((isOpp ? 0 : 384) + type * 64 + (sq ^ 56)) ^ themFlip);
+        const int bucket = forEachFeature(r, [&](size_t us, size_t them) {
             for (int h = 0; h < HIDDEN; ++h) {
                 fUs[h] += fl.l0w[us * HIDDEN + h];
                 fThem[h] += fl.l0w[them * HIDDEN + h];
                 iUs[h] = static_cast<int16_t>(iUs[h] + q.l0w[us][h]);
                 iThem[h] = static_cast<int16_t>(iThem[h] + q.l0w[them][h]);
             }
-        }
-        const int bucket = (idx - 2) / BUCKET_DIVISOR;
+        });
         const int fb = bucket / span;
 
         for (int side = 0; side < 2; ++side) {

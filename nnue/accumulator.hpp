@@ -43,51 +43,24 @@ struct alignas(64) Accumulator {
     uint8_t  ndelta;
     AccDelta delta[ACC_MAX_DELTAS];
 
-    // Wipes both perspectives to the bias and installs the given own-king
-    // squares (LERF, already from each perspective's view) as bases.
-    inline void resetWithKings(int wKingLerf, int bKingLerfFromBlack) noexcept {
-        const Deep::NetworkDeep& net = *activeNetwork;
-        std::memcpy(v[0], net.l0b, sizeof(net.l0b));
-        std::memcpy(v[1], net.l0b, sizeof(net.l0b));
-        base[0] = kingFeatureBase(wKingLerf);
-        base[1] = kingFeatureBase(bKingLerfFromBlack);
-        flip[0] = static_cast<uint8_t>(kingFlip(wKingLerf));
-        flip[1] = static_cast<uint8_t>(kingFlip(bKingLerfFromBlack));
-        dirty[0] = dirty[1] = false;
-    }
-
-    // Both perspectives in one traversal of the rows, reading s0/s1 and
-    // writing d0/d1 (another frame). int16 is modular, so the order the
-    // contributions are summed in does not change the result. The accumulator
-    // rows never alias the weight rows: restrict-qualified parameters say so,
-    // or GCC versions the loop on runtime alias checks.
-    template<int NS, int NA>
-    static inline void fusePairFrom(const int16_t* __restrict s0, const int16_t* __restrict s1,
-                                    int16_t* __restrict d0, int16_t* __restrict d1,
-                                    const int16_t* const (&sub)[2][2],
-                                    const int16_t* const (&add)[2][2]) noexcept {
+    // Both perspectives in one traversal of the rows, writing d0/d1 from
+    // s0/s1 (another frame) when From, in place otherwise (s0/s1 unused).
+    // int16 is modular, so the order the contributions are summed in does not
+    // change the result. The accumulator rows never alias the weight rows:
+    // restrict-qualified parameters say so, or GCC versions the loop on
+    // runtime alias checks.
+    template<int NS, int NA, bool From = false>
+    static inline void fusePair(int16_t* __restrict d0, int16_t* __restrict d1,
+                                const int16_t* __restrict s0, const int16_t* __restrict s1,
+                                const int16_t* const (&sub)[2][2],
+                                const int16_t* const (&add)[2][2]) noexcept {
         for (int i = 0; i < HIDDEN; ++i) {
-            int x0 = s0[i];
-            int x1 = s1[i];
+            int x0 = From ? s0[i] : d0[i];
+            int x1 = From ? s1[i] : d1[i];
             for (int k = 0; k < NS; ++k) { x0 -= sub[0][k][i]; x1 -= sub[1][k][i]; }
             for (int k = 0; k < NA; ++k) { x0 += add[0][k][i]; x1 += add[1][k][i]; }
             d0[i] = static_cast<int16_t>(x0);
             d1[i] = static_cast<int16_t>(x1);
-        }
-    }
-
-    // The same in place, for the passes after the first.
-    template<int NS, int NA>
-    static inline void fusePair(int16_t* __restrict v0, int16_t* __restrict v1,
-                                const int16_t* const (&sub)[2][2],
-                                const int16_t* const (&add)[2][2]) noexcept {
-        for (int i = 0; i < HIDDEN; ++i) {
-            int s0 = v0[i];
-            int s1 = v1[i];
-            for (int k = 0; k < NS; ++k) { s0 -= sub[0][k][i]; s1 -= sub[1][k][i]; }
-            for (int k = 0; k < NA; ++k) { s0 += add[0][k][i]; s1 += add[1][k][i]; }
-            v0[i] = static_cast<int16_t>(s0);
-            v1[i] = static_cast<int16_t>(s1);
         }
     }
 
@@ -104,27 +77,12 @@ struct alignas(64) Accumulator {
         return activeNetwork->l0w[rowBase + (feat768 ^ rowFlip)];
     }
 
-    [[nodiscard]] inline const int16_t* featureRow(int p, uint8_t piece, uint8_t index) const noexcept {
-        return rowFor(base[p], flip[p], p, piece, index);
-    }
-
-    // Single-row counterparts of fusePairFrom and fusePair.
-    template<int NS, int NA>
-    static inline void fuseRowsFrom(const int16_t* __restrict src, int16_t* __restrict row,
-                                    const int16_t* const* sub, const int16_t* const* add) noexcept {
+    // Single-row counterpart of fusePair.
+    template<int NS, int NA, bool From = false>
+    static inline void fuseRows(int16_t* __restrict row, const int16_t* __restrict src,
+                                const int16_t* const* sub, const int16_t* const* add) noexcept {
         for (int i = 0; i < HIDDEN; ++i) {
-            int x = src[i];
-            for (int k = 0; k < NS; ++k) x -= sub[k][i];
-            for (int k = 0; k < NA; ++k) x += add[k][i];
-            row[i] = static_cast<int16_t>(x);
-        }
-    }
-
-    template<int NS, int NA>
-    static inline void fuseRows(int16_t* __restrict row, const int16_t* const* sub,
-                                const int16_t* const* add) noexcept {
-        for (int i = 0; i < HIDDEN; ++i) {
-            int x = row[i];
+            int x = From ? src[i] : row[i];
             for (int k = 0; k < NS; ++k) x -= sub[k][i];
             for (int k = 0; k < NA; ++k) x += add[k][i];
             row[i] = static_cast<int16_t>(x);
@@ -168,10 +126,10 @@ struct alignas(64) Accumulator {
         }
         forEachPass(ns, na, [&]<int S, int A>(int si, int ai) {
             if (src != nullptr) {
-                fuseRowsFrom<S, A>(src, row, sub + si, add + ai);
+                fuseRows<S, A, true>(row, src, sub + si, add + ai);
                 src = nullptr;
             } else {
-                fuseRows<S, A>(row, sub + si, add + ai);
+                fuseRows<S, A>(row, nullptr, sub + si, add + ai);
             }
         });
     }

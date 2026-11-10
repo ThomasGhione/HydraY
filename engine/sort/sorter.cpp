@@ -64,8 +64,8 @@ Attacker leastValuableAttacker(const Board& b, int sq, uint64_t occ, int side) n
     mask = b.bb[Board::KNIGHT][side] & occ & pieces::KNIGHT_ATTACKS[sq];
     if (mask) return {std::countr_zero(mask), Board::KNIGHT};
     // Slider rays shared by bishop/queen and rook/queen.
-    const uint64_t bishopRays = pieces::getBishopAttacks(sq, occ);
-    const uint64_t rookRays   = pieces::getRookAttacks(sq, occ);
+    const uint64_t bishopRays = pieces::Bishop::attacks(sq, occ);
+    const uint64_t rookRays   = pieces::Rook::attacks(sq, occ);
     const uint64_t rays[4] = {bishopRays, rookRays, bishopRays | rookRays, pieces::KING_ATTACKS[sq]};
     for (int type = Board::BISHOP; type <= Board::KING; ++type) {
         mask = b.bb[type][side] & occ & rays[type - Board::BISHOP];
@@ -115,21 +115,12 @@ bool givesCheckAfterQuietMoveFast(const Board& b, const chess::Move& m,
     const int usSide = Board::colorToIndex(b.getActiveColor());
     const uint64_t fromBit = 1ULL << m.from;
     const uint64_t toBit   = 1ULL << m.to;
-    const uint64_t occAfter = (occ & ~fromBit) | toBit;
-    // Our pieces of a type after the move.
-    const auto mine = [&](int type) {
+    // Our pieces as they stand after the move.
+    const auto after = [&](int type) {
         const uint64_t bits = b.bb[type][usSide];
         return type == fromPieceType ? (bits & ~fromBit) | toBit : bits;
     };
-
-    if (pieces::PAWN_ATTACKS[usSide ^ 1][oppKingSq] & mine(Board::PAWN)) return true;
-    if (pieces::KNIGHT_ATTACKS[oppKingSq] & mine(Board::KNIGHT))         return true;
-
-    const uint64_t queens       = mine(Board::QUEEN);
-    const uint64_t rookQueens   = mine(Board::ROOK)   | queens;
-    const uint64_t bishopQueens = mine(Board::BISHOP) | queens;
-    if (rookQueens   && (pieces::getRookAttacks(oppKingSq, occAfter)   & rookQueens))   return true;
-    return bishopQueens && (pieces::getBishopAttacks(oppKingSq, occAfter) & bishopQueens);
+    return Board::attackersOf(static_cast<uint8_t>(oppKingSq), usSide, (occ & ~fromBit) | toBit, after) != 0;
 }
 
 MovePicker sortLegalMoves(MoveList moves, int ply, const Board& b, const SearchRuntime& runtime,

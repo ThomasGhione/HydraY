@@ -13,6 +13,7 @@
 # Built engine binaries at repo root (chess, chess_dev, chess.exe, chess_windows, ...).
 # git cannot ignore "all executables" by permission bit, so anchor the build names.
 /chess*
+/release/
 /tests/test
 /tests/perf
 /tests/sacrifice
@@ -59,3 +60,8 @@ config.json
 # Python bytecode (never track compiled caches)
 __pycache__/
 *.pyc
+/tuning/spsa_*_state.json
+
+# Docker datagen: local settings (may hold HF_TOKEN) and the default data folder
+/docker/.env
+/data/

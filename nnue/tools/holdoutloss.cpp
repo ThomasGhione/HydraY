@@ -36,36 +36,14 @@
 
 #include "fen_accumulator.hpp"
 
-#include <algorithm>
-#include <bit>
-#include <charconv>
-#include <cmath>
-#include <cstdint>
 #include <cstdio>
 #include <cstdlib>
-#include <cstring>
-#include <fstream>
-#include <string>
 #include <thread>
-#include <vector>
 
 using namespace NNUE::Deep;
+using namespace NNUE::Deep::tools;
 
 namespace {
-
-// bulletformat::ChessBoard, 32 bytes. Declared here rather than included from
-// nnue/bulletformat.hpp, which pulls in board.hpp for the writer side; this
-// tool only reads. The field meanings are documented there.
-struct Record {
-    uint64_t occ;
-    uint8_t  pcs[16];
-    int16_t  score;
-    uint8_t  result;
-    uint8_t  ksq;
-    uint8_t  oppKsq;
-    uint8_t  extra[3];
-};
-static_assert(sizeof(Record) == 32, "must match bulletformat::ChessBoard");
 
 // Single-layer quantised.bin: (768x4kb_hm -> 1024)x2 -> 8, SCReLU. Same l0 as
 // the deep format, so the accumulator is shared; only the output layer differs.
@@ -117,43 +95,6 @@ struct Evaluator {
         return out * SCALE / (QA * QB);
     }
 };
-
-void addRow(int16_t* acc, const int16_t* w) noexcept {
-    for (int i = 0; i < HIDDEN; ++i) acc[i] = static_cast<int16_t>(acc[i] + w[i]);
-}
-
-// Same features as tools::accumulate, read straight from the record instead of
-// from a FEN. Records are stored in the stm frame (the stm is always "white"
-// and its king is ksq; oppKsq is already the opponent king in its own view),
-// so the black-to-move branch of the FEN path collapses away here.
-// --selfcheck holds the two paths against each other.
-int accumulateRecord(const NetworkDeep& net, const Record& r,
-                     int16_t* accUs, int16_t* accThem) noexcept {
-    const int usFlip   = (r.ksq & 7) > 3 ? 7 : 0;
-    const int usBase   = INPUTS * tools::kingBucket(r.ksq);
-    const int themFlip = (r.oppKsq & 7) > 3 ? 7 : 0;
-    const int themBase = INPUTS * tools::kingBucket(r.oppKsq);
-
-    std::memcpy(accUs, net.l0b, sizeof(net.l0b));
-    std::memcpy(accThem, net.l0b, sizeof(net.l0b));
-
-    uint64_t occ = r.occ;
-    int idx = 0;
-    while (occ != 0) {
-        const int sq = std::countr_zero(occ);
-        occ &= occ - 1;
-        const uint8_t nibble = (r.pcs[idx / 2] >> (4 * (idx & 1))) & 0xF;
-        ++idx;
-        const bool isOpp = (nibble & 8) != 0;
-        const int  type  = nibble & 7;
-
-        addRow(accUs, net.l0w[usBase + (((isOpp ? 384 : 0) + type * 64 + sq) ^ usFlip)]);
-        addRow(accThem, net.l0w[themBase + (((isOpp ? 0 : 384) + type * 64 + (sq ^ 56)) ^ themFlip)]);
-    }
-    return (idx - 2) / BUCKET_DIVISOR;
-}
-
-double sigmoid(double x) noexcept { return 1.0 / (1.0 + std::exp(-x)); }
 
 struct Totals {
     double   loss[OUTPUT_BUCKETS] = {};
@@ -304,7 +245,7 @@ bool selfcheck(const Evaluator& ev, const std::string& path, uint64_t n) {
 
         const std::string fen = recordToFen(r);
         int fenBucket = 0;
-        if (!tools::accumulate(*ev.l0, fen, fenUs, fenThem, fenBucket)) {
+        if (!accumulate(*ev.l0, fen, fenUs, fenThem, fenBucket)) {
             std::fprintf(stderr, "record %llu: FEN path rejected '%s'\n",
                          static_cast<unsigned long long>(i), fen.c_str());
             return false;
@@ -323,11 +264,6 @@ bool selfcheck(const Evaluator& ev, const std::string& path, uint64_t n) {
                 static_cast<unsigned long long>(n),
                 ev.deep != nullptr ? ", simd == scalar" : "");
     return true;
-}
-
-bool parseU64(const char* s, uint64_t& out) {
-    const char* end = s + std::strlen(s);
-    return std::from_chars(s, end, out).ec == std::errc{};
 }
 
 } // namespace

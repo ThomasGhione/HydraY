@@ -38,8 +38,10 @@ TEST_FLAGS = -std=c++23 -Wall -Wextra -Wpedantic -O3 -DDEBUG -fopenmp -march=nat
 #   Here (GCC 13) native resolves to ARCH="-march=sierraforest -mtune=generic";
 #   ARCH=-march=x86-64-v3 runs on any AVX2 + BMI2 CPU (no-VNNI L1 fallback).
 ARCH ?= -march=native -mtune=native
+# RELEASE_FLAGS: set by `make release`.
+RELEASE_FLAGS ?=
 # Balanced production flags (safety + speed)
-PRODFLAGS = -std=c++23 -Wall -Wextra -Wpedantic -fopenmp $(ARCH) \
+PRODFLAGS = -std=c++23 -Wall -Wextra -Wpedantic -fopenmp $(ARCH) $(RELEASE_FLAGS) \
 		-flto=auto -fno-math-errno -fno-trapping-math -funroll-loops \
 		-ffunction-sections -fdata-sections -O3 -fno-pie -no-pie
 # clang: node-identical to g++ and faster (bench6 +3.8% on a P-core, +1.8% on
@@ -56,14 +58,42 @@ TEST_FLAGS := $(filter-out -fopenmp -flto=8 -fext-numeric-literals,$(TEST_FLAGS)
 		-flto=full -Wno-unused-command-line-argument
 OMP_LIBS = -Wl,--no-as-needed -lgomp
 endif
-# Objects (LTO bitcode) from one compiler cannot be linked by the other: a
-# switch leaves no stamp for the new compiler, which then rebuilds them all.
-COMPILER_STAMP = $(OUTPUT_DIR)/.cxx-$(notdir $(CXX))
+# Objects (LTO bitcode) from one compiler cannot be linked by the other, and
+# objects built for one ARCH must not reach a binary for another: a switch
+# leaves no stamp for the new combination, which then rebuilds them all.
+BUILD_ID := $(shell printf '%s' '$(ARCH) $(RELEASE_FLAGS)' | cksum | cut -d' ' -f1)
+COMPILER_STAMP = $(OUTPUT_DIR)/.cxx-$(notdir $(CXX))-$(BUILD_ID)
 
-# Windows cross-compiler (requires mingw-w64)
-WIN_CXX = x86_64-w64-mingw32-g++
-WIN_CC = x86_64-w64-mingw32-gcc
-WIN_PRODFLAGS = -std=c++23 -Wall -Wextra -Wpedantic -O3 -DDEBUG -march=x86-64-v3 -static -static-libgcc -static-libstdc++ -fopenmp -flto=4 -fext-numeric-literals
+# Windows cross-compiler (requires mingw-w64). The -posix variant, where the
+# distribution has one: winpthreads gives std::thread and the watchdog's timed
+# wait a monotonic clock.
+WIN_CXX = $(or $(shell command -v x86_64-w64-mingw32-g++-posix 2>/dev/null),x86_64-w64-mingw32-g++)
+WIN_CC = $(or $(shell command -v x86_64-w64-mingw32-gcc-posix 2>/dev/null),x86_64-w64-mingw32-gcc)
+WIN_ARCH ?= -march=x86-64-v3
+# --stack: Engine lives on main's stack and every search thread recurses, so
+# they get the 8 MiB they have on Linux, not the 2 MiB of a PE default.
+WIN_PRODFLAGS = -std=c++23 -Wall -Wextra -Wpedantic -O3 $(WIN_ARCH) $(RELEASE_FLAGS) \
+		-fno-math-errno -fno-trapping-math -funroll-loops \
+		-static -static-libgcc -static-libstdc++ -fopenmp -flto=auto -fext-numeric-literals \
+		-Wl,--stack,8388608
+
+# `make release`, Linux and Windows, static, without the tuning spins, each
+# target with its own object directory:
+#   x86-64-v3-vnni    AVX-VNNI: Intel 12th gen and later, Zen 5 (+30% over v3)
+#   x86-64-v3         AVX2, BMI2: the rest from Haswell and Zen 3 on
+#   x86-64-v3-nobmi2  AVX2 only: Zen 1/2, whose PEXT is microcoded
+#   x86-64-v2         neither, for older CPUs (about a third of v3's speed)
+VERSION = $(shell sed -n 's/.*id name HydraY \([0-9.]*\).*/\1/p' $(ROOT_DIR)/uci/uci.cpp)
+RELEASE_DIR := $(ROOT_DIR)/release
+RELEASE_ISAS := x86-64-v3-vnni x86-64-v3 x86-64-v3-nobmi2 x86-64-v2
+RELEASE_ARCH_x86-64-v3-vnni := -march=x86-64-v3 -mavxvnni
+RELEASE_ARCH_x86-64-v3 := -march=x86-64-v3
+RELEASE_ARCH_x86-64-v3-nobmi2 := -march=x86-64-v3 -mno-bmi2
+RELEASE_ARCH_x86-64-v2 := -march=x86-64-v2
+# -u log: LTO only calls log() once the archives have been scanned, and the libm
+# members it then pulls in land after crtend.o: .eh_frame loses its terminator
+# and the static startup code walks off the end of it.
+STATIC_FLAGS := -static -Wl,-u,log
 
 # Static-analysis tools: cppcheck and lizard come from the system now
 # (install: apt/brew cppcheck, `pip install lizard`). gprof2dot stays vendored.
@@ -137,7 +167,7 @@ PERF_OBJS = $(patsubst $(ROOT_DIR)/%.cpp,$(OUTPUT_DIR)/%.o,$(ALL_PERF_MODULE_SRC
 DEPFILES = $(ALL_OBJS:.o=.d) $(TEST_OBJS:.o=.d) $(TEST_MAIN_OBJ:.o=.d) $(PERF_OBJS:.o=.d) $(PERF_MAIN_OBJ:.o=.d)
 
 # Main targets
-.PHONY: all prod prod_windows parallel_prod prod_sequential debug test perf all-tests analyze analyze-setup analyze-cppcheck analyze-clang-tidy analyze-iwyu analyze-scan-build analyze-gcc-analyzer analyze-cppclean analyze-lizard analyze-summary complexity test-valgrind cls cls-compile-files get-image help debug-vars
+.PHONY: all prod prod_windows release parallel_prod prod_sequential debug test perf all-tests analyze analyze-setup analyze-cppcheck analyze-clang-tidy analyze-iwyu analyze-scan-build analyze-gcc-analyzer analyze-cppclean analyze-lizard analyze-summary complexity test-valgrind cls cls-compile-files get-image help debug-vars
 
 # Default target for plain `make`
 all: PRODFLAGS += -DDEBUG -fomit-frame-pointer
@@ -157,9 +187,24 @@ parallel_prod: prod
 # tbprobe.c compiled separately as C (not C++) to avoid name mangling issues
 prod_windows:
 	@printf "\nCompiling Windows binary..."
-	$(WIN_CC) -O3 -std=c11 -Wall -c $(SYZYGY_C_SRC) -o $(OUTPUT_DIR)/tbprobe_win.o
+	@mkdir -p $(OUTPUT_DIR)
+	$(WIN_CC) -O3 $(WIN_ARCH) -std=c11 -Wall -c $(SYZYGY_C_SRC) -o $(OUTPUT_DIR)/tbprobe_win.o
 	$(WIN_CXX) $(WIN_PRODFLAGS) $(MAIN_SRC) $(ALL_MODULE_SRCS) $(OUTPUT_DIR)/tbprobe_win.o -o $(NAME_APP_WIN)
 	@printf "\nBuild completed: $(NAME_APP_WIN)\n\n"
+
+# Release binaries in release/
+define release_isa
+	$(MAKE) prod ARCH="$(RELEASE_ARCH_$(1))" RELEASE_FLAGS="-DHYDRAY_RELEASE $(STATIC_FLAGS)" OUTPUT_DIR=$(OUTPUT_DIR)/$(1) \
+		NAME_APP=$(RELEASE_DIR)/hydray-$(VERSION)-linux-$(1)
+	$(MAKE) prod_windows WIN_ARCH="$(RELEASE_ARCH_$(1))" RELEASE_FLAGS=-DHYDRAY_RELEASE OUTPUT_DIR=$(OUTPUT_DIR)/$(1) \
+		NAME_APP_WIN=$(RELEASE_DIR)/hydray-$(VERSION)-windows-$(1).exe
+
+endef
+
+release:
+	@mkdir -p $(RELEASE_DIR)
+	$(foreach isa,$(RELEASE_ISAS),$(call release_isa,$(isa)))
+	@ls -l $(RELEASE_DIR)
 
 # Sequential production build
 # Note: no slower, but does not generate .o files
@@ -210,7 +255,7 @@ $(COMPILER_STAMP):
 $(OUTPUT_DIR)/nnue/embedded.o: $(ROOT_DIR)/nnue/net/hydray.nnue $(ROOT_DIR)/nnue/scale_ref.txt
 
 # tbprobe.c compiled as C (not C++) to avoid name mangling issues
-$(SYZYGY_C_OBJ): $(SYZYGY_C_SRC)
+$(SYZYGY_C_OBJ): $(SYZYGY_C_SRC) $(COMPILER_STAMP)
 	@printf "\nCompiling $<..."
 	@mkdir -p $(dir $@)
 	gcc -O3 $(ARCH) -std=c11 -Wall -MMD -MP -c $< -o $@
@@ -370,6 +415,7 @@ cls-compile-files:
 cls: cls-compile-files
 	@printf "\nCleaning..."
 	rm -f $(COMPILATION_DB)
+	rm -rf $(RELEASE_DIR)
 	rm -rf $(GPROF_OUTPUT)
 	@printf "\nClean completed\n\n"
 
@@ -384,6 +430,7 @@ help:
 	@printf "\nBUILD TARGETS:\n"
 	@printf "  make prod           - Optimized production build\n"
 	@printf "  make prod_windows   - Windows cross-build (requires mingw-w64)\n"
+	@printf "  make release        - Release binaries in release/ (Linux and Windows, four ISAs)\n"
 	@printf "  make debug          - Build with debug symbols\n"
 	@printf "  make test           - Build functional tests\n"
 	@printf "  make perf           - Build performance tests\n"

@@ -2,8 +2,6 @@
 
 #include <algorithm>
 
-#include <omp.h>
-
 namespace engine {
 
 void Engine::bindSearchRuntime() noexcept {
@@ -16,7 +14,6 @@ void Engine::bindSearchRuntime() noexcept {
 // The network must be active before construction: the board fills its
 // accumulator when it is built.
 Engine::Engine() {
-    searchRuntime.maxThreads = omp_get_max_threads();
     bindSearchRuntime();
 }
 
@@ -25,7 +22,7 @@ void Engine::reset() noexcept {
     timeManager.stop();
     board = chess::Board();
     searchRuntime = SearchRuntime{};
-    searchRuntime.maxThreads = (requestedThreads > 0) ? requestedThreads : omp_get_max_threads();
+    searchRuntime.maxThreads = requestedThreads;
     bindSearchRuntime();
     tt.clear();
 }

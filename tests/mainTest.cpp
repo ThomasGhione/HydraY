@@ -14,14 +14,10 @@ void testQuiescenceScoresThreefoldAsDrawBeforeStaticEval() {
     // v3 net evaluates near 0 (Syzygy adjudication starves it of endgames).
     chess::Board board("k7/pp6/8/8/8/8/PP6/K6R w - - 0 1");
 
-    assert(board.move({chess::parseSquare("h1"), chess::parseSquare("g1")}));
-    assert(board.move({chess::parseSquare("a8"), chess::parseSquare("b8")}));
-    assert(board.move({chess::parseSquare("g1"), chess::parseSquare("h1")}));
-    assert(board.move({chess::parseSquare("b8"), chess::parseSquare("a8")}));
-    assert(board.move({chess::parseSquare("h1"), chess::parseSquare("g1")}));
-    assert(board.move({chess::parseSquare("a8"), chess::parseSquare("b8")}));
-    assert(board.move({chess::parseSquare("g1"), chess::parseSquare("h1")}));
-    assert(board.move({chess::parseSquare("b8"), chess::parseSquare("a8")}));
+    for (int i = 0; i < 8; ++i) {
+        const std::string_view m = std::string_view("h1g1a8b8g1h1b8a8").substr(4 * (i % 4), 4);
+        assert(board.move({chess::parseSquare(m.substr(0, 2)), chess::parseSquare(m.substr(2, 2))}));
+    }
 
     assert(board.isThreefoldRepetition());
     assert(NNUE::evaluate(board) > 0);

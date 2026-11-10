@@ -6,11 +6,8 @@
 #include <string_view>
 #include <cstddef>
 #include <cstdint>
-#include <fstream>
 #include <iostream>
-#include <iterator>
 #include <memory>
-#include <vector>
 
 #include "../board/board.hpp"
 #include "accumulator.hpp"
@@ -59,13 +56,14 @@ double measureScale() {
     return netSum > 0 ? static_cast<double>(refSum) / static_cast<double>(netSum) : 1.0;
 }
 
-// Copies a net blob into an owned NetworkDeep (l1w16 and l1wT are derived, so
-// the blob cannot be used in place), makes it active and normalises it.
-// bullet's format has no header: the exact size, padding included, is the
-// first sanity check, and loadFromMemory makes it.
-bool activate(const unsigned char* data, size_t size) {
+// Loads a net into an owned NetworkDeep (l1w16 and l1wT are derived, so a blob
+// cannot be used in place), makes it active and normalises it. bullet's format
+// has no header: the exact size, padding included, is the first sanity check,
+// and loadFromMemory makes it.
+template<typename Load>
+bool activate(Load&& load) {
     auto deep = std::make_unique<Deep::NetworkDeep>();
-    if (!Deep::loadFromMemory(data, size, *deep)) return false;
+    if (!load(*deep)) return false;
     ownedDeep = std::move(deep);
     activeNetwork = ownedDeep.get();
     scale = measureScale();
@@ -76,9 +74,7 @@ bool activate(const unsigned char* data, size_t size) {
 } // namespace
 
 bool loadNetwork(const std::string& path) {
-    std::ifstream in(path, std::ios::binary);
-    const std::vector<unsigned char> blob((std::istreambuf_iterator<char>(in)), std::istreambuf_iterator<char>());
-    if (!activate(blob.data(), blob.size())) {
+    if (!activate([&](Deep::NetworkDeep& net) { return Deep::loadFromFile(path.c_str(), net); })) {
         std::cout << "info string EvalFile error: cannot load '" << path << "'\n";
         return false;
     }
@@ -91,7 +87,8 @@ bool loadNetwork(const std::string& path) {
 double evalScale() noexcept { return scale; }
 
 bool activateEmbedded() noexcept {
-    return activate(g_hydrayEmbeddedNetStart, static_cast<size_t>(g_hydrayEmbeddedNetEnd - g_hydrayEmbeddedNetStart));
+    const auto size = static_cast<size_t>(g_hydrayEmbeddedNetEnd - g_hydrayEmbeddedNetStart);
+    return activate([&](Deep::NetworkDeep& net) { return Deep::loadFromMemory(g_hydrayEmbeddedNetStart, size, net); });
 }
 
 int32_t evaluate(const chess::Board& b) noexcept {

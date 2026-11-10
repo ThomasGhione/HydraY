@@ -7,7 +7,6 @@
 #include <utility>
 #include <vector>
 
-#include "../../debug.hpp"
 #include "../../nnue/nnue.hpp"
 #include "../../uci/output.hpp"
 #include "../engine.hpp"
@@ -37,17 +36,9 @@ void rebuildSearchDerivedTables() noexcept {
             LMR_REDUCTIONS[d][m] = static_cast<int8_t>(std::max(1, static_cast<int>(raw)));
         }
     }
-    for (int d = 1; d <= FUTILITY_DEPTH_CAP; ++d) {
-        FUTILITY_MARGINS[d] = FUTILITY_MID_STEP * d;
-    }
-    for (int improving = 0; improving < 2; ++improving) {
-        for (int d = 1; d <= LMP_DEPTH_CAP; ++d) {
-            LMP_THRESHOLDS[improving][d] = lmpBaseThreshold(improving, d) * LMP_SCALE_PCT[improving] / 100;
-        }
-    }
 }
 
-// Built once at startup; the UCI layer rebuilds after writing a generator spin.
+// Built once at startup; the UCI layer rebuilds after writing a spin.
 [[maybe_unused]] static const bool searchTablesBuilt = (rebuildSearchDerivedTables(), true);
 
 namespace Searcher {
@@ -57,18 +48,16 @@ using chess::Move;
 
 namespace {
 
-// Per thread (Lazy SMP): each ancestor writes evalStack[ply] before its
-// grandchild two plies down reads it. Slot 0 is the root, which never runs
-// through searchPosition, so getBestMove seeds it.
-thread_local int32_t evalStack[MAX_PLY] = {};
-// The LMR reduction of the move being searched at each ply, 0 outside a
-// reduced search (per thread, like evalStack).
-thread_local int reductionStack[MAX_PLY] = {};
+// A king can only vanish after an illegal FEN: losing ours is a mate, taking
+// theirs a win. 0 while both kings stand.
+int32_t missingKingScore(const Board& b, int ply) noexcept {
+    if (b.bb[Board::KING][0] != 0 && b.bb[Board::KING][1] != 0) [[likely]] return 0;
+    return ((b.bb[Board::KING][0] == 0) == (b.getActiveColor() == Board::WHITE)) ? -MATE_VALUE + ply : MATE_VALUE - ply;
+}
 
-// A missing king (reachable only from an illegal FEN) is decisive, not an eval.
+// A missing king is decisive, not an eval.
 int32_t evaluate(const Board& b) noexcept {
-    if (b.bb[Board::KING][0] == 0 || b.bb[Board::KING][1] == 0) [[unlikely]]
-        return ((b.bb[Board::KING][0] == 0) == (b.getActiveColor() == Board::WHITE)) ? -MATE_VALUE : MATE_VALUE;
+    if (const int32_t score = missingKingScore(b, 0); score != 0) [[unlikely]] return score;
     return NNUE::evaluate(b);
 }
 
@@ -79,6 +68,41 @@ int32_t cachedEval(uint64_t hashKey, Board& b) noexcept {
     const int32_t value = evaluate(b);
     evalCache.store(hashKey, value);
     return value;
+}
+
+// Whether a bound of this flag proves a cutoff for the [alpha, beta] window.
+constexpr bool ttBoundCutoff(uint8_t flag, int32_t score, int32_t alpha, int32_t beta) noexcept {
+    return flag == TT::Entry::EXACT
+        || (flag == TT::Entry::LOWERBOUND && score >= beta)
+        || (flag == TT::Entry::UPPERBOUND && score <= alpha);
+}
+
+// Mate and TB scores carry their ply distance; rebase them on TT store/load.
+// |score| <= MATE_VALUE and ply <= MAX_PLY keep the result inside int16_t.
+constexpr int32_t scoreToTT(int32_t score, int ply) noexcept {
+    if (score >= TB_WIN_BOUND)  return score + ply;
+    if (score <= -TB_WIN_BOUND) return score - ply;
+    return score;
+}
+
+constexpr int32_t scoreFromTT(int32_t score, int ply) noexcept {
+    return scoreToTT(score, -ply);
+}
+
+// The static eval of a node not in check: raw (from the TT entry or the eval
+// cache), corrected by the correction history, and the value the pruning
+// reads, which a TT bound that proves the corrected eval wrong replaces (an
+// equal one changes nothing).
+struct NodeEval { int32_t raw, corrected, value; };
+
+__attribute__((always_inline))
+inline NodeEval nodeEval(Board& b, SearchRuntime& runtime, const TT::ProbeResult& tte, int ply) noexcept {
+    const int32_t raw = (tte.hit && tte.staticEval != TT::Entry::NO_EVAL) ? tte.staticEval
+                                                                          : cachedEval(b.getHash(), b);
+    const int32_t corrected = std::clamp(raw + runtime.corrHist.correction(b), -TB_WIN_BOUND + 1, TB_WIN_BOUND - 1);
+    const int32_t ttScore = scoreFromTT(tte.score, ply);
+    const bool replaced = tte.hit && ttBoundCutoff(tte.flag, ttScore, corrected, corrected);
+    return {raw, corrected, replaced ? std::clamp(ttScore, -TB_WIN_BOUND + 1, TB_WIN_BOUND - 1) : corrected};
 }
 
 // "Level enough that a repetition is acceptable": half a pawn, converted to
@@ -123,31 +147,6 @@ bool skipToLosingCaptures(MovePicker& picker, const Board& b,
     return true;
 }
 
-// Mate and TB scores carry their ply distance; rebase them on TT store/load.
-// |score| <= MATE_VALUE and ply <= MAX_PLY keep the result inside int16_t.
-constexpr int32_t scoreToTT(int32_t score, int ply) noexcept {
-    if (score >= TB_WIN_BOUND)  return score + ply;
-    if (score <= -TB_WIN_BOUND) return score - ply;
-    return score;
-}
-
-constexpr int32_t scoreFromTT(int32_t score, int ply) noexcept {
-    return scoreToTT(score, -ply);
-}
-
-// Whether a bound of this flag proves a cutoff for the [alpha, beta] window.
-constexpr bool ttBoundCutoff(uint8_t flag, int32_t score, int32_t alpha, int32_t beta) noexcept {
-    return flag == TT::Entry::EXACT
-        || (flag == TT::Entry::LOWERBOUND && score >= beta)
-        || (flag == TT::Entry::UPPERBOUND && score <= alpha);
-}
-
-// delta > 0 is a bonus, delta < 0 a malus; the decay scales with |delta|.
-void applyHistoryGravity(int16_t& cell, int32_t delta, int32_t maxValue) noexcept {
-    const int32_t value = cell + delta - cell * std::abs(delta) / maxValue;
-    cell = static_cast<int16_t>(std::clamp<int32_t>(value, INT16_MIN, INT16_MAX));
-}
-
 // Per-node entry shared by searchPosition and quiescenceSearch: count the node,
 // enforce the `go nodes` cap, and stop at an abort, the ply limit or a missing
 // king. Returns true with outScore set when the node must return at once.
@@ -158,6 +157,9 @@ inline bool enterNode(Board& b, SearchRuntime& runtime, int ply, int32_t& outSco
     // helpers' ones), so a plain read and a relaxed store, no locked RMW.
     const uint64_t searched = runtime.nodesSearched + 1;
     std::atomic_ref<uint64_t>(runtime.nodesSearched).store(searched, std::memory_order_relaxed);
+    if ((searched & 1023) == 0 && runtime.timeManager != nullptr) [[unlikely]] {
+        runtime.timeManager->checkHardDeadline();
+    }
     if ((runtime.maxNodes > 0 && searched >= runtime.maxNodes) || runtime.shouldAbort()) [[unlikely]] {
         runtime.markInterrupted();
         outScore = evaluate(b);
@@ -167,14 +169,8 @@ inline bool enterNode(Board& b, SearchRuntime& runtime, int ply, int32_t& outSco
         outScore = evaluate(b);
         return true;
     }
-    // A king can only vanish after an illegal FEN: losing ours is a mate,
-    // taking theirs a win.
-    if (b.bb[Board::KING][0] == 0 || b.bb[Board::KING][1] == 0) {
-        const bool ourKingGone = (b.bb[Board::KING][0] == 0) == (b.getActiveColor() == Board::WHITE);
-        outScore = ourKingGone ? (-MATE_VALUE + ply) : (MATE_VALUE - ply);
-        return true;
-    }
-    return false;
+    outScore = missingKingScore(b, ply);
+    return outScore != 0;
 }
 
 // Lazy SMP helper state, one slot per helper thread, kept across searches so
@@ -211,13 +207,14 @@ uint64_t totalNodesSearched(const SearchRuntime& runtime) noexcept {
 
 // The principal variation read back from the TT. Each move is checked against
 // the legal moves (a key collision could store an illegal one) and the walk
-// stops at a repetition, so a cycle cannot loop. The board is left as found.
+// stops at a repetition or at the fifty-move rule, where the game is over.
+// The board is left as found.
 std::string buildPvFromTT(Board& board, const TT& tt, int maxLen) noexcept {
     std::array<Move, MAX_PLY> pvMoves{};
     std::array<Board::MoveState, MAX_PLY> states{};
     int applied = 0;
     std::string pv;
-    while (applied < maxLen && applied < MAX_PLY) {
+    while (applied < maxLen && applied < MAX_PLY && !board.isFiftyMoveRule() && board.countRepetitions() < 3) {
         const Move mv = tt.probeDecodedMove(board.getHash());
         if (!chess::isValidSquare(mv.from)) break;
         const MoveList legal = MoveGenerator::generateLegalMoves(board);
@@ -226,7 +223,6 @@ std::string buildPvFromTT(Board& board, const TT& tt, int maxLen) noexcept {
         pv += mv.toUCIString();
         pvMoves[applied] = mv;
         board.doMove(mv, states[applied++]);
-        if (board.countRepetitions() >= 3) break;
     }
     while (applied > 0) {
         --applied;
@@ -235,10 +231,11 @@ std::string buildPvFromTT(Board& board, const TT& tt, int maxLen) noexcept {
     return pv;
 }
 
-// One `info` line for a completed iteration. With firstMove the PV starts with
-// that root move and follows the TT from the position after it.
+// One `info` line for a completed iteration. The PV starts with firstMove and
+// follows the TT from the position after it: the root entry itself may already
+// hold a helper's move.
 void emitUciInfoLine(int depth, int32_t score, const SearchRuntime& runtime,
-                     Board& rootBoard, const Move* firstMove = nullptr) noexcept {
+                     Board& rootBoard, const Move& firstMove) noexcept {
     const int64_t timeMs = (runtime.timeManager != nullptr) ? runtime.timeManager->elapsedMs() : 0;
     const uint64_t nodes = totalNodesSearched(runtime);
     const int64_t nps = (timeMs > 0)
@@ -255,18 +252,11 @@ void emitUciInfoLine(int depth, int32_t score, const SearchRuntime& runtime,
     line += " nodes " + std::to_string(nodes) + " nps " + std::to_string(nps)
           + " time " + std::to_string(timeMs);
 
-    std::string pv;
-    if (firstMove != nullptr) {
-        Board::MoveState state;
-        rootBoard.doMove(*firstMove, state);
-        const std::string rest = buildPvFromTT(rootBoard, *runtime.transpositionTable, 15);
-        rootBoard.undoMove(*firstMove, state);
-        pv = firstMove->toUCIString() + (rest.empty() ? "" : " " + rest);
-    } else {
-        pv = buildPvFromTT(rootBoard, *runtime.transpositionTable, 16);
-    }
-    if (!pv.empty()) line += " pv " + pv;
-    uci::emit(line + '\n');
+    Board::MoveState state;
+    rootBoard.doMove(firstMove, state);
+    const std::string rest = buildPvFromTT(rootBoard, *runtime.transpositionTable, 15);
+    rootBoard.undoMove(firstMove, state);
+    uci::emit(line + " pv " + firstMove.toUCIString() + (rest.empty() ? "" : " " + rest) + '\n');
 }
 
 } // namespace
@@ -281,7 +271,6 @@ struct SearchContext {
     Move     excludedMove    {};
     uint8_t  activeColor;
     bool     inCheck         {};
-    bool     isPVNode        {};
     bool     iirActive       {};
     bool     improving       {};
     // Expected cut node: a null-window child whose parent hopes it fails
@@ -297,9 +286,17 @@ struct SearchMoveResult {
     bool    pruned {};
 };
 
+// PV: the window is wider than a null window (searchNode picks it from the window).
+template<bool PV>
 int32_t searchPosition(Board& b, SearchRuntime& runtime, int depth, int32_t alpha, int32_t beta,
                        int ply, bool allowHeuristicUpdates = true, const Move* previousMove = nullptr,
                        bool allowNullMove = true, Move excludedMove = {}, bool cutNode = false) noexcept;
+
+template<typename... Args>
+int32_t searchNode(Board& b, SearchRuntime& runtime, int depth, int32_t alpha, int32_t beta, Args... args) noexcept {
+    return beta - alpha > 1 ? searchPosition<true>(b, runtime, depth, alpha, beta, args...)
+                            : searchPosition<false>(b, runtime, depth, alpha, beta, args...);
+}
 
 // atRoot restricts terminals to forced draws (third repetition, fifty moves,
 // insufficient material): scoring the second repetition as 0 is an interior
@@ -340,6 +337,7 @@ bool checkDrawTerminalConditions(const Board& b, int ply, int32_t& outScore, boo
     return false;
 }
 
+template<bool PV>
 SearchMoveResult searchMoves(Board& b, MovePicker& movePicker, const SearchContext& ctx,
                              int32_t alpha, int32_t beta, SearchRuntime& runtime,
                              bool allowHeuristicUpdates) noexcept {
@@ -358,11 +356,11 @@ SearchMoveResult searchMoves(Board& b, MovePicker& movePicker, const SearchConte
     int numSearchedCaptures = 0;
 
     // Interior non-PV node past the root: the gate for futility, LMP, history and SEE pruning.
-    const bool interiorNonPv = !ctx.isPVNode && !ctx.inCheck && ctx.ply > 0;
+    const bool interiorNonPv = !PV && !ctx.inCheck && ctx.ply > 0;
     const bool canFutilityPrune = interiorNonPv && ctx.depth >= 1 && ctx.depth <= FUTILITY_MAX_DEPTH;
-    const int32_t futilityMargin = canFutilityPrune ? FUTILITY_MARGINS[ctx.depth] : 0;
+    const int32_t futilityMargin = canFutilityPrune ? FUTILITY_MID_STEP * ctx.depth : 0;
     const bool canLMP = interiorNonPv && ctx.depth >= 1 && ctx.depth <= LMP_MAX_DEPTH;
-    const int lmpThreshold = canLMP ? LMP_THRESHOLDS[ctx.improving][ctx.depth] : 999;
+    const int lmpLimit = canLMP ? lmpThreshold(ctx.improving, ctx.depth) : 999;
 
     const int usSide = Board::colorToIndex(ctx.activeColor);
     const int oppKingSq = std::countr_zero(b.bb[Board::KING][usSide ^ 1]);
@@ -385,7 +383,7 @@ SearchMoveResult searchMoves(Board& b, MovePicker& movePicker, const SearchConte
         const MoveTraits t = moveTraits(b, m, enPassant, promotionRank);
         const bool isQuietMove = !t.isCapture && !t.isPromotion;
 
-        if (canLMP && isQuietMove && moveIndex >= lmpThreshold) {
+        if (canLMP && isQuietMove && moveIndex >= lmpLimit) {
             if constexpr (kSearchStats) ++gSearchStats.prunedLmp;
             prunedAny = true;
             if (!lmpSkipTried) {
@@ -438,13 +436,13 @@ SearchMoveResult searchMoves(Board& b, MovePicker& movePicker, const SearchConte
         // PVS: the full window for the first move, a null window for the rest.
         const int32_t scoutBeta = isFirstMove ? beta : alpha + 1;
         const auto search = [&](int d, int32_t lo, int32_t hi, bool cut) {
-            return -searchPosition(b, runtime, d, -hi, -lo, ctx.ply + 1, allowHeuristicUpdates, &m,
-                                   true, Move{}, cut);
+            return -searchNode(b, runtime, d, -hi, -lo, ctx.ply + 1, allowHeuristicUpdates, &m,
+                               true, Move{}, cut);
         };
 
         int32_t score;
         // Late captures are reduced too: ordering puts the good ones early.
-        const int lmrMinIndex = (!ctx.isPVNode && !ctx.cutNode) ? LMR_MIN_INDEX_ALL : 4;
+        const int lmrMinIndex = (!PV && !ctx.cutNode) ? LMR_MIN_INDEX_ALL : 4;
         // Below index 4 only plain quiets may be reduced: captures, killers and
         // the countermove fail high there several times as often.
         const bool earlyReducible = moveIndex >= 4 || !LMR_EARLY_QUIET_ONLY
@@ -454,7 +452,7 @@ SearchMoveResult searchMoves(Board& b, MovePicker& movePicker, const SearchConte
                      && runtime.counterMoves[ctx.previousMove->from][ctx.previousMove->to] == TT::Entry::encodeMove(m)));
         if (ctx.depth >= 3 && moveIndex >= lmrMinIndex && earlyReducible && !t.isPromotion) {
             int reduction = LMR_REDUCTIONS[std::min(ctx.depth, LMR_MAX_DEPTH - 1)][moveIndex];
-            if (ctx.isPVNode) reduction = std::max(1, reduction - 1);
+            if (PV) reduction = std::max(1, reduction - 1);
             if (ctx.iirActive) reduction = std::min(reduction + 1, childDepth - 1);
             // More when the eval is falling, and at an expected cut node.
             reduction += !ctx.improving + (ctx.cutNode ? LMR_CUT_BONUS : 0);
@@ -477,19 +475,19 @@ SearchMoveResult searchMoves(Board& b, MovePicker& movePicker, const SearchConte
                 ++gSearchStats.lmrSearches;
                 gSearchStats.lmrReductionSum += static_cast<uint64_t>(childDepth - reducedDepth);
             }
-            reductionStack[ctx.ply] = childDepth - reducedDepth;
+            runtime.reductionStack[ctx.ply] = childDepth - reducedDepth;
             score = search(reducedDepth, alpha, scoutBeta, true);
-            reductionStack[ctx.ply] = 0;
+            runtime.reductionStack[ctx.ply] = 0;
             if (score > alpha) {
                 if constexpr (kSearchStats) ++gSearchStats.lmrResearches;
                 score = search(childDepth, alpha, scoutBeta, !ctx.cutNode);
             }
         } else {
             // The first move of a PV node is a PV child; every other first search is a null window.
-            score = search(childDepth, alpha, scoutBeta, !(ctx.isPVNode && isFirstMove) && !ctx.cutNode);
+            score = search(childDepth, alpha, scoutBeta, !(PV && isFirstMove) && !ctx.cutNode);
         }
         // Only a PV node's full window is wider than the scout's.
-        if (ctx.isPVNode && !isFirstMove && score > alpha) score = search(childDepth, alpha, beta, false);
+        if (PV && !isFirstMove && score > alpha) score = search(childDepth, alpha, beta, false);
 
         b.undoMove(m, state);
         searchedAnyMove = true;
@@ -516,6 +514,12 @@ SearchMoveResult searchMoves(Board& b, MovePicker& movePicker, const SearchConte
 
         if (allowHeuristicUpdates) {
             const int32_t bonus = (ctx.depth + 1) * (ctx.depth + 1) * HIST_BONUS_PCT / 100;
+            // A quiet move's butterfly and continuation history, for the bonus and the malus alike.
+            const auto quietHistory = [&](int from, int to, int pieceType, int32_t delta) {
+                applyHistoryGravity(runtime.history[usSide][from][to], delta, MAX_HISTORY);
+                if (ctx.contHistEntry != nullptr)
+                    applyHistoryGravity(ctx.contHistEntry[contHistIndex(pieceType, to)], delta, MAX_HISTORY);
+            };
             if (t.isCapture) {
                 int16_t* cell = runtime.captureHistory[usSide][m.to][t.victimType];
                 applyHistoryGravity(cell[0], bonus, MAX_CAPTURE_HISTORY);
@@ -530,21 +534,12 @@ SearchMoveResult searchMoves(Board& b, MovePicker& movePicker, const SearchConte
                     killers[1] = killers[0];
                     killers[0] = m;
                 }
-                applyHistoryGravity(runtime.history[usSide][m.from][m.to], bonus, MAX_HISTORY);
-                if (ctx.contHistEntry != nullptr) {
-                    applyHistoryGravity(ctx.contHistEntry[contHistIndex(t.fromType, m.to)], bonus, MAX_HISTORY);
-                }
+                quietHistory(m.from, m.to, t.fromType, bonus);
             }
             // Malus to the moves searched before the cutoff; the cutoff move
             // itself is the last tracked entry of its kind and is spared.
-            for (int i = 0; i < numSearchedQuiets - isQuietMove; ++i) {
-                applyHistoryGravity(runtime.history[usSide][searchedQuiets[i].from][searchedQuiets[i].to],
-                                    -bonus, MAX_HISTORY);
-                if (ctx.contHistEntry != nullptr) {
-                    applyHistoryGravity(ctx.contHistEntry[contHistIndex(searchedQuiets[i].pieceType, searchedQuiets[i].to)],
-                                        -bonus, MAX_HISTORY);
-                }
-            }
+            for (int i = 0; i < numSearchedQuiets - isQuietMove; ++i)
+                quietHistory(searchedQuiets[i].from, searchedQuiets[i].to, searchedQuiets[i].pieceType, -bonus);
             for (int i = 0; i < numSearchedCaptures - t.isCapture; ++i) {
                 int16_t* cell = runtime.captureHistory[usSide][searchedCaptures[i].to][searchedCaptures[i].victimType];
                 applyHistoryGravity(cell[0], -bonus, MAX_CAPTURE_HISTORY);
@@ -561,6 +556,7 @@ SearchMoveResult searchMoves(Board& b, MovePicker& movePicker, const SearchConte
     return {bestMove, (!searchedAnyMove && runtime.isInterrupted()) ? ctx.staticEval : best, prunedAny};
 }
 
+template<bool PV>
 int32_t searchPosition(Board& b, SearchRuntime& runtime, int depth, int32_t alpha, int32_t beta,
                        int ply, bool allowHeuristicUpdates, const Move* previousMove,
                        bool allowNullMove, Move excludedMove, bool cutNode) noexcept {
@@ -568,7 +564,7 @@ int32_t searchPosition(Board& b, SearchRuntime& runtime, int depth, int32_t alph
     int32_t early = 0;
     if (enterNode(b, runtime, ply, early)) return early;
 
-    const bool isPVNode = beta - alpha > 1;
+    constexpr bool isPVNode = PV;
     // Mate-distance pruning; it never demotes a PV node to a null window.
     if (ply > 0) {
         alpha = std::max(alpha, -MATE_VALUE + ply);
@@ -638,35 +634,22 @@ int32_t searchPosition(Board& b, SearchRuntime& runtime, int depth, int32_t alph
     // The raw eval goes back into the TT, so a later visit skips the forward
     // pass (NO_EVAL in check). The correction history learns against the
     // corrected eval; the pruning gates read staticEval, tightened by the TT.
-    int32_t rawStaticEval = TT::Entry::NO_EVAL;
-    int32_t correctedEval = 0;
-    int32_t staticEval = 0;
-    if (!inCheck) {
-        rawStaticEval = (tte.hit && tte.staticEval != TT::Entry::NO_EVAL) ? tte.staticEval
-                                                                          : cachedEval(hashKey, b);
-        correctedEval = std::clamp(rawStaticEval + runtime.corrHist.correction(b),
-                                   -TB_WIN_BOUND + 1, TB_WIN_BOUND - 1);
-        staticEval = correctedEval;
-        // A TT bound that proves the eval wrong replaces it (an equal one changes nothing).
-        if (tte.hit && ttBoundCutoff(tte.flag, scoreFromTT(tte.score, ply), staticEval, staticEval)) {
-            staticEval = scoreFromTT(tte.score, ply);
-        }
-        staticEval = std::clamp(staticEval, -TB_WIN_BOUND + 1, TB_WIN_BOUND - 1);
-    }
+    const NodeEval eval = inCheck ? NodeEval{TT::Entry::NO_EVAL, 0, 0} : nodeEval(b, runtime, tte, ply);
+    const int32_t staticEval = eval.value;
 
     // In check there is no static eval: the sentinel keeps a stale value out of
     // the comparison two plies down, where the same side is to move.
-    evalStack[ply] = inCheck ? NEG_INF : staticEval;
+    runtime.evalStack[ply] = inCheck ? NEG_INF : staticEval;
     const bool improving = !inCheck && ply >= 2
-        && evalStack[ply - 2] != NEG_INF && staticEval > evalStack[ply - 2];
+        && runtime.evalStack[ply - 2] != NEG_INF && staticEval > runtime.evalStack[ply - 2];
 
     // Hindsight: a node reduced a lot whose opponent is not worse off gets a
     // ply back; a reduced node where both static evals look good gives one up.
-    if (ply > 0 && !inCheck && evalStack[ply - 1] != NEG_INF) {
-        const int priorReduction = reductionStack[ply - 1];
-        if (HINDSIGHT_EXT && priorReduction >= 3 && staticEval <= -evalStack[ply - 1]) ++depth;
+    if (ply > 0 && !inCheck && runtime.evalStack[ply - 1] != NEG_INF) {
+        const int priorReduction = runtime.reductionStack[ply - 1];
+        if (HINDSIGHT_EXT && priorReduction >= 3 && staticEval <= -runtime.evalStack[ply - 1]) ++depth;
         if (HINDSIGHT_MARGIN > 0 && priorReduction >= 2 && depth >= 2
-            && staticEval + evalStack[ply - 1] > HINDSIGHT_MARGIN) --depth;
+            && staticEval + runtime.evalStack[ply - 1] > HINDSIGHT_MARGIN) --depth;
     }
 
     const int side = Board::colorToIndex(activeColor);
@@ -679,7 +662,7 @@ int32_t searchPosition(Board& b, SearchRuntime& runtime, int depth, int32_t alph
         const int32_t seBeta = ttSeScore - SE_BETA_MARGIN * depth;
         // Only this node's own store is suppressed (by the excluded move); the
         // probe's descendants store normally.
-        const int32_t seScore = searchPosition(b, runtime, depth / 2 - 1, seBeta - 1, seBeta, ply,
+        const int32_t seScore = searchPosition<false>(b, runtime, depth / 2 - 1, seBeta - 1, seBeta, ply,
                                                allowHeuristicUpdates, previousMove, false,
                                                TT::Entry::decodeMove(tte.move), cutNode);
         if (seScore < seBeta) {
@@ -701,10 +684,10 @@ int32_t searchPosition(Board& b, SearchRuntime& runtime, int depth, int32_t alph
             | b.bb[Board::ROOK][side] | b.bb[Board::QUEEN][side]) != 0ULL) {
         // The further the eval sits above beta, the deeper the reduction.
         if constexpr (kSearchStats) ++gSearchStats.nmpTries;
-        const int reduction = NMP_BASE_R + depth / 3 + std::clamp((staticEval - beta) / NMP_EVAL_DIV, 0, NMP_EVAL_MAX);
+        const int reduction = NMP_BASE_R + depth / 3 + std::clamp<int32_t>((staticEval - beta) / NMP_EVAL_DIV, 0, NMP_EVAL_MAX);
         Board::MoveState nullState;
         b.doNullMove(nullState);
-        const int32_t nullScore = -searchPosition(b, runtime, depth - reduction, -beta, -alpha, ply + 1,
+        const int32_t nullScore = -searchPosition<false>(b, runtime, depth - reduction, -beta, -alpha, ply + 1,
                                                   allowHeuristicUpdates, nullptr, false);
         b.undoNullMove(nullState);
         // Fail-soft, but a mate or TB win found behind a null move is unproven.
@@ -735,7 +718,7 @@ int32_t searchPosition(Board& b, SearchRuntime& runtime, int depth, int32_t alph
             int32_t pcScore = probcutBound;
             if (depth > 4) pcScore = -quiescenceSearch(b, runtime, -probcutBound, -probcutBound + 1, ply + 1);
             if (pcScore >= probcutBound) {
-                pcScore = -searchPosition(b, runtime, depth - 4, -probcutBound, -probcutBound + 1, ply + 1,
+                pcScore = -searchPosition<false>(b, runtime, depth - 4, -probcutBound, -probcutBound + 1, ply + 1,
                                           false, &mc, false, Move{}, !cutNode);
             }
             b.undoMove(mc, pcState);
@@ -749,11 +732,9 @@ int32_t searchPosition(Board& b, SearchRuntime& runtime, int depth, int32_t alph
     int16_t* contHistEntry = nullptr;
     if (previousMove != nullptr && previousMove->to < 64) {
         const int prevPiece = b.get(previousMove->to) & Board::MASK_PIECE_TYPE;
-        DBG_ONLY(
-            if (prevPiece == 0) {
-                DBG_LOG_STREAM("contHist: EMPTY square under previousMove->to\n");
-            }
-        );
+        if constexpr (kDebugChecks) {
+            if (prevPiece == 0) std::cout << "contHist: EMPTY square under previousMove->to\n";
+        }
         contHistEntry = &runtime.contHist[side ^ 1][prevPiece - 1][previousMove->to][0][0];
     }
 
@@ -771,11 +752,11 @@ int32_t searchPosition(Board& b, SearchRuntime& runtime, int depth, int32_t alph
     if (iirDepth) --depth;
     const SearchContext ctx{
         previousMove, contHistEntry, depth, ply, staticEval,
-        hasHashMove ? singularExtension : 0, excludedMove, activeColor, inCheck, isPVNode,
+        hasHashMove ? singularExtension : 0, excludedMove, activeColor, inCheck,
         iirNode && !iirDepth, improving, cutNode && !isPVNode
     };
 
-    const SearchMoveResult result = searchMoves(b, movePicker, ctx, alpha, beta, runtime, allowHeuristicUpdates);
+    const SearchMoveResult result = searchMoves<PV>(b, movePicker, ctx, alpha, beta, runtime, allowHeuristicUpdates);
     const int32_t best = result.score;
     if (runtime.isInterrupted()) return evaluate(b);
 
@@ -789,14 +770,11 @@ int32_t searchPosition(Board& b, SearchRuntime& runtime, int depth, int32_t alph
         const bool bestIsCapture = raisedAlpha
             && moveTraits(b, result.move, b.getEnPassant(), Board::promotionRank(activeColor == Board::WHITE)).isCapture;
         const int32_t target = (!raisedAlpha && result.pruned) ? alpha : best;
-        if (!bestIsCapture && (target > correctedEval) == raisedAlpha) {
-            const int32_t bonus = std::clamp((target - correctedEval) * depth / (raisedAlpha ? 10 : 8),
-                                             -CORR_BONUS_CAP, CORR_BONUS_CAP);
-            const CorrectionHistory::Cells cells = runtime.corrHist.cellsFor(b);
-            applyHistoryGravity(*cells.pawn, bonus, CORR_HIST_LIMIT);
-            applyHistoryGravity(*cells.minor, bonus * 156 / 128, CORR_HIST_LIMIT);
-            applyHistoryGravity(*cells.nonPawnWhite, bonus * 178 / 128, CORR_HIST_LIMIT);
-            applyHistoryGravity(*cells.nonPawnBlack, bonus * 178 / 128, CORR_HIST_LIMIT);
+        if (!bestIsCapture && (target > eval.corrected) == raisedAlpha) {
+            const int64_t step = int64_t{target - eval.corrected} * depth
+                               * (raisedAlpha ? CORR_BONUS_RATE_RAISED : CORR_BONUS_RATE) / 1280;
+            const int32_t bonus = static_cast<int32_t>(std::clamp<int64_t>(step, -CORR_BONUS_CAP, CORR_BONUS_CAP));
+            runtime.corrHist.update(b, bonus);
         }
     }
 
@@ -806,7 +784,7 @@ int32_t searchPosition(Board& b, SearchRuntime& runtime, int depth, int32_t alph
     if (!hasExcludedMove) {
         const auto flag = determineFlag(best, alpha, beta);
         tt.store(hashKey, static_cast<uint8_t>(depth), scoreToTT(best, ply), static_cast<uint8_t>(flag),
-                 flag == TT::Entry::UPPERBOUND ? 0 : TT::Entry::encodeMove(result.move), rawStaticEval);
+                 flag == TT::Entry::UPPERBOUND ? 0 : TT::Entry::encodeMove(result.move), eval.raw);
     }
     return best;
 }
@@ -840,13 +818,9 @@ int32_t quiescenceSearch(Board& b, SearchRuntime& runtime, int32_t alpha, int32_
     if (!inCheck) {
         // The probe above pulled this bucket into cache, so a recorded eval is
         // free here, where 50-80% of all nodes are.
-        rawStaticEval = (tte.hit && tte.staticEval != TT::Entry::NO_EVAL) ? tte.staticEval
-                                                                          : cachedEval(b.getHash(), b);
-        best = std::clamp(rawStaticEval + runtime.corrHist.correction(b), -TB_WIN_BOUND + 1, TB_WIN_BOUND - 1);
-        // As in the main search, a TT bound that proves the eval wrong replaces it.
-        if (tte.hit && ttBoundCutoff(tte.flag, scoreFromTT(tte.score, ply), best, best)) {
-            best = std::clamp(scoreFromTT(tte.score, ply), -TB_WIN_BOUND + 1, TB_WIN_BOUND - 1);
-        }
+        const NodeEval eval = nodeEval(b, runtime, tte, ply);
+        rawStaticEval = eval.raw;
+        best = eval.value;
         // Fail-soft stand pat. No store: the eval cache already returns the eval.
         if (best >= beta) return best;
         alpha = std::max(alpha, best);
@@ -891,13 +865,13 @@ Move getBestMove(Board& rootBoard, const MoveList& moves, SearchRuntime& runtime
 
     // ply 2 compares against the root, which never writes slot 0 itself;
     // unseeded, `improving` there would mean eval > 0.
-    evalStack[0] = rootBoard.checkersTo(rootBoard.getActiveColor()) ? NEG_INF : evaluate(rootBoard);
+    runtime.evalStack[0] = rootBoard.checkersTo(rootBoard.getActiveColor()) ? NEG_INF : evaluate(rootBoard);
 
     const auto scoreMove = [&](const Move& m, int32_t lo, int32_t hi, bool cut) {
         Board::MoveState state;
         rootBoard.doMove(m, state);
-        const int32_t score = -searchPosition(rootBoard, runtime, std::max(0, runtime.depth - 1), -hi, -lo, 1,
-                                              true, nullptr, true, Move{}, cut);
+        const int32_t score = -searchNode(rootBoard, runtime, std::max(0, runtime.depth - 1), -hi, -lo, 1,
+                                          true, nullptr, true, Move{}, cut);
         rootBoard.undoMove(m, state);
         return score;
     };
@@ -934,10 +908,9 @@ IterativeSearchResult runIterativeDeepening(Board& rootBoard, SearchRuntime& run
     const int firstDepth = std::max(1, startDepth);
     const int maxDepth = std::max(firstDepth, targetDepth);
 
-    if (rootBoard.bb[Board::KING][0] == 0 || rootBoard.bb[Board::KING][1] == 0) {
-        const bool ourKingGone = (rootBoard.bb[Board::KING][0] == 0) == (rootBoard.getActiveColor() == Board::WHITE);
+    if (const int32_t score = missingKingScore(rootBoard, 0); score != 0) {
         result.terminalRoot = result.completedAnyDepth = true;
-        result.bestScore = runtime.eval = ourKingGone ? -MATE_VALUE : MATE_VALUE; // side-to-move relative
+        result.bestScore = runtime.eval = score;
         return result;
     }
 
@@ -1054,7 +1027,7 @@ IterativeSearchResult runIterativeDeepening(Board& rootBoard, SearchRuntime& run
         runtime.transpositionTable->store(rootBoard.getHash(), currentDepth, scoreToTT(runtime.eval, 0),
                                           static_cast<uint8_t>(determineFlag(runtime.eval, iterationAlpha, iterationBeta)),
                                           TT::Entry::encodeMove(bestMove));
-        if (runtime.emitUciInfo) emitUciInfoLine(currentDepth, runtime.eval, runtime, rootBoard);
+        if (runtime.emitUciInfo) emitUciInfoLine(currentDepth, runtime.eval, runtime, rootBoard, bestMove);
     }
 
     // A deadline before depth 1 completes (a few ms left, or the thread
@@ -1169,7 +1142,7 @@ Move searchBestMove(Board& board, SearchRuntime& runtime, int requestedDepth) no
         // The last info line was the main thread's: a helper's winning move
         // gets its own, or the GUI shows a PV for another move.
         if (best != &result && runtime.emitUciInfo && !(best->bestMove == result.bestMove)) {
-            emitUciInfoLine(best->completedDepth, best->bestScore, runtime, board, &best->bestMove);
+            emitUciInfoLine(best->completedDepth, best->bestScore, runtime, board, best->bestMove);
         }
         result.bestMove  = best->bestMove;
         result.bestScore = best->bestScore;

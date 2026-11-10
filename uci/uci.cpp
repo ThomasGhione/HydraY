@@ -35,53 +35,10 @@ namespace {
         return display;
     }
 
-    struct SpinOption final {
-        const char* key;
-        int32_t* value;
-        int32_t minValue;
-        int32_t maxValue;
-        // Rebuild the search-derived tables (LMR/futility/LMP) after writing.
-        bool refreshSearchTables = false;
-    };
-
-    SpinOption kSpinOptions[] = {
-        {"RFP_MARGIN_PER_DEPTH", &engine::RFP_MARGIN_PER_DEPTH,           30,  250},
-        {"NMP_EVAL_DIV",         &engine::NMP_EVAL_DIV,                   50,  400},
-        {"NMP_EVAL_MAX",         &engine::NMP_EVAL_MAX,                    0,   10},
-        {"SEE_CAPTURE_MARGIN",   &engine::SEE_CAPTURE_MARGIN,             20,  200},
-        {"SEE_PRUNE_MAX_DEPTH",  &engine::SEE_PRUNE_MAX_DEPTH,             0,   12},
-        {"QUIET_SEE_MARGIN",     &engine::QUIET_SEE_MARGIN,                0,  200},
-        {"QUIET_SEE_MAX_DEPTH",  &engine::QUIET_SEE_MAX_DEPTH,             0,   12},
-        {"PROBCUT_MARGIN",       &engine::PROBCUT_MARGIN,                 30,  250},
-        {"SE_BETA_MARGIN",       &engine::SE_BETA_MARGIN,                  0,   16},
-        {"HISTORY_PRUNE_D1",     &engine::HISTORY_PRUNE_THRESHOLD[1], -16384,    0},
-        {"HISTORY_PRUNE_D2",     &engine::HISTORY_PRUNE_THRESHOLD[2], -16384,    0},
-        {"HISTORY_PRUNE_D3",     &engine::HISTORY_PRUNE_THRESHOLD[3], -16384,    0},
-        {"FUTILITY_MID_STEP",    &engine::FUTILITY_MID_STEP,              80,  600, true},
-        {"FUTILITY_MAX_DEPTH",   &engine::FUTILITY_MAX_DEPTH,              0, engine::FUTILITY_DEPTH_CAP},
-        {"LMP_SCALE_STD_PCT",    &engine::LMP_SCALE_PCT[0],               10,  250, true},
-        {"LMP_SCALE_IMP_PCT",    &engine::LMP_SCALE_PCT[1],               10,  250, true},
-        {"LMP_MAX_DEPTH",        &engine::LMP_MAX_DEPTH,                   0, engine::LMP_DEPTH_CAP},
-        {"LMR_C_PERCENT",        &engine::LMR_C_PERCENT,                 150,  600, true},
-        {"LMR_CUT_BONUS",        &engine::LMR_CUT_BONUS,                   0,    4},
-        {"LMR_MIN_INDEX_ALL",    &engine::LMR_MIN_INDEX_ALL,               1,    8},
-        {"LMR_EARLY_QUIET_ONLY", &engine::LMR_EARLY_QUIET_ONLY,            0,    1},
-        {"LMR_GOOD_HIST",        &engine::LMR_GOOD_HIST,                   0,    3},
-        {"LMR_BAD_HIST",         &engine::LMR_BAD_HIST,                    0,    3},
-        {"LMR_HIST_MODE",        &engine::LMR_HIST_MODE,                   0,    2},
-        {"HIST_BONUS_PCT",       &engine::HIST_BONUS_PCT,                 25, 1000},
-        {"IIR_MODE",             &engine::IIR_MODE,                        0,    1},
-        {"IIR_MIN_DEPTH",        &engine::IIR_MIN_DEPTH,                   2,   12},
-        {"TT_CUT_HIST",          &engine::TT_CUT_HIST,                     0,    1},
-        {"LMR_CHECK_LESS",       &engine::LMR_CHECK_LESS,                  0,    3},
-        {"QS_EVAL_PCT_MG",       &engine::QS_EVAL_PCT_MG,                100,  600},
-        {"QS_EVAL_PCT_LATE_MG",  &engine::QS_EVAL_PCT_LATE_MG,           100,  600},
-        {"QS_EVAL_PCT_ENDGAME",  &engine::QS_EVAL_PCT_ENDGAME,           100,  600},
-        {"HINDSIGHT_EXT",        &engine::HINDSIGHT_EXT,                   0,    1},
-        {"HINDSIGHT_MARGIN",     &engine::HINDSIGHT_MARGIN,                0, 2000},
-        {"NMP_BASE_R",           &engine::NMP_BASE_R,                      1,    8},
-        {"CORR_HIST_WEIGHT_PCT", &engine::CORR_HIST_WEIGHT_PCT,            0,  400},
-    };
+    // The CPUs in the affinity mask, up to what the search can start.
+    int maxThreads() noexcept {
+        return std::min(omp_get_max_threads(), engine::MAX_HELPER_THREADS + 1);
+    }
 
     std::string ponderSuffix(const engine::Engine& engine, const chess::Move& bestMove) noexcept {
         chess::Board board = engine.board;
@@ -148,21 +105,23 @@ namespace uci {
     }
 
     void UCI::uci() noexcept {
-        const std::string threads = std::to_string(omp_get_max_threads());
         std::string out =
-            "id name HydraY 4.3.0\n"
+            "id name HydraY 4.4.0\n"
             "id author Thomas Ghione, Andrea Vaccari, Daniele Ferretti, Simone Tomasella\n"
             "option name SyzygyPath type string default <empty>\n"
             "option name SyzygyProbeDepth type spin default 1 min 1 max 100\n"
             "option name EvalFile type string default <empty>\n"
-            "option name Threads type spin default " + threads + " min 1 max " + threads + "\n"
+            "option name Threads type spin default 1 min 1 max " + std::to_string(maxThreads()) + "\n"
             "option name Hash type spin default " + std::to_string(TT::DEFAULT_HASH_MB)
-            + " min " + std::to_string(TT::MIN_HASH_MB) + " max " + std::to_string(TT::MAX_HASH_MB) + "\n";
-        for (const auto& option : kSpinOptions) {
-            out += "option name " + optionDisplayName(option.key)
+            + " min " + std::to_string(TT::MIN_HASH_MB) + " max " + std::to_string(TT::MAX_HASH_MB) + "\n"
+            "option name Move Overhead type spin default " + std::to_string(engine::time::TimeManager::DEFAULT_MOVE_OVERHEAD_MS)
+            + " min 0 max " + std::to_string(engine::time::TimeManager::MAX_MOVE_OVERHEAD_MS) + "\n"
+            "option name Ponder type check default false\n";
+        for (const auto& option : engine::spinOptions()) {
+            out += "option name " + optionDisplayName(option.name)
                  + " type spin default " + std::to_string(*option.value)
-                 + " min " + std::to_string(option.minValue)
-                 + " max " + std::to_string(option.maxValue) + "\n";
+                 + " min " + std::to_string(option.min)
+                 + " max " + std::to_string(option.max) + "\n";
         }
         emit(out + "uciok\n");
     }
@@ -181,16 +140,16 @@ namespace uci {
         const bool isInt = static_cast<bool>(std::istringstream(value) >> v);
         const auto invalid = [](const std::string& option) { emit("info string invalid value for " + option + "\n"); };
 
-        for (auto& option : kSpinOptions) {
-            if (key != normalizedOptionName(option.key)) continue;
+        for (const auto& option : engine::spinOptions()) {
+            if (key != normalizedOptionName(option.name)) continue;
             if (!isInt) return invalid(name);
-            if (v < option.minValue || v > option.maxValue) {
+            if (v < option.min || v > option.max) {
                 return emit("info string value out of range for " + name + " ("
-                            + std::to_string(option.minValue) + ".." + std::to_string(option.maxValue) + ")\n");
+                            + std::to_string(option.min) + ".." + std::to_string(option.max) + ")\n");
             }
             *option.value = v;
-            if (option.refreshSearchTables) engine::rebuildSearchDerivedTables();
-            return emit("info string " + optionDisplayName(option.key) + " set to " + std::to_string(v) + "\n");
+            engine::rebuildSearchDerivedTables();
+            return emit("info string " + optionDisplayName(option.name) + " set to " + std::to_string(v) + "\n");
         }
 
         if (key == "evalfile") {
@@ -202,17 +161,17 @@ namespace uci {
                 emit("info string EvalFile loaded: " + value + "\n");
             }
         } else if (key == "syzygypath") {
-            emit(engine.syzygyProber.load(value)
-                 ? "info string SyzygyPath loaded: " + value + " (max pieces: "
-                   + std::to_string(engine.syzygyProber.maxPieces()) + ")\n"
-                 : "info string SyzygyPath error: could not load '" + value + "'\n");
+            const bool loaded = engine.syzygyProber.load(value);
+            if (value.empty() || value == "<empty>") emit("info string SyzygyPath cleared\n");
+            else if (!loaded || engine.syzygyProber.maxPieces() == 0) emit("info string SyzygyPath error: no tablebases in '" + value + "'\n");
+            else emit("info string SyzygyPath loaded: " + value + " (max pieces: " + std::to_string(engine.syzygyProber.maxPieces()) + ")\n");
         } else if (key == "syzygyprobedepth") {
             if (!isInt || v < 1 || v > 100) return invalid("SyzygyProbeDepth");
             engine.syzygyProber.probeDepth = v;
             emit("info string SyzygyProbeDepth set to " + std::to_string(v) + "\n");
         } else if (key == "threads") {
             if (!isInt || v < 1) return invalid("Threads");
-            engine.requestedThreads = engine.searchRuntime.maxThreads = std::min(v, omp_get_max_threads());
+            engine.requestedThreads = engine.searchRuntime.maxThreads = std::min(v, maxThreads());
             emit("info string Threads set to " + std::to_string(engine.requestedThreads) + "\n");
         } else if (key == "hash") {
             if (!isInt || v < 1) return invalid("Hash");
@@ -220,6 +179,12 @@ namespace uci {
             emit(engine.tt.resize(static_cast<size_t>(mb))
                  ? "info string Hash set to " + std::to_string(engine.tt.sizeMB()) + " MB\n"
                  : "info string Hash resize to " + std::to_string(mb) + " MB failed (out of memory)\n");
+        } else if (key == "moveoverhead") {
+            if (!isInt || v < 0 || v > engine::time::TimeManager::MAX_MOVE_OVERHEAD_MS) return invalid("Move Overhead");
+            engine.timeManager.moveOverheadMs = v;
+            emit("info string Move Overhead set to " + std::to_string(v) + "\n");
+        } else if (key != "ponder") { // Ponder only tells us the GUI may send `go ponder`.
+            emit("info string unknown option " + name + "\n");
         }
     }
 
@@ -264,11 +229,13 @@ namespace uci {
             else if (token == "movetime") is >> limits.movetime;
         }
 
-        const bool ponder = limits.ponder;
+        // The bestmove of these two waits for ponderhit or stop, however soon the
+        // search ends (a mated root, a depth reached).
+        const bool hold = limits.ponder || limits.infinite;
         {
             std::lock_guard<std::mutex> lock(searchMutex);
             searchBestMove = "0000";
-            searchPonder = ponder;
+            searchHold = hold;
             searchDone = false;
             searchPrinted = false;
         }
@@ -288,18 +255,18 @@ namespace uci {
                 std::lock_guard<std::mutex> lock(searchMutex);
                 searchBestMove = bestMove;
                 searchDone = true;
-                if (!searchPonder && !searchPrinted) emitBestMove(searchBestMove);
+                if (!searchHold && !searchPrinted) emitBestMove(searchBestMove);
             });
         } catch (...) {
             std::lock_guard<std::mutex> lock(searchMutex);
             searchDone = true;
-            if (!ponder) emitBestMove("0000");
+            if (!hold) emitBestMove("0000");
         }
     }
     
     void UCI::ponderhit() noexcept {
         std::lock_guard<std::mutex> lock(searchMutex);
-        searchPonder = false;
+        searchHold = false;
         if (searchDone) {
             if (!searchPrinted) emitBestMove(searchBestMove);
             return;

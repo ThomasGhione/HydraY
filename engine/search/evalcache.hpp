@@ -4,12 +4,9 @@
 #include <atomic>
 #include <cstddef>
 #include <cstdint>
-#include <memory>
 #include <new>
 
-#if defined(__linux__)
-#include <sys/mman.h>
-#endif
+#include "../../tt/tt.hpp"
 
 namespace engine {
 
@@ -23,13 +20,8 @@ namespace engine {
 // value. The 48-bit tag makes a false hit, empty slots included, a 2^-48 event.
 class EvalCache {
 public:
-    // On the heap like the TT, so it can be backed by transparent huge pages:
-    // a probe lands on a random slot, and with 4 KiB pages most of them also
-    // missed the TLB.
-    EvalCache() : table_(static_cast<uint64_t*>(::operator new(BYTES, ALIGNMENT))) {
-#if defined(MADV_HUGEPAGE)
-        ::madvise(table_.get(), BYTES, MADV_HUGEPAGE);
-#endif
+    EvalCache() : table_(allocateHugePages<uint64_t>(SLOTS)) {
+        if (!table_) throw std::bad_alloc{};
         clear();
     }
 
@@ -48,12 +40,7 @@ public:
 
 private:
     static constexpr size_t SLOTS = 1u << 21; // 16 MiB
-    static constexpr size_t BYTES = SLOTS * sizeof(uint64_t);
-    static constexpr std::align_val_t ALIGNMENT{2 * 1024 * 1024};
-    struct Free {
-        void operator()(uint64_t* p) const noexcept { ::operator delete(p, ALIGNMENT); }
-    };
-    std::unique_ptr<uint64_t[], Free> table_;
+    HugePageArray<uint64_t> table_;
 
     [[nodiscard]] std::atomic_ref<uint64_t> word(uint64_t key) const noexcept {
         return std::atomic_ref<uint64_t>(table_[key & (SLOTS - 1)]);

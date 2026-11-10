@@ -6,12 +6,9 @@
 
 #include "coords.hpp"
 
-// Sliding-piece attacks use PEXT (BMI2). Every shipped build (-march=native,
-// -march=x86-64-v3) provides it; fail loudly on anything that does not.
-#if !defined(__BMI2__)
-#error "HydraY requires BMI2 (PEXT) for sliding-piece attacks; build with -march=native or -march=x86-64-v3."
-#endif
+#if defined(__BMI2__)
 #include <immintrin.h>
+#endif
 
 namespace pieces {
 
@@ -59,25 +56,8 @@ constexpr uint64_t slidingAttacks(int sq, uint64_t occ, const int8_t dirs[4][2])
 
 // --- Sliding pieces: PEXT attack tables ---
 
-// Relevant-occupancy masks: rook = its rank+file, bishop = its four diagonals,
-// both minus the board edges (edge squares never block, so they carry no index
-// bit). static_asserts anchor the retired table.
-constexpr uint64_t rookRelevantMask(int sq) noexcept {
-    const int f = sq & 7, r = sq >> 3;
-    uint64_t m = 0ULL;
-    for (int rr = 1; rr <= 6; ++rr) if (rr != r) m |= 1ULL << (rr * 8 + f);
-    for (int ff = 1; ff <= 6; ++ff) if (ff != f) m |= 1ULL << (r * 8 + ff);
-    return m;
-}
-inline constexpr std::array<uint64_t, 64> ROOK_MASKS   = squareTable(rookRelevantMask);
-inline constexpr std::array<uint64_t, 64> BISHOP_MASKS = squareTable([](int sq) {
-    return slidingAttacks(sq, 0ULL, BISHOP_DIRS) & ~0xFF818181818181FFULL;
-});
-static_assert(ROOK_MASKS[0] == 0x000101010101017EULL && ROOK_MASKS[63] == 0x7E80808080808000ULL, "rook mask");
-static_assert(BISHOP_MASKS[0] == 0x0040201008040200ULL && BISHOP_MASKS[27] == 0x0040221400142200ULL, "bishop mask");
-
-// Table index via PEXT: with these fancy masks the index range equals
-// 2^popcount(mask), exactly the range the attack tables are built against.
+// A square's mask and the start of its slice: PEXT of the occupancy under the
+// mask indexes the 2^popcount(mask) entries of the slice.
 struct MagicParams {
     uint64_t mask;
     uint32_t offset;
@@ -85,26 +65,18 @@ struct MagicParams {
 
 __attribute__((always_inline))
 inline uint32_t sliderIndex(uint64_t occ, const MagicParams& p) noexcept {
+#if defined(__BMI2__)
     return static_cast<uint32_t>(_pext_u64(occ, p.mask));
-}
-
-template<typename MaskArray>
-constexpr std::array<MagicParams, 64> buildMagicParams(const MaskArray& masks) noexcept {
-    std::array<MagicParams, 64> table{};
-    uint32_t offset = 0;
-    for (int sq = 0; sq < 64; ++sq) {
-        table[sq] = {masks[sq], offset};
-        offset += (1u << std::popcount(masks[sq]));
+#else
+    // x86-64-v2 builds have no PEXT: same index, one mask bit at a time.
+    uint32_t index = 0;
+    uint32_t out = 1;
+    for (uint64_t mask = p.mask; mask != 0; mask &= mask - 1, out <<= 1) {
+        if ((occ & mask & -mask) != 0) index |= out;
     }
-    return table;
+    return index;
+#endif
 }
-inline constexpr std::array<MagicParams, 64> ROOK_PARAMS   = buildMagicParams(ROOK_MASKS);
-inline constexpr std::array<MagicParams, 64> BISHOP_PARAMS = buildMagicParams(BISHOP_MASKS);
-
-constexpr size_t ROOK_LOOKUP_SIZE   = 102400;  // ~800 KB
-constexpr size_t BISHOP_LOOKUP_SIZE = 5248;    // ~40 KB
-inline std::array<uint64_t, ROOK_LOOKUP_SIZE>   ROOK_ATTACK_LOOKUP;
-inline std::array<uint64_t, BISHOP_LOOKUP_SIZE> BISHOP_ATTACK_LOOKUP;
 
 // The i-th occupancy subset of `mask` (i in [0, 2^popcount(mask))).
 constexpr uint64_t occupancySubset(int i, uint64_t mask) noexcept {
@@ -116,67 +88,69 @@ constexpr uint64_t occupancySubset(int i, uint64_t mask) noexcept {
     return occ;
 }
 
-// Fill one square's slice of a slider table across all its occupancy subsets.
-template<size_t N>
-inline void populateAttackTable(int sq, const MagicParams& p,
-                                std::array<uint64_t, N>& lookup, const int8_t dirs[4][2]) noexcept {
-    const int patterns = 1 << std::popcount(p.mask);
-    for (int i = 0; i < patterns; ++i) {
-        const uint64_t occ = occupancySubset(i, p.mask);
-        lookup[p.offset + sliderIndex(occ, p)] = slidingAttacks(sq, occ, dirs);
-    }
-}
-inline void initMagicBitboards() noexcept {
-    for (int sq = 0; sq < 64; ++sq) {
-        populateAttackTable(sq, ROOK_PARAMS[sq],   ROOK_ATTACK_LOOKUP,   ROOK_DIRS);
-        populateAttackTable(sq, BISHOP_PARAMS[sq], BISHOP_ATTACK_LOOKUP, BISHOP_DIRS);
-    }
-}
+// One slider type. A square's mask is its empty-board rays without the edge
+// squares off its own rank and file: nothing stands behind them, so they
+// never change the attacks. The slices, and so the table, are sized at
+// compile time; the table is filled once at startup.
+template<bool IsRook>
+struct Slider {
+    static constexpr auto& DIRS = IsRook ? ROOK_DIRS : BISHOP_DIRS;
+    static constexpr std::array<MagicParams, 64> PARAMS = [] {
+        std::array<MagicParams, 64> params{};
+        uint32_t offset = 0;
+        for (int sq = 0; sq < 64; ++sq) {
+            const uint64_t edges = (0xFF000000000000FFULL & ~(0xFFULL << (8 * chess::rank(sq))))
+                                 | (0x8181818181818181ULL & ~(0x0101010101010101ULL << chess::file(sq)));
+            params[sq] = {slidingAttacks(sq, 0ULL, DIRS) & ~edges, offset};
+            offset += 1u << std::popcount(params[sq].mask);
+        }
+        return params;
+    }();
+    static constexpr size_t SIZE = PARAMS[63].offset + (size_t{1} << std::popcount(PARAMS[63].mask));
+    static inline std::array<uint64_t, SIZE> lookup;
 
-// Use uint8_t sq (0..63) to avoid sign-extension corner cases.
-__attribute__((hot, always_inline))
-inline uint64_t getRookAttacks(uint8_t sq, uint64_t occ) noexcept {
-    const MagicParams& p = ROOK_PARAMS[sq];
-    return ROOK_ATTACK_LOOKUP[p.offset + sliderIndex(occ, p)];
-}
-__attribute__((hot, always_inline))
-inline uint64_t getBishopAttacks(uint8_t sq, uint64_t occ) noexcept {
-    const MagicParams& p = BISHOP_PARAMS[sq];
-    return BISHOP_ATTACK_LOOKUP[p.offset + sliderIndex(occ, p)];
-}
+    static void init() noexcept {
+        for (int sq = 0; sq < 64; ++sq)
+            for (int i = 0; i < (1 << std::popcount(PARAMS[sq].mask)); ++i)
+                lookup[PARAMS[sq].offset + i] = slidingAttacks(sq, occupancySubset(i, PARAMS[sq].mask), DIRS);
+    }
+
+    __attribute__((hot, always_inline))
+    static uint64_t attacks(uint8_t sq, uint64_t occ) noexcept {
+        const MagicParams& p = PARAMS[sq];
+        return lookup[p.offset + sliderIndex(occ, p)];
+    }
+};
+using Rook = Slider<true>;
+using Bishop = Slider<false>;
+static_assert(Rook::PARAMS[0].mask == 0x000101010101017EULL && Rook::PARAMS[63].mask == 0x7E80808080808000ULL
+              && Bishop::PARAMS[0].mask == 0x0040201008040200ULL && Bishop::PARAMS[27].mask == 0x0040221400142200ULL,
+              "relevant-occupancy masks");
+static_assert(Rook::SIZE == 102400 && Bishop::SIZE == 5248, "800 KiB and 41 KiB of attack tables");
 
 // --- Step pieces: attack tables ---
 // Square convention: rank 0 = row 8 (top), rank 7 = row 1. White pawns move to
 // a lower rank number, black to a higher one.
 
-constexpr uint64_t pawnAttacks(int sq, bool isWhite) noexcept {
-    const int f = chess::file(sq);
-    const int r = chess::rank(sq) + (isWhite ? -1 : 1);
+// The squares one (file, rank) offset away from sq that are on the board.
+template<size_t N>
+constexpr uint64_t stepAttacks(int sq, const int8_t (&offsets)[N][2]) noexcept {
     uint64_t a = 0ULL;
-    if (r >= 0 && r < 8) {
-        if (f - 1 >= 0) a |= 1ULL << (r * 8 + f - 1);
-        if (f + 1 < 8)  a |= 1ULL << (r * 8 + f + 1);
-    }
-    return a;
-}
-constexpr uint64_t stepAttacks(int sq, const int8_t offsets[8][2]) noexcept {
-    const int f0 = chess::file(sq), r0 = chess::rank(sq);
-    uint64_t a = 0ULL;
-    for (int i = 0; i < 8; ++i) {
-        const int f = f0 + offsets[i][0], r = r0 + offsets[i][1];
+    for (const auto& o : offsets) {
+        const int f = chess::file(sq) + o[0], r = chess::rank(sq) + o[1];
         if (f >= 0 && f < 8 && r >= 0 && r < 8) a |= 1ULL << (r * 8 + f);
     }
     return a;
 }
+constexpr uint64_t pawnAttacks(int sq, bool isWhite) noexcept {
+    const int8_t dr = isWhite ? -1 : 1;
+    return stepAttacks(sq, {{-1, dr}, {1, dr}});
+}
 constexpr uint64_t pawnSinglePush(int sq, bool isWhite) noexcept {
-    const int f = chess::file(sq), r = chess::rank(sq);
-    if (isWhite) return r > 0 ? 1ULL << ((r - 1) * 8 + f) : 0ULL;
-    return r < 7 ? 1ULL << ((r + 1) * 8 + f) : 0ULL;
+    return stepAttacks(sq, {{0, static_cast<int8_t>(isWhite ? -1 : 1)}});
 }
 constexpr uint64_t pawnDoublePush(int sq, bool isWhite) noexcept {
-    const int f = chess::file(sq), r = chess::rank(sq);
-    if (isWhite) return r == 6 ? 1ULL << ((r - 2) * 8 + f) : 0ULL;
-    return r == 1 ? 1ULL << ((r + 2) * 8 + f) : 0ULL;
+    return chess::rank(sq) == (isWhite ? 6 : 1) ? stepAttacks(sq, {{0, static_cast<int8_t>(isWhite ? -2 : 2)}}) : 0ULL;
 }
 
 // PAWN_ATTACKS[side][sq]: squares a pawn of `side` on sq attacks. The pawns of
@@ -198,11 +172,11 @@ inline constexpr uint64_t getPawnForwardPushes(uint8_t sq, bool isWhite, uint64_
 template<uint8_t PieceType>
 [[nodiscard]] __attribute__((hot, always_inline))
 inline constexpr uint64_t generateMovesByType(uint8_t sq, uint64_t occupancy) noexcept {
-    if constexpr (PieceType == 0x2) return KNIGHT_ATTACKS[sq];                                                // KNIGHT
-    if constexpr (PieceType == 0x3) return getBishopAttacks(sq, occupancy);                                   // BISHOP
-    if constexpr (PieceType == 0x4) return getRookAttacks(sq, occupancy);                                     // ROOK
-    if constexpr (PieceType == 0x5) return getRookAttacks(sq, occupancy) | getBishopAttacks(sq, occupancy);   // QUEEN
-    if constexpr (PieceType == 0x6) return KING_ATTACKS[sq];                                                  // KING
+    if constexpr (PieceType == 0x2) return KNIGHT_ATTACKS[sq];                                              // KNIGHT
+    if constexpr (PieceType == 0x3) return Bishop::attacks(sq, occupancy);                                  // BISHOP
+    if constexpr (PieceType == 0x4) return Rook::attacks(sq, occupancy);                                    // ROOK
+    if constexpr (PieceType == 0x5) return Rook::attacks(sq, occupancy) | Bishop::attacks(sq, occupancy);   // QUEEN
+    if constexpr (PieceType == 0x6) return KING_ATTACKS[sq];                                                // KING
     return 0ULL;
 }
 

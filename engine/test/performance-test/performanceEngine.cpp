@@ -9,6 +9,16 @@
 
 namespace ut = boost::ut;
 
+namespace {
+// Wall time of f() in milliseconds.
+template<typename F>
+int64_t msOf(F&& f) {
+  const auto start = std::chrono::high_resolution_clock::now();
+  f();
+  return std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::high_resolution_clock::now() - start).count();
+}
+} // namespace
+
 // A plain lambda, registered from main: ut's cfg is a variable template, whose
 // dynamic initialization is unordered, and clang builds it after a global
 // ut::suite has registered, which drops the suite.
@@ -19,10 +29,7 @@ const auto performanceEngineSuite = [] {
     engine::Engine e = engine::Engine();
     constexpr int depth = 11;
 
-    auto start = std::chrono::high_resolution_clock::now();
-    e.search(engine::time::Limits{.maxDepth = depth});
-    auto end = std::chrono::high_resolution_clock::now();
-    auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count();
+    const int64_t duration = msOf([&] { e.search(engine::time::Limits{.maxDepth = depth}); });
 
     printf("Depth 11 search completed in %lu ms\n", duration);
     expect(duration < 9000);
@@ -42,10 +49,8 @@ const auto performanceEngineSuite = [] {
     // hits a fully warm TT (~0 ms at any depth), measuring nothing.
     int completedRuns = 0;
     for (int i = 0; i < runs; ++i) {
-        auto start = std::chrono::high_resolution_clock::now();
-        const chess::Move move = e.search(engine::time::Limits{.maxDepth = depth});
-        auto end = std::chrono::high_resolution_clock::now();
-        auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count();
+        chess::Move move;
+        const int64_t duration = msOf([&] { move = e.search(engine::time::Limits{.maxDepth = depth}); });
         printf("Run %d completed in %lu ms\n", i + 1, duration);
         totalDuration += duration;
         ++completedRuns;
@@ -95,29 +100,20 @@ const auto performanceEngineSuite = [] {
 
     constexpr int EVAL_ITERATIONS = 500'000;
     int64_t evalSink = 0;
-    auto evalStart = std::chrono::high_resolution_clock::now();
-    for (int iter = 0; iter < EVAL_ITERATIONS; ++iter) {
-      for (int i = 0; i < 16; ++i) {
-        evalSink += NNUE::evaluate(boards[i]);
-      }
-    }
-    auto evalEnd = std::chrono::high_resolution_clock::now();
-    auto evalDuration = std::chrono::duration_cast<std::chrono::milliseconds>(evalEnd - evalStart).count();
+    const int64_t evalDuration = msOf([&] {
+      for (int iter = 0; iter < EVAL_ITERATIONS; ++iter)
+        for (int i = 0; i < 16; ++i) evalSink += NNUE::evaluate(boards[i]);
+    });
     printf("NNUE evaluate on 16 FENs * %d iterations took %lu ms\n", EVAL_ITERATIONS, static_cast<unsigned long>(evalDuration));
     printf("Eval sink: %lld\n\n", static_cast<long long>(evalSink));
 
     constexpr int ITERATIONS = 500'000;
     int64_t dummySink = 0;
 
-    auto start = std::chrono::high_resolution_clock::now();
-    for (int iter = 0; iter < ITERATIONS; ++iter) {
-      for (int i = 0; i < 16; ++i) {
-        MoveList moves = engine::MoveGenerator::generateLegalMoves(boards[i]);
-        dummySink += moves.size;
-      }
-    }
-    auto end = std::chrono::high_resolution_clock::now();
-    auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count();
+    const int64_t duration = msOf([&] {
+      for (int iter = 0; iter < ITERATIONS; ++iter)
+        for (int i = 0; i < 16; ++i) dummySink += engine::MoveGenerator::generateLegalMoves(boards[i]).size;
+    });
 
     printf("generateLegalMoves on 16 FENs * %d iterations took %lu ms\n", ITERATIONS, static_cast<unsigned long>(duration));
     printf("Dummy sink: %lld\n\n", static_cast<long long>(dummySink));

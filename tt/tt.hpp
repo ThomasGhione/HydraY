@@ -14,6 +14,25 @@
 
 #include "zobrist.hpp"
 
+// A heap array on 2 MiB boundaries, which lets Linux back it with transparent
+// huge pages: the TT and the eval cache are probed at random slots, and with
+// 4 KiB pages most probes also missed the TLB. Null when out of memory.
+inline constexpr std::align_val_t HUGE_PAGE_ALIGNMENT{2 * 1024 * 1024};
+struct HugePageFree {
+    void operator()(void* p) const noexcept { ::operator delete(p, HUGE_PAGE_ALIGNMENT); }
+};
+template<typename T>
+using HugePageArray = std::unique_ptr<T[], HugePageFree>;
+
+template<typename T>
+[[nodiscard]] HugePageArray<T> allocateHugePages(size_t count) noexcept {
+    T* p = static_cast<T*>(::operator new(count * sizeof(T), HUGE_PAGE_ALIGNMENT, std::nothrow));
+#if defined(MADV_HUGEPAGE)
+    if (p != nullptr) ::madvise(p, count * sizeof(T), MADV_HUGEPAGE);
+#endif
+    return HugePageArray<T>(p);
+}
+
 class alignas(64) TT {
 public:
     struct Entry {
@@ -110,13 +129,9 @@ public:
             clear();
             return true;
         }
-        auto* fresh = static_cast<Entry*>(::operator new(buckets * ENTRIES_PER_BUCKET * sizeof(Entry),
-                                                         TABLE_ALIGNMENT, std::nothrow));
-        if (fresh == nullptr) return false;
-#if defined(MADV_HUGEPAGE)
-        ::madvise(fresh, buckets * ENTRIES_PER_BUCKET * sizeof(Entry), MADV_HUGEPAGE);
-#endif
-        table_.reset(fresh);
+        auto fresh = allocateHugePages<Entry>(buckets * ENTRIES_PER_BUCKET);
+        if (!fresh) return false;
+        table_ = std::move(fresh);
         bucketMask_ = buckets - 1;
         clear();
         return true;
@@ -130,13 +145,7 @@ public:
     void clear() noexcept { std::fill_n(table_.get(), (bucketMask_ + 1) * ENTRIES_PER_BUCKET, Entry{}); }
 
 private:
-    // 2 MiB alignment lets Linux back the table with transparent huge pages.
-    static constexpr std::align_val_t TABLE_ALIGNMENT{2 * 1024 * 1024};
-    struct FreeTable {
-        void operator()(Entry* p) const noexcept { ::operator delete(p, TABLE_ALIGNMENT); }
-    };
-
-    std::unique_ptr<Entry[], FreeTable> table_;
+    HugePageArray<Entry> table_;
     size_t bucketMask_ = 0;
     uint8_t generation_ = 0;
 

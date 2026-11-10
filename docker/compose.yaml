@@ -1,0 +1,56 @@
+# HydraY datagen with Docker Compose: edit the settings below; docker/.env
+# holds only HF_TOKEN. docker/README.md has the walkthrough.
+#
+#   mkdir -p data engine/syzygy/files                 # before the first start
+#   docker compose -f docker/compose.yaml up -d --build
+#   docker compose -f docker/compose.yaml logs -f
+#   docker compose -f docker/compose.yaml down        # seals and uploads the shard
+
+services:
+  datagen:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile
+      args:
+        # ISA, as in the makefile. AVX-VNNI (Intel 12th gen+, Zen 5) is ~30%
+        # faster; where it does not run the container uses FALLBACK_ARCH.
+        ARCH: -march=x86-64-v3 -mavxvnni
+        FALLBACK_ARCH: -march=x86-64-v3   # "" builds ARCH only
+        JOBS: "2"                 # parallel compile jobs
+        GIT_COMMIT: ${GIT_COMMIT:-}   # optional, for the manifests
+    image: hydray-datagen
+    init: true
+    # Must own data/ and engine/syzygy/files: what `id -u`:`id -g` prints.
+    user: "1000:1000"
+    env_file:
+      - path: .env                # HF_TOKEN=...
+        required: false
+    volumes:
+      - ../data:/data
+      # The Syzygy 3-4-5 tables, fetched here (~1 GB) at the first start and
+      # shared with the engine on the host.
+      - ../engine/syzygy/files:/hydray/engine/syzygy/files
+      # The prefix (m + 8 hex of its hash), the machine in the manifests and
+      # the owner of the dataset folder come from the machine-id. Linux only:
+      # elsewhere remove it and set --out below.
+      - /etc/machine-id:/host/machine-id:ro
+    # The flags of ./chess datagen (--help), plus the upload ones. Threads
+    # default to every CPU; --games does not fit a service that restarts.
+    command:
+      # - --out=/data/NAME        # default /data/m<machine-id hash>-v<version>-n<nodes>
+      - --nodes=8000
+      - --seal-on-exit
+      - --min-free-gb=4           # pause below 4 GB free, room left for the upload
+      # Upload of the sealed shards (HF_TOKEN in .env); without a token or
+      # connection comment these two out.
+      - --hf-repo=ThomasGhione/hydray
+      - --delete-after-upload     # a shard leaves the disk once the Hub holds it
+    # The default json-file log has no size limit.
+    logging:
+      driver: json-file
+      options:
+        max-size: 10m
+        max-file: "3"
+    # Time for the last game, the seal and the upload of the last shard.
+    stop_grace_period: 10m
+    restart: unless-stopped
