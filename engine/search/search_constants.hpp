@@ -38,7 +38,7 @@ using Spin = SpinValue<true>;
 #endif
 
 // --- Core sizes ---
-inline constexpr int32_t  MAX_PLY                = 64;
+inline constexpr int32_t  MAX_PLY                = 128;
 inline constexpr int32_t  CAPTURE_HISTORY_SLOTS  = 2;
 inline constexpr int DEFAULT_DEPTH               = 11;
 

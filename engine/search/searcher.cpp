@@ -16,6 +16,9 @@
 
 namespace engine {
 
+// The null move pushes no frame: a line of MAX_PLY plies fits the ring.
+static_assert(NNUE::ACC_FRAMES >= MAX_PLY, "a search line must fit the accumulator ring");
+
 namespace {
 
 EvalCache evalCache;

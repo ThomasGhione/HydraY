@@ -28,7 +28,8 @@ struct AccDelta {
 
 // A move changes at most four features: a promotion capture.
 inline constexpr int ACC_MAX_DELTAS = 4;
-// Frames in Board's ring: a power of two, far deeper than any search line.
+// Frames in Board's ring: a power of two, at least MAX_PLY (a search line
+// longer than the ring would overwrite its own ancestors).
 inline constexpr int ACC_FRAMES = 128;
 // A frame is computed from an ancestor at most this many moves back; past
 // that the Finny refresh is the cheaper start.
