@@ -39,6 +39,10 @@ using Spin = SpinValue<true>;
 
 // --- Core sizes ---
 inline constexpr int32_t  MAX_PLY                = 128;
+// Deepest iteration of a search without a depth limit. The TT stores a depth
+// in 6 bits (TT::Entry::MAX_DEPTH), so a deeper iteration would read every
+// entry as deep enough.
+inline constexpr int32_t  MAX_ITERATION_DEPTH    = 64;
 inline constexpr int32_t  CAPTURE_HISTORY_SLOTS  = 2;
 inline constexpr int DEFAULT_DEPTH               = 11;
 

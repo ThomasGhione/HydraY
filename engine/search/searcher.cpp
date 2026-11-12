@@ -18,6 +18,8 @@ namespace engine {
 
 // The null move pushes no frame: a line of MAX_PLY plies fits the ring.
 static_assert(NNUE::ACC_FRAMES >= MAX_PLY, "a search line must fit the accumulator ring");
+static_assert(MAX_ITERATION_DEPTH <= MAX_PLY && MAX_ITERATION_DEPTH <= TT::Entry::MAX_DEPTH + 1,
+              "an iteration deeper than the TT depth field cannot be stored");
 
 namespace {
 

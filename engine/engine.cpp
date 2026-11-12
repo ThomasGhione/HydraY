@@ -37,11 +37,13 @@ chess::Move Engine::search(const time::Limits& limits) noexcept {
     timeManager.init(limits, board.getActiveColor() == chess::Board::WHITE,
                      std::max(0, board.getFullMoveClock() - 1), &stopSearchRequested);
 
-    // A depth limit keeps its cap; a time-managed, infinite or node-bounded
-    // search deepens until stopped. A bare `go` (or `go ponder` without a clock)
-    // has nothing that would stop it, so it gets DEFAULT_DEPTH.
-    const int targetDepth = (limits.maxDepth > 0) ? static_cast<int>(limits.maxDepth)
-        : (timeManager.useTimeManagement() || limits.infinite || limits.maxNodes > 0) ? MAX_PLY
+    // A depth limit keeps its cap, up to the deepest iteration the TT can
+    // tell apart; a time-managed, infinite or node-bounded search deepens
+    // until stopped. A bare `go` (or `go ponder` without a clock) has nothing
+    // that would stop it, so it gets DEFAULT_DEPTH.
+    const int targetDepth = (limits.maxDepth > 0)
+        ? static_cast<int>(std::min<int64_t>(limits.maxDepth, MAX_ITERATION_DEPTH))
+        : (timeManager.useTimeManagement() || limits.infinite || limits.maxNodes > 0) ? MAX_ITERATION_DEPTH
         : DEFAULT_DEPTH;
 
     searchRuntime.timeManager = &timeManager;
