@@ -208,7 +208,8 @@ void TimeManager::checkHardDeadline() const noexcept {
 }
 
 bool TimeManager::shouldStartNextDepth() const noexcept {
-    if (!useTm_ || pondering_.load(std::memory_order_acquire)) return true;
+    // go movetime is the user's budget: only the hard deadline ends it.
+    if (!useTm_ || fixedTime_ || pondering_.load(std::memory_order_acquire)) return true;
     const int64_t threshold = static_cast<int64_t>(
         static_cast<double>(softMs_) * START_NEXT_FRACTION);
     return elapsedMs() < std::max<int64_t>(MIN_THINK_MS, threshold);
