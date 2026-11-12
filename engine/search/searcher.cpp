@@ -307,11 +307,11 @@ int32_t searchNode(Board& b, SearchRuntime& runtime, int depth, int32_t alpha, i
                             : searchPosition<false>(b, runtime, depth, alpha, beta, args...);
 }
 
-// atRoot restricts terminals to forced draws (third repetition, fifty moves,
-// insufficient material): scoring the second repetition as 0 is an interior
-// heuristic, and at the root it would end the search with an arbitrary move.
+// Draws of a node past the root. The root is never one of these: a third
+// repetition or a hundred reversible half-moves only end the game when
+// somebody claims them, and a root we are asked to move in was not claimed.
 // ply only places a mate delivered on the 100th half-move.
-bool checkDrawTerminalConditions(const Board& b, int ply, int32_t& outScore, bool atRoot = false) noexcept {
+bool checkDrawTerminalConditions(const Board& b, int ply, int32_t& outScore) noexcept {
     // A repetition needs at least 4 reversible plies; the guard skips the scan
     // in most of the tree.
     if (b.getHalfMoveClock() >= 4) {
@@ -325,7 +325,7 @@ bool checkDrawTerminalConditions(const Board& b, int ply, int32_t& outScore, boo
                 : (staticEval > 0 ? -REPETITION_CONTEMPT : REPETITION_CONTEMPT);
             return true;
         }
-        if (!atRoot && repCount >= 2) {
+        if (repCount >= 2) {
             outScore = 0;
             return true;
         }
@@ -923,11 +923,14 @@ IterativeSearchResult runIterativeDeepening(Board& rootBoard, SearchRuntime& run
         return result;
     }
 
-    int32_t rootDrawScore = 0;
-    if (checkDrawTerminalConditions(rootBoard, 0, rootDrawScore, /*atRoot=*/true)) {
+    // A dead position (insufficient material) is over whatever is played: any
+    // legal move. A root that is a third repetition or past the hundredth
+    // reversible half-move is searched like any other: nobody claimed the
+    // draw, and the first generated move can lose a piece.
+    if (rootBoard.hasInsufficientMaterialDraw()) {
         const MoveList drawMoves = MoveGenerator::generateLegalMoves(rootBoard);
         result.terminalRoot = result.completedAnyDepth = true;
-        result.bestScore = runtime.eval = rootDrawScore;
+        result.bestScore = runtime.eval = 0;
         result.bestMove = drawMoves.is_empty() ? Move{} : drawMoves[0];
         return result;
     }
