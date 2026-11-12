@@ -6,6 +6,7 @@
 
 #include "../../board/board.hpp"
 #include "../../tt/tt.hpp"
+#include "../movelist.hpp"
 #include "../syzygy/syzygy.hpp"
 #include "corrhist.hpp"
 #include "search_constants.hpp"
@@ -61,6 +62,11 @@ struct SearchRuntime {
     // Null for the helpers, datagen and the tests.
     time::TimeManager*        timeManager            = nullptr;
     syzygy::SyzygyProber*     syzygyProber           = nullptr;
+    // A tables-off search of a tablebase-drawn root has stored eval scores in the TT.
+    bool                      tbOffScoresInTT        = false;
+    // Not empty at a tablebase-drawn root: the drawing moves, the only ones the
+    // root searches (searchBestMove fills it, the tables are off meanwhile).
+    MoveList                  tbDrawMoves;
 
     [[nodiscard]] inline bool shouldAbort() const noexcept {
         return stopSearchRequested != nullptr

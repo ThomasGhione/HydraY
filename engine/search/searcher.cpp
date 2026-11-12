@@ -964,6 +964,17 @@ IterativeSearchResult runIterativeDeepening(Board& rootBoard, SearchRuntime& run
         }
     }
 
+    // Tablebase-drawn root (see searchBestMove): the drawing moves only, and
+    // the score shown is the tables' 0, not the eval that chooses among them.
+    const bool tbDrawnRoot = !runtime.tbDrawMoves.is_empty();
+    if (tbDrawnRoot) {
+        MoveList kept;
+        for (const Move& m : moves) {
+            if (std::find(runtime.tbDrawMoves.begin(), runtime.tbDrawMoves.end(), m) != runtime.tbDrawMoves.end()) kept.emplace_back(m);
+        }
+        if (!kept.is_empty()) moves = kept;
+    }
+
     Move bestMove = moves[0];
     int32_t prevScore = 0;
     int32_t prevPrevScore = 0;
@@ -1035,11 +1046,11 @@ IterativeSearchResult runIterativeDeepening(Board& rootBoard, SearchRuntime& run
         result.completedAnyDepth = true;
         result.completedDepth = currentDepth;
         result.bestMove = bestMove;
-        result.bestScore = runtime.eval;
+        result.bestScore = tbDrawnRoot ? 0 : runtime.eval;
         runtime.transpositionTable->store(rootBoard.getHash(), currentDepth, scoreToTT(runtime.eval, 0),
                                           static_cast<uint8_t>(determineFlag(runtime.eval, iterationAlpha, iterationBeta)),
                                           TT::Entry::encodeMove(bestMove));
-        if (runtime.emitUciInfo) emitUciInfoLine(currentDepth, runtime.eval, runtime, rootBoard, bestMove);
+        if (runtime.emitUciInfo) emitUciInfoLine(currentDepth, result.bestScore, runtime, rootBoard, bestMove);
     }
 
     // A deadline before depth 1 completes (a few ms left, or the thread
@@ -1094,6 +1105,37 @@ Move searchBestMove(Board& board, SearchRuntime& runtime, int requestedDepth) no
     runtime.nodesSearched = 0;
     runtime.softResetHistory();
 
+    // A tablebase-drawn root: the tables rank every drawing move 0 and do not
+    // order them, and the first of the list may give material away. With more
+    // than one, the search runs over the drawing moves only and with the tables
+    // off (they would score every line 0), so the eval chooses among them.
+    syzygy::SyzygyProber* const prober = runtime.syzygyProber;
+    runtime.tbDrawMoves.size = 0;
+    bool tbAnswersRoot = false;
+    if (prober != nullptr && board.castlingRights() == 0) {
+        const auto tbMoves = prober->probeRoot(board);
+        const auto tbBest = std::ranges::max_element(tbMoves, {}, &syzygy::RootMove::tbRank);
+        if (tbBest != tbMoves.end() && tbBest->tbRank == 0) {
+            for (const syzygy::RootMove& m : tbMoves) {
+                if (m.tbRank == 0 && static_cast<size_t>(runtime.tbDrawMoves.size) < MAX_MOVES) runtime.tbDrawMoves.emplace_back(m.move);
+            }
+            if (runtime.tbDrawMoves.size > 1) runtime.syzygyProber = nullptr;
+            else runtime.tbDrawMoves.size = 0;
+        }
+        // The tables answer every other root in range without a search.
+        tbAnswersRoot = !tbMoves.empty() && runtime.syzygyProber != nullptr;
+    }
+    if (prober != nullptr && runtime.syzygyProber == nullptr) {
+        // This search leaves eval scores in the TT for positions the tables know.
+        runtime.tbOffScoresInTT = true;
+    } else if (prober != nullptr && !tbAnswersRoot && runtime.tbOffScoresInTT) {
+        // A search with the tables on must not meet them: the TT cut-off comes
+        // before the probe. Not in a game: after a root in tablebase range every
+        // later root is in range too. A new position without ucinewgame gets here.
+        runtime.transpositionTable->clear();
+        runtime.tbOffScoresInTT = false;
+    }
+
     // Lazy SMP: helpers run their own iterative deepening on private boards and
     // runtimes, sharing only the TT. The main thread's result stands unless the
     // vote below picks a helper's; helpers stop the moment it returns.
@@ -1110,6 +1152,7 @@ Move searchBestMove(Board& board, SearchRuntime& runtime, int requestedDepth) no
         SearchRuntime& hr = slot.runtime;
         hr.transpositionTable  = runtime.transpositionTable;
         hr.syzygyProber        = runtime.syzygyProber;
+        hr.tbDrawMoves         = runtime.tbDrawMoves;
         hr.stopSearchRequested = &helperStop;
         hr.maxNodes            = runtime.maxNodes;
         hr.nodesSearched       = 0;
@@ -1139,6 +1182,8 @@ Move searchBestMove(Board& board, SearchRuntime& runtime, int requestedDepth) no
 
     helperStop.store(true, std::memory_order_release);
     for (auto& helper : helpers) helper.join();
+    runtime.syzygyProber = prober;
+    runtime.tbDrawMoves.size = 0;
     runtime.depth = targetDepth;
 
     // Thread vote: among the threads that completed the deepest iteration, the
