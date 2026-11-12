@@ -1,10 +1,12 @@
 // HydraY NNUE: the deep net, (768x4kb_hm -> 1024)x2 -> pairwise -> 1024 -> 16 -> 1,
-// with material-count output buckets on BOTH layers after the feature transformer.
+// with material-count output buckets on every layer after the feature transformer.
 //
-// One hidden layer, not bullet's 16 -> 32 -> 1 example: the second layer costs
-// little but was never validated on a net this size. Adapted from bullet
-// examples/progression/4_multi_layer.rs, the sequel of 3_input_buckets.rs that
-// trainer.rs comes from.
+// One hidden layer by default, not bullet's 16 -> 32 -> 1 example: the second layer
+// costs little but was never validated on a net this size. HYDRAY_L2=32 adds it
+// (1024 -> 16 -> 32 -> 1): measured 2026-11-12 on the laptop, -2% nps on an E-core
+// with the layer in int8, about -4% in float as this trainer saves it. Adapted from
+// bullet examples/progression/4_multi_layer.rs, the sequel of 3_input_buckets.rs
+// that trainer.rs comes from.
 //
 // Two choices come with the architecture and are not free:
 //   1. CReLU on the feature transformer, with the pairwise product of its two
@@ -30,7 +32,10 @@
 //   OB = 16: 6,557,760 B (a multiple of 64: bullet adds no padding)
 //   OB = 8:  6,425,632 B, padded to 6,425,664
 //
-// Only l0 and l1w are quantised; the 16 -> 1 tail stays float. sanity_deep.rs is
+// With HYDRAY_L2=32 the tail after l1b is l2w [OB][32][16], l2b [OB][32],
+// l3w [OB][1][32], l3b [OB], all f32: OB = 8 is 6,443,552 B padded to 6,443,584.
+//
+// Only l0 and l1w are quantised; the tail after l1 stays float. sanity_deep.rs is
 // the reference reader, and the C++ must agree with it byte for byte.
 //
 // Usage, stages included:
@@ -54,10 +59,14 @@
 //   HYDRAY_EVAL_SCALE       sigmoid scale of the labels, default 400
 //   HYDRAY_LOSS=mse|pow2.5  default mse
 //   HYDRAY_L1B_INIT         initial l1 bias, default 0 (bullet zeroes it)
-//   HYDRAY_FLOAT_CLIP       weight clip of the float tail l1b, l2w, l2b; default
-//                           bullet's 1.98, which only the quantised layers need
+//   HYDRAY_FLOAT_CLIP       weight clip of the float tail l1b, l2w, l2b (l3w, l3b);
+//                           default bullet's 1.98, which only the quantised layers need
+//   HYDRAY_L2=0|32          second hidden layer of that width, default 0 (none).
+//                           Its bias starts at HYDRAY_L1B_INIT too, for the same reason
 //   HYDRAY_INIT_NET         start from this quantised net (same layout) instead of
-//                           random weights; the run checks it evaluates the same
+//                           random weights; the run checks it evaluates the same. With
+//                           HYDRAY_L2=32 a net without the second layer is accepted:
+//                           l0 and l1 come from it, l2 and l3 start fresh (sanity_deep.rs)
 //   HYDRAY_REVIVE=1         with HYDRAY_INIT_NET: re-initialise its dead l1 neurons
 //                           (bias HYDRAY_L1B_INIT, default 0.1), see sanity_deep.rs
 //   HYDRAY_QAT=1            quantisation-aware training: the forward computes what
@@ -189,8 +198,11 @@ fn main() {
         .ok()
         .and_then(|s| s.parse().ok())
         .unwrap_or(superbatches);
+    let l2_size: usize = env_or("HYDRAY_L2", 0);
+    assert!(l2_size == 0 || l2_size == sanity_deep::L2_SIZE, "HYDRAY_L2={l2_size}: 0 or {}", sanity_deep::L2_SIZE);
     // The notebook checks this line against the arm it means to train.
-    println!("trainer_deep: {HIDDEN_SIZE} -> {L1_SIZE} -> 1, {OUTPUT_BUCKETS} output buckets");
+    let shape = if l2_size == 0 { format!("{L1_SIZE}") } else { format!("{L1_SIZE} -> {l2_size}") };
+    println!("trainer_deep: {HIDDEN_SIZE} -> {shape} -> 1, {OUTPUT_BUCKETS} output buckets");
 
     let lr_kind: String = env_or("HYDRAY_LR", "step".to_string());
     let lr_start: f32 = env_or("HYDRAY_LR_START", 0.001);
@@ -218,38 +230,49 @@ fn main() {
     // One line with the whole recipe: the notebook checks it against the arm.
     println!(
         "recipe: lr {lr_kind} {lr_start} (final {lr_final}), warmup {warmup}, wdl {wdl_weight}, eval_scale {eval_scale}, \
-         loss {loss}, l1b_init {l1b_init}, float_clip {float_clip}, init_net '{init_net}', revive {revive}, qat {qat}"
+         loss {loss}, l1b_init {l1b_init}, float_clip {float_clip}, init_net '{init_net}', revive {revive}, qat {qat}, l2 {l2_size}"
     );
 
     let init = (!init_net.is_empty()).then(|| {
         let net = sanity_deep::load(&init_net);
         assert_eq!(net.ob, OUTPUT_BUCKETS, "{init_net}: {} output buckets, this build has {OUTPUT_BUCKETS}", net.ob);
-        let b = sanity_deep::to_bullet(&net, revive.then_some(l1b_init));
-        println!("init net {init_net}: {} dead l1 neurons revived, {} l0 values past the ±0.99 clip", b.revived, b.clipped);
+        let b = sanity_deep::to_bullet(&net, revive.then_some(l1b_init), l2_size, if l1b_init == 0.0 { 0.1 } else { l1b_init });
+        println!(
+            "init net {init_net}: {} dead l1 neurons revived, {} l0 values past the ±0.99 clip, {}",
+            b.revived,
+            b.clipped,
+            if b.fresh_head { "l2 and l3 newly initialised (the net has no second layer)" } else { "every layer from the net" }
+        );
         b
     });
+
+    let mut save_format = vec![
+        SavedFormat::id("l0w")
+            .transform(|store, weights| {
+                let factoriser = store.get("l0f").values.f32().repeat(INPUT_BUCKETS);
+                weights.into_iter().zip(factoriser).map(|(a, b)| a + b).collect()
+            })
+            .round()
+            .quantise::<i16>(QA),
+        SavedFormat::id("l0b").round().quantise::<i16>(QA),
+        // i8 at QB=64: bullet FAILS on a weight that does not fit (it does
+        // not truncate silently), so a wrong scale shows up at save time.
+        SavedFormat::id("l1w").transpose().round().quantise::<i8>(QB),
+        SavedFormat::id("l1b"),
+        SavedFormat::id("l2w").transpose(),
+        SavedFormat::id("l2b"),
+    ];
+    if l2_size > 0 {
+        save_format.push(SavedFormat::id("l3w").transpose());
+        save_format.push(SavedFormat::id("l3b"));
+    }
 
     let mut trainer = ValueTrainerBuilder::default()
         .dual_perspective()
         .optimiser(AdamW)
         .inputs(ChessBucketsMirrored::new(BUCKET_LAYOUT))
         .output_buckets(MaterialCount::<OUTPUT_BUCKETS>)
-        .save_format(&[
-            SavedFormat::id("l0w")
-                .transform(|store, weights| {
-                    let factoriser = store.get("l0f").values.f32().repeat(INPUT_BUCKETS);
-                    weights.into_iter().zip(factoriser).map(|(a, b)| a + b).collect()
-                })
-                .round()
-                .quantise::<i16>(QA),
-            SavedFormat::id("l0b").round().quantise::<i16>(QA),
-            // i8 at QB=64: bullet FAILS on a weight that does not fit (it does
-            // not truncate silently), so a wrong scale shows up at save time.
-            SavedFormat::id("l1w").transpose().round().quantise::<i8>(QB),
-            SavedFormat::id("l1b"),
-            SavedFormat::id("l2w").transpose(),
-            SavedFormat::id("l2b"),
-        ])
+        .save_format(&save_format)
         .loss_fn(if pow25 {
             |output, target| output.sigmoid().power_error(target, 2.5)
         } else {
@@ -288,10 +311,25 @@ fn main() {
             if qat {
                 l1.weights = l1.weights.faux_quantise(qb, true);
             }
+            // Without the second layer l2 is the output (16 -> 1); with it l2 is the
+            // second hidden layer (16 -> L2, bias as l1's) and l3 the output (L2 -> 1).
+            let l2_out = if l2_size == 0 { 1 } else { l2_size };
             let l2 = match &init {
-                Some(n) => affine(builder, "l2", L1_SIZE, OUTPUT_BUCKETS, custom(&n.l2w), custom(&n.l2b)),
-                None => builder.new_affine("l2", L1_SIZE, OUTPUT_BUCKETS),
+                Some(n) => affine(builder, "l2", L1_SIZE, OUTPUT_BUCKETS * l2_out, custom(&n.l2w), custom(&n.l2b)),
+                None if l2_size > 0 && l1b_init != 0.0 => affine(
+                    builder,
+                    "l2",
+                    L1_SIZE,
+                    OUTPUT_BUCKETS * l2_out,
+                    InitSettings::Normal { mean: 0.0, stdev: (2.0 / L1_SIZE as f32).sqrt() },
+                    custom(&vec![l1b_init; OUTPUT_BUCKETS * l2_out]),
+                ),
+                None => builder.new_affine("l2", L1_SIZE, OUTPUT_BUCKETS * l2_out),
             };
+            let l3 = (l2_size > 0).then(|| match &init {
+                Some(n) => affine(builder, "l3", l2_size, OUTPUT_BUCKETS, custom(&n.l3w), custom(&n.l3b)),
+                None => builder.new_affine("l3", l2_size, OUTPUT_BUCKETS),
+            });
 
             // Pairwise: CReLU on the two halves of the feature transformer, then
             // their product. A fast form of `.crelu().pairwise_mul()`.
@@ -310,7 +348,11 @@ fn main() {
             // grows with OUTPUT_BUCKETS.
             let hl1 = stm_hidden.concat(ntm_hidden);
             let hl2 = l1.forward(hl1).select(output_buckets).screlu();
-            l2.forward(hl2).select(output_buckets)
+            let out2 = l2.forward(hl2).select(output_buckets);
+            match &l3 {
+                None => out2,
+                Some(l3) => l3.forward(out2.screlu()).select(output_buckets),
+            }
         });
 
     // The SAVED l0 weight is l0w + l0f: clipping both to ±0.99 keeps the sum in
@@ -319,7 +361,8 @@ fn main() {
     trainer.optimiser.set_params_for_weight("l0w", stricter);
     trainer.optimiser.set_params_for_weight("l0f", stricter);
     let float_tail = AdamWParams { max_weight: float_clip, min_weight: -float_clip, ..Default::default() };
-    for id in ["l1b", "l2w", "l2b"] {
+    let tail_ids: &[&str] = if l2_size == 0 { &["l1b", "l2w", "l2b"] } else { &["l1b", "l2w", "l2b", "l3w", "l3b"] };
+    for id in tail_ids {
         trainer.optimiser.set_params_for_weight(id, float_tail);
     }
 

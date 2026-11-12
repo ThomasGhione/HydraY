@@ -2,9 +2,10 @@
 // trainer_deep.rs: it is the ORACLE. The C++ must agree with this file, not the
 // other way round.
 //
-// Net: (768x4kb_hm -> 1024)x2 -> pairwise -> 1024 -> 16 -> 1, with OB
-// material-count output buckets on l1 and l2. QA=255 QB=64 SCALE=400. OB is 16
-// or 8, recognised by the file size; the inputs are those of sanity.rs.
+// Net: (768x4kb_hm -> 1024)x2 -> pairwise -> 1024 -> 16 [-> L2] -> 1, with OB
+// material-count output buckets on every layer after l0. QA=255 QB=64 SCALE=400.
+// OB is 16 or 8 and L2 is 0 (no second hidden layer) or L2_SIZE, all recognised by
+// the file size; the inputs are those of sanity.rs.
 //
 // LAYOUT (little-endian, save_format order, padded to 64 B with "bullet"):
 //
@@ -17,6 +18,16 @@
 //   + OB*64             l2b [OB]               f32    real
 //   OB = 16: payload and file 6,557,760; OB = 8: payload 6,425,632, file 6,425,664
 //
+// WITH THE SECOND HIDDEN LAYER (L2 = L2_SIZE = 32), the tail after l1b is instead:
+//
+//   l2w [OB][L2][16]       f32    real   (transposed)
+//   l2b [OB][L2]           f32    real
+//   l3w [OB][1][L2]        f32    real   (transposed)
+//   l3b [OB]               f32    real
+//   OB = 8: payload 6,443,552, file 6,443,584; OB = 16: payload and file 6,593,600
+//
+// The whole tail after l1w stays float, as l2 always has.
+//
 // ARITHMETIC, the delicate part:
 //
 //   c[i]  = clamp(acc[i], 0, QA)                    QA scale, fits in u8
@@ -24,13 +35,19 @@
 //   hl1   = [p_stm (512), p_ntm (512)]              1024 values, QA scale
 //   z[o]  = (SUM hl1[i]*l1w[o][i]) / (QA*QB) + l1b[o]     real
 //   a[o]  = clamp(z[o], 0, 1)^2                     SCReLU in float
-//   y     = SUM a[o]*l2w[o] + l2b                   linear
+//   y     = SUM a[o]*l2w[o] + l2b                   linear (L2 = 0)
+//   or, with L2:
+//   a2[k] = clamp(SUM a[o]*l2w[k][o] + l2b[k], 0, 1)^2   SCReLU in float
+//   y     = SUM a2[k]*l3w[k] + l3b                  linear
 //   cp    = y * SCALE
 //
 // Usage: cargo run -r --bin sanity_deep -- <quantised.bin> [fen... | --init-check]
 
 const HIDDEN: usize = 1024;
 const L1_SIZE: usize = 16;
+// Width of the optional second hidden layer; a file has it or not (L2 = 0).
+pub const L2_SIZE: usize = 32;
+const L2_WIDTHS: [usize; 2] = [0, L2_SIZE];
 const INPUT_BUCKETS: usize = 4;
 // The output-bucket counts a file may have, as in network_deep.hpp.
 const OUTPUT_BUCKET_COUNTS: [usize; 2] = [16, 8];
@@ -58,34 +75,39 @@ fn king_bucket(ksq: usize) -> usize {
 
 pub struct Network {
     pub ob: usize,      // output buckets
+    pub l2: usize,      // width of the second hidden layer, 0 if none
     pub l0w: Vec<i16>,  // [4*768 * HIDDEN]
     pub l0b: Vec<i16>,  // [HIDDEN]
     pub l1w: Vec<i8>,   // [OB * L1 * HIDDEN]
     pub l1b: Vec<f32>,  // [OB * L1]
-    pub l2w: Vec<f32>,  // [OB * L1]
-    pub l2b: Vec<f32>,  // [OB]
+    pub l2w: Vec<f32>,  // [OB * L1] if l2 == 0, else [OB * L2 * L1]
+    pub l2b: Vec<f32>,  // [OB] if l2 == 0, else [OB * L2]
+    pub l3w: Vec<f32>,  // [OB * L2], empty if l2 == 0
+    pub l3b: Vec<f32>,  // [OB], empty if l2 == 0
 }
 
 pub const L0W: usize = INPUT_BUCKETS * 768 * HIDDEN;
 
-pub const fn payload(ob: usize) -> usize {
-    L0W * 2 + HIDDEN * 2 + ob * L1_SIZE * HIDDEN + ob * L1_SIZE * 4 + ob * L1_SIZE * 4 + ob * 4
+pub const fn payload(ob: usize, l2: usize) -> usize {
+    let head = ob * L1_SIZE * HIDDEN + ob * L1_SIZE * 4;
+    let tail = if l2 == 0 { ob * L1_SIZE * 4 + ob * 4 } else { ob * l2 * L1_SIZE * 4 + ob * l2 * 4 + ob * l2 * 4 + ob * 4 };
+    L0W * 2 + HIDDEN * 2 + head + tail
+}
+
+pub const fn file_bytes(ob: usize, l2: usize) -> usize {
+    payload(ob, l2).div_ceil(64) * 64
 }
 
 pub fn load(path: &str) -> Network {
     let bytes = std::fs::read(path).unwrap_or_else(|e| panic!("cannot read {path}: {e}"));
-    let ob = OUTPUT_BUCKET_COUNTS
-        .into_iter()
-        .find(|&ob| bytes.len() == payload(ob).div_ceil(64) * 64)
-        .unwrap_or_else(|| {
-            panic!(
-                "size mismatch: got {} bytes, expected {} (16 buckets) or {} (8 buckets)",
-                bytes.len(),
-                payload(16).div_ceil(64) * 64,
-                payload(8).div_ceil(64) * 64
-            )
-        });
-    let end = payload(ob);
+    let layouts: Vec<(usize, usize)> =
+        OUTPUT_BUCKET_COUNTS.into_iter().flat_map(|ob| L2_WIDTHS.into_iter().map(move |l2| (ob, l2))).collect();
+    let (ob, l2) = layouts.iter().copied().find(|&(ob, l2)| bytes.len() == file_bytes(ob, l2)).unwrap_or_else(|| {
+        let known: Vec<String> =
+            layouts.iter().map(|&(ob, l2)| format!("{} ({ob} buckets, l2 {l2})", file_bytes(ob, l2))).collect();
+        panic!("size mismatch: got {} bytes, expected one of {}", bytes.len(), known.join(", "))
+    });
+    let end = payload(ob, l2);
     // bullet fills the tail with "bullet" repeated: anything else means the
     // layout has drifted.
     assert!(
@@ -118,11 +140,18 @@ pub fn load(path: &str) -> Network {
         v
     };
     let l1b = f32s(ob * L1_SIZE, &mut off);
-    let l2w = f32s(ob * L1_SIZE, &mut off);
-    let l2b = f32s(ob, &mut off);
+    let (l2w, l2b, l3w, l3b) = if l2 == 0 {
+        (f32s(ob * L1_SIZE, &mut off), f32s(ob, &mut off), Vec::new(), Vec::new())
+    } else {
+        let l2w = f32s(ob * l2 * L1_SIZE, &mut off);
+        let l2b = f32s(ob * l2, &mut off);
+        let l3w = f32s(ob * l2, &mut off);
+        let l3b = f32s(ob, &mut off);
+        (l2w, l2b, l3w, l3b)
+    };
     assert_eq!(off, end, "parsing did not consume exactly the payload");
 
-    Network { ob, l0w, l0b, l1w, l1b, l2w, l2b }
+    Network { ob, l2, l0w, l0b, l1w, l1b, l2w, l2b, l3w, l3b }
 }
 
 fn screlu_f32(x: f32) -> f32 {
@@ -235,19 +264,34 @@ pub fn evaluate(net: &Network, fen: &str) -> i32 {
         a1[o] = screlu_f32(sum as f32 / (QA * QB) as f32 + b1[o]);
     }
 
-    let w2 = &net.l2w[ob * L1_SIZE..(ob + 1) * L1_SIZE];
-    let mut y = net.l2b[ob];
-    for (a, w) in a1.iter().zip(w2) {
-        y += a * w;
+    (head(net, ob, &a1) * SCALE).round() as i32
+}
+
+/// Everything after l1, in float: l2 -> 1, or l2 (SCReLU) -> l3 -> 1.
+fn head(net: &Network, ob: usize, a1: &[f32; L1_SIZE]) -> f32 {
+    if net.l2 == 0 {
+        let w2 = &net.l2w[ob * L1_SIZE..(ob + 1) * L1_SIZE];
+        return net.l2b[ob] + a1.iter().zip(w2).map(|(a, w)| a * w).sum::<f32>();
     }
-    (y * SCALE).round() as i32
+    let l2 = net.l2;
+    let mut y = net.l3b[ob];
+    for k in 0..l2 {
+        let row = &net.l2w[(ob * l2 + k) * L1_SIZE..(ob * l2 + k + 1) * L1_SIZE];
+        let z = net.l2b[ob * l2 + k] + a1.iter().zip(row).map(|(a, w)| a * w).sum::<f32>();
+        y += screlu_f32(z) * net.l3w[ob * l2 + k];
+    }
+    y
 }
 
 // ---------------------------------------------------------------------------
 // The same net in bullet's weight layout, to start a training run from it
 // (trainer_deep.rs, HYDRAY_INIT_NET). bullet holds a matrix column-major as
-// (outputs x inputs): l0w keeps its saved order, l1w and l2w are the transposes of
-// their saved form (their SavedFormat transposes them).
+// (outputs x inputs): l0w keeps its saved order, l1w, l2w and l3w are the
+// transposes of their saved form (their SavedFormat transposes them).
+//
+// A net without the second hidden layer can start a run that has one: l0 and l1
+// come from the net, l2 and l3 are new (fresh_head), so that run begins from the
+// net's feature transformer and first layer but not from its evaluation.
 
 pub struct BulletInit {
     pub ob: usize,
@@ -256,10 +300,14 @@ pub struct BulletInit {
     pub l0b: Vec<f32>, // [HIDDEN]
     pub l1w: Vec<f32>, // [HIDDEN][OB*L1]
     pub l1b: Vec<f32>, // [OB*L1]
-    pub l2w: Vec<f32>, // [L1][OB]
-    pub l2b: Vec<f32>, // [OB]
+    pub l2: usize,     // width of the second hidden layer, 0 if none
+    pub l2w: Vec<f32>, // [L1][OB] if l2 == 0, else [L1][OB*L2]
+    pub l2b: Vec<f32>, // [OB] if l2 == 0, else [OB*L2]
+    pub l3w: Vec<f32>, // [L2][OB], empty if l2 == 0
+    pub l3b: Vec<f32>, // [OB], empty if l2 == 0
     pub clipped: usize, // l0 values past the trainer's ±0.99 clip
     pub revived: usize,
+    pub fresh_head: bool, // l2 and l3 newly initialised (the net had no second layer)
 }
 
 /// Dead l1 neurons per output bucket: all-zero rows. A neuron that stops firing
@@ -292,8 +340,15 @@ fn gaussian(state: &mut u64) -> f32 {
 }
 
 /// With `revive_bias`, every dead l1 neuron gets a fresh row (bullet's l1 init),
-/// that bias and a zero l2 weight: it fires again, and no evaluation changes.
-pub fn to_bullet(net: &Network, revive_bias: Option<f32>) -> BulletInit {
+/// that bias and a zero weight into the next layer: it fires again, and no
+/// evaluation changes.
+///
+/// `l2` is the width of the run's second hidden layer. When the net has none and
+/// `l2` > 0, l2 and l3 are initialised here (fixed seed, He-normal weights, l2's
+/// bias `head_bias` so that its neurons start firing, l3's bias 0): computed here
+/// rather than by bullet so that the start check can still compare the two forwards.
+pub fn to_bullet(net: &Network, revive_bias: Option<f32>, l2: usize, head_bias: f32) -> BulletInit {
+    assert!(net.l2 == l2 || net.l2 == 0, "the net has a second layer of {}, the run wants {l2}", net.l2);
     let (qa, qb) = (QA as f32, QB as f32);
     let folded: Vec<f32> = net.l0w.iter().map(|&w| f32::from(w) / qa).collect();
     // The factoriser takes the midrange of each feature's four bucket weights,
@@ -318,12 +373,42 @@ pub fn to_bullet(net: &Network, revive_bias: Option<f32>) -> BulletInit {
         }
     }
     let mut l1b = net.l1b.clone();
-    let mut l2w = vec![0f32; n1];
-    for b in 0..net.ob {
-        for n in 0..L1_SIZE {
-            l2w[n * net.ob + b] = net.l2w[b * L1_SIZE + n];
+    let ob = net.ob;
+    let fresh_head = l2 > 0 && net.l2 == 0;
+    let (mut l2w, l2b, l3w, l3b) = if l2 == 0 {
+        let mut w = vec![0f32; n1];
+        for b in 0..ob {
+            for n in 0..L1_SIZE {
+                w[n * ob + b] = net.l2w[b * L1_SIZE + n];
+            }
         }
-    }
+        (w, net.l2b.clone(), Vec::new(), Vec::new())
+    } else if !fresh_head {
+        // saved [OB][L2][L1] -> bullet (OB*L2 x L1) column-major: [L1][OB*L2]
+        let n2 = ob * l2;
+        let mut w2 = vec![0f32; L1_SIZE * n2];
+        for o in 0..n2 {
+            for n in 0..L1_SIZE {
+                w2[n * n2 + o] = net.l2w[o * L1_SIZE + n];
+            }
+        }
+        // saved [OB][1][L2] -> bullet (OB x L2): [L2][OB]
+        let mut w3 = vec![0f32; l2 * ob];
+        for b in 0..ob {
+            for k in 0..l2 {
+                w3[k * ob + b] = net.l3w[b * l2 + k];
+            }
+        }
+        (w2, net.l2b.clone(), w3, net.l3b.clone())
+    } else {
+        let mut rng = 0x5eed_u64; // fixed seed: two arms start from the same head
+        let n2 = ob * l2;
+        let s2 = (2.0 / L1_SIZE as f32).sqrt();
+        let s3 = (2.0 / l2 as f32).sqrt();
+        let w2 = (0..L1_SIZE * n2).map(|_| s2 * gaussian(&mut rng)).collect();
+        let w3 = (0..l2 * ob).map(|_| s3 * gaussian(&mut rng)).collect();
+        (w2, vec![head_bias; n2], w3, vec![0f32; ob])
+    };
 
     let mut revived = 0;
     if let Some(bias) = revive_bias {
@@ -335,14 +420,22 @@ pub fn to_bullet(net: &Network, revive_bias: Option<f32>) -> BulletInit {
                     l1w[i * n1 + o] = stdev * gaussian(&mut rng);
                 }
                 l1b[o] = bias;
-                l2w[(o % L1_SIZE) * net.ob + o / L1_SIZE] = 0.0;
+                let (b, n) = (o / L1_SIZE, o % L1_SIZE);
+                if l2 == 0 {
+                    l2w[n * ob + b] = 0.0;
+                } else if !fresh_head {
+                    // its weight into every l2 neuron of its bucket
+                    for k in 0..l2 {
+                        l2w[n * (ob * l2) + b * l2 + k] = 0.0;
+                    }
+                }
                 revived += 1;
             }
         }
     }
 
     let l0b = net.l0b.iter().map(|&w| f32::from(w) / qa).collect();
-    BulletInit { ob: net.ob, l0w, l0f, l0b, l1w, l1b, l2w, l2b: net.l2b.clone(), clipped, revived }
+    BulletInit { ob, l0w, l0f, l0b, l1w, l1b, l2, l2w, l2b, l3w, l3b, clipped, revived, fresh_head }
 }
 
 /// Under QAT, added to the pairwise product before it is truncated. The exact
@@ -385,12 +478,25 @@ pub fn evaluate_bullet(b: &BulletInit, fen: &str, qat: bool) -> f32 {
     let hl1: Vec<f32> = ft(&us).into_iter().chain(ft(&them)).collect();
 
     let n1 = b.ob * L1_SIZE;
-    let mut y = b.l2b[ob];
-    for n in 0..L1_SIZE {
-        let o = ob * L1_SIZE + n;
-        let z = b.l1b[o] + hl1.iter().enumerate().map(|(i, h)| h * q(b.l1w[i * n1 + o], QB, true)).sum::<f32>();
-        y += screlu_f32(z) * b.l2w[n * b.ob + ob];
-    }
+    let a1: Vec<f32> = (0..L1_SIZE)
+        .map(|n| {
+            let o = ob * L1_SIZE + n;
+            screlu_f32(b.l1b[o] + hl1.iter().enumerate().map(|(i, h)| h * q(b.l1w[i * n1 + o], QB, true)).sum::<f32>())
+        })
+        .collect();
+    let y = if b.l2 == 0 {
+        b.l2b[ob] + (0..L1_SIZE).map(|n| a1[n] * b.l2w[n * b.ob + ob]).sum::<f32>()
+    } else {
+        let n2 = b.ob * b.l2;
+        b.l3b[ob]
+            + (0..b.l2)
+                .map(|k| {
+                    let o = ob * b.l2 + k;
+                    let z = b.l2b[o] + (0..L1_SIZE).map(|n| a1[n] * b.l2w[n * n2 + o]).sum::<f32>();
+                    screlu_f32(z) * b.l3w[k * b.ob + ob]
+                })
+                .sum::<f32>()
+    };
     y * SCALE
 }
 
@@ -398,7 +504,7 @@ fn main() {
     let args: Vec<String> = std::env::args().collect();
     let path = args.get(1).map(String::as_str).unwrap_or("quantised.bin");
     let net = load(path);
-    println!("{path}: layout OK ({} output buckets, {} B payload)", net.ob, payload(net.ob));
+    println!("{path}: layout OK ({} output buckets, second hidden layer {}, {} B payload)", net.ob, net.l2, payload(net.ob, net.l2));
     println!("dead l1 neurons (all-zero rows) per output bucket: {:?}", dead_rows(&net));
 
     let default_fens = [
@@ -422,7 +528,7 @@ fn main() {
         // must match the quantised one up to the rounding of the quantised net, and
         // the QAT forward must match it exactly but for the l0 values past the clip.
         for revive in [None, Some(0.1)] {
-            let b = to_bullet(&net, revive);
+            let b = to_bullet(&net, revive, net.l2, 0.1);
             let worst = |qat| {
                 default_fens
                     .iter()
