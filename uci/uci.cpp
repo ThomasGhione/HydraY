@@ -5,6 +5,7 @@
 #include "../nnue/nnue.hpp"
 #include "output.hpp"
 
+#include <bit>
 #include <omp.h>
 
 #include <iostream>
@@ -201,6 +202,12 @@ namespace uci {
             return;
         }
         engine.board = chess::Board(fen);
+        if (std::popcount(engine.board.bb[chess::Board::KING][0]) != 1
+            || std::popcount(engine.board.bb[chess::Board::KING][1]) != 1) {
+            // Not a chess position: refuse it whole. The empty board answers `go` with bestmove 0000.
+            engine.board = chess::Board(std::string(chess::Board::EMPTY_FEN));
+            emit("info string invalid position (malformed FEN or not one king per side): " + fen + "\n");
+        }
         // Coordinate notation; an illegal move is skipped.
         while (is >> token) {
             if (token.size() < 4) continue;

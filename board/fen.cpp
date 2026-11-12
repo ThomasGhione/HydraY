@@ -13,10 +13,10 @@ uint8_t Board::safeParseInt(const std::string& section, int min, int max, int de
     return (res.ec == std::errc{} && res.ptr == section.data() + section.size()) ? std::clamp(v, min, max) : defaultValue;
 }
 
-void Board::fenToBoard(const std::string& fen) {
+bool Board::fenToBoard(const std::string& fen) {
     std::istringstream fenStream(fen);
     std::string board, active, castling, ep, half, full;
-    if (!(fenStream >> board >> active)) return;
+    if (!(fenStream >> board >> active)) return false;
     // Trailing fields are optional, as in Stockfish: an EPD line stops after the
     // en passant square, and missing fields read as "- - 0 1".
     fenStream >> castling >> ep >> half >> full;
@@ -25,17 +25,17 @@ void Board::fenToBoard(const std::string& fen) {
     {
         int rank = 7, file = 0;
         for (char c : board) {
-            if (c == '/') { --rank; file = 0; }
+            if (c == '/') { if (file != 8) return false; --rank; file = 0; }
             else if (ascii::isDigit(c)) file += c - '0';
             else {
                 const size_t piece = PIECE_LETTERS.find(c);   // '.' finds 0: not a piece
-                if (rank < 0 || file > 7 || piece == 0 || piece == std::string_view::npos) return;
+                if (rank < 0 || file > 7 || piece == 0 || piece == std::string_view::npos) return false;
                 parsedBoard[(7 - rank) * 8 + file++] = static_cast<uint8_t>(piece);
             }
         }
-        if (rank != 0 || file != 8) return;
+        if (rank != 0 || file != 8) return false;
         // The net's output bucket is indexed by the piece count.
-        if (std::ranges::count_if(parsedBoard, [](uint8_t p) { return p != 0; }) > 32) return;
+        if (std::ranges::count_if(parsedBoard, [](uint8_t p) { return p != 0; }) > 32) return false;
     }
 
     chessboard = parsedBoard;
@@ -52,6 +52,7 @@ void Board::fenToBoard(const std::string& fen) {
 
     rebuildBitboardsFromSquares();
     rebuildRepetitionHistory();
+    return true;
 }
 
 std::string placementFen(const std::array<char, 64>& squares) {

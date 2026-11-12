@@ -42,6 +42,7 @@ struct Move {
 class Board {
 public:
     static constexpr const char* STARTING_FEN = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1";
+    static constexpr const char* EMPTY_FEN = "8/8/8/8/8/8/8/8 w - - 0 1";
 
     // --- Enums ---
 
@@ -128,7 +129,9 @@ public:
 
     // --- Constructors ---
     Board() noexcept { fenToBoard(STARTING_FEN); }
-    explicit Board(const std::string& fen) { fenToBoard(fen); }
+    // A malformed FEN gives the empty board (no kings: the search answers
+    // `bestmove 0000`), never a half-written one.
+    explicit Board(const std::string& fen) { if (!fenToBoard(fen)) fenToBoard(EMPTY_FEN); }
     // A copy takes the current position's accumulator only, computed first.
     Board(const Board& other) noexcept { copyFromBoard(other); }
     Board& operator=(const Board& other) noexcept {
@@ -202,7 +205,8 @@ public:
     const NNUE::Accumulator& accumulator() const noexcept { return frame(accTop); }
 
     // --- FEN ---
-    void        fenToBoard(const std::string& fen);
+    // False on malformed input, and the board is then left as it was.
+    bool        fenToBoard(const std::string& fen);
     std::string boardToFen() const;
 
     // --- Public bitboards (direct access for eval/search hot paths) ---
