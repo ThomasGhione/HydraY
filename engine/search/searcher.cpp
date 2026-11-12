@@ -1122,9 +1122,12 @@ Move searchBestMove(Board& board, SearchRuntime& runtime, int requestedDepth) no
         hr.depthSkipSize  = SKIP_SIZE[i % 20];
         hr.depthSkipPhase = SKIP_PHASE[i % 20];
 
+        // A depth limit binds the main thread only: a helper that reached it
+        // would stop and idle while the main thread finishes alone. Helpers
+        // deepen until the main thread returns, as they do under a clock.
         const int startDepth = 1 + (i & 1);
-        helpers.emplace_back([&slot, startDepth, targetDepth] {
-            slot.result = runIterativeDeepening(slot.board, slot.runtime, startDepth, targetDepth);
+        helpers.emplace_back([&slot, startDepth] {
+            slot.result = runIterativeDeepening(slot.board, slot.runtime, startDepth, MAX_ITERATION_DEPTH);
         });
     }
     activeHelperCount = helperCount;
