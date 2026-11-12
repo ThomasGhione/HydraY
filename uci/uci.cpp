@@ -155,7 +155,13 @@ namespace uci {
 
         if (key == "evalfile") {
             if (NNUE::loadNetwork(value)) {
+                // Everything computed with the old net goes: the eval cache, the
+                // TT (scores and static evals) and the histories, the correction
+                // history among them. The position stays.
                 engine::clearEvalCache();
+                engine.tt.clear();
+                engine.searchRuntime.clearHistory();
+                engine::Searcher::clearHelperHistories();
                 // The board may already hold a position: bring the accumulator
                 // in sync now; later `position` commands refresh via FEN load.
                 engine.board.refreshNnueAccumulator();
