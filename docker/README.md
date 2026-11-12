@@ -101,16 +101,16 @@ The prefix needs no setting: `m` plus 8 hex digits of the hash of the host's
 engine version and the nodes per move (`--nodes`):
 
 ```txt
-data/m956ee98b-v4.4.1-n8000.s0000.bin    sealed shard
-data/m956ee98b-v4.4.1-n8000.s0000.json   its manifest
-data/m956ee98b-v4.4.1-n8000.s0001.bin.part   the shard being written
+data/m956ee98b-v4.4.0-n8000.s0000.bin    sealed shard
+data/m956ee98b-v4.4.0-n8000.s0000.json   its manifest
+data/m956ee98b-v4.4.0-n8000.s0001.bin.part   the shard being written
 ```
 
 A new engine version or another `--nodes` starts new names, and every new net
 comes with a new version, so a series never mixes two labeler nets or two node
 counts: an 8000-node and a 24000-node run of the same machine are two series,
 side by side in its folder. Series made before the nodes were in the name
-(`m956ee98b-v4.4.1.s0000.bin`) keep their names. Smaller changes without a
+(`m956ee98b-v4.4.0.s0000.bin`) keep their names. Smaller changes without a
 version bump (a retuned search) are told apart by the manifests, which hold
 the machine hash and the build: version, a hash of the sources and net, the ISA,
 and the commit when the build gets `GIT_COMMIT=$(git rev-parse --short HEAD)`
@@ -183,7 +183,7 @@ pip install huggingface_hub
 hf download ThomasGhione/hydray --repo-type dataset --local-dir ~/hydray-data
 ```
 
-`--include "m956ee98b/*-v4.4.1.*"` takes one machine and version only;
+`--include "m956ee98b/*-v4.4.0.*"` takes one machine and version only;
 `index.jsonl` and the manifests tell which shards were made with which net
 and settings.
 
