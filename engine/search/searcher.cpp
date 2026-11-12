@@ -266,6 +266,10 @@ void emitUciInfoLine(int depth, int32_t score, const SearchRuntime& runtime,
 
 } // namespace
 
+void clearHelperHistories() noexcept {
+    for (auto& slot : helperSlots) slot->runtime.clearHistory();
+}
+
 struct SearchContext {
     const Move* previousMove {};
     int16_t* contHistEntry   {};

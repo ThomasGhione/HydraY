@@ -31,6 +31,11 @@ struct IterativeSearchResult {
 chess::Move searchBestMove(chess::Board& board, SearchRuntime& runtime,
                            int requestedDepth = DEFAULT_DEPTH) noexcept;
 
+// Wipes the Lazy SMP helpers' histories, killers, countermoves and correction
+// history. `ucinewgame` rebuilds the main runtime; the helpers' tables live in
+// their slots and would carry the previous game into the next one.
+void clearHelperHistories() noexcept;
+
 IterativeSearchResult runIterativeDeepening(chess::Board& rootBoard, SearchRuntime& runtime,
                                             int startDepth, int targetDepth) noexcept;
 

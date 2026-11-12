@@ -24,6 +24,7 @@ void Engine::reset() noexcept {
     searchRuntime = SearchRuntime{};
     searchRuntime.maxThreads = requestedThreads;
     bindSearchRuntime();
+    Searcher::clearHelperHistories();
     tt.clear();
 }
 
