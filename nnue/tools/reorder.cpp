@@ -124,8 +124,8 @@ int main(int argc, char** argv) {
         return 2;
     }
     static NetworkDeep net;
-    if (!loadFromFile(argv[1], net)) {
-        std::fprintf(stderr, "cannot load %s\n", argv[1]);
+    if (!loadFromFile(argv[1], net) || net.fileThreats) {
+        std::fprintf(stderr, "cannot load %s (threat inputs are not supported here)\n", argv[1]);
         return 1;
     }
 
@@ -181,8 +181,11 @@ int main(int argc, char** argv) {
     std::printf("l1 work: %.1f%% -> %.1f%%\n", 100 - rate(identity), 100 - rate(perm));
 
     // --- apply: perm[q] is the pair that lands at position q ---
+    // The loop below writes every value of l0w, l0b and l1w.
     static NetworkDeep out;
-    out = net;
+    std::memcpy(out.l1b, net.l1b, sizeof(out.l1b));
+    std::memcpy(out.l2w, net.l2w, sizeof(out.l2w));
+    std::memcpy(out.l2b, net.l2b, sizeof(out.l2b));
     for (int q = 0; q < PAIRWISE_OUT; ++q) {
         const int src = perm[q];
         for (int f = 0; f < INPUT_BUCKETS * INPUTS; ++f) {
@@ -211,7 +214,7 @@ int main(int argc, char** argv) {
     };
     bool ok = wr(out.l0w, sizeof(out.l0w)) && wr(out.l0b, sizeof(out.l0b))
            && heads(out.l1w) && heads(out.l1b) && heads(out.l2w) && heads(out.l2b);
-    const size_t padBytes = fileBytes(net.fileBuckets) - payloadBytes(net.fileBuckets);
+    const size_t padBytes = fileBytes(net.fileBuckets, false) - payloadBytes(net.fileBuckets, false);
     static const char kTag[] = "bullet";
     for (size_t i = 0; i < padBytes && ok; ++i) ok = std::fputc(kTag[i % 6], f) != EOF;
     std::fclose(f);
@@ -241,8 +244,8 @@ int main(int argc, char** argv) {
             pb[q] = b[perm[q]]; pb[q + PAIRWISE_OUT] = b[perm[q] + PAIRWISE_OUT];
         }
         for (int bk = 0; bk < OUTPUT_BUCKETS; ++bk, ++checks)
-            if (forwardSimd(net, a.data(), b.data(), bk)
-                != forwardSimd(back, pa.data(), pb.data(), bk)) ++bad;
+            if (forwardSimd(net, a.data(), b.data(), NO_THREATS, NO_THREATS, bk)
+                != forwardSimd(back, pa.data(), pb.data(), NO_THREATS, NO_THREATS, bk)) ++bad;
     }
     if (bad != 0) {
         std::fprintf(stderr, "\nCHECK FAILED: %ld mismatches in %ld - the file is NOT valid\n", bad, checks);

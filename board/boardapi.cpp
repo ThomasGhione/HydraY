@@ -18,6 +18,21 @@ constexpr std::array<uint8_t, 64> CASTLING_KEEP = [] {
     return keep;
 }();
 
+// BEYOND[a][b]: the squares past b on the line from a through b, 0 when the two
+// are not aligned.
+constexpr std::array<std::array<uint64_t, 64>, 64> BEYOND = [] {
+    std::array<std::array<uint64_t, 64>, 64> lut{};
+    for (int a = 0; a < 64; ++a)
+        for (int b = 0; b < 64; ++b) {
+            const int df = chess::file(b) - chess::file(a), dr = chess::rank(b) - chess::rank(a);
+            if (a == b || (df != 0 && dr != 0 && df != dr && df != -dr)) continue;
+            const int sf = (df > 0) - (df < 0), sr = (dr > 0) - (dr < 0);
+            for (int f = chess::file(b) + sf, r = chess::rank(b) + sr; f >= 0 && f < 8 && r >= 0 && r < 8; f += sf, r += sr)
+                lut[a][b] |= 1ULL << (r * 8 + f);
+        }
+    return lut;
+}();
+
 } // namespace
 
 __attribute__((always_inline))
@@ -32,6 +47,7 @@ __attribute__((always_inline))
 inline void Board::pushAccFrame() noexcept {
     NNUE::Accumulator& f = frame(++accTop);
     f.ndelta = 0;
+    f.nthreat = 0;
     f.dirty[0] = f.dirty[1] = true;
     if (accTop - accFloor >= NNUE::ACC_FRAMES) accFloor = accTop - NNUE::ACC_FRAMES + 1;
 }
@@ -40,6 +56,42 @@ __attribute__((always_inline))
 inline void Board::recordAcc(NNUE::AccDelta delta) noexcept {
     NNUE::Accumulator& f = frame(accTop);
     f.delta[f.ndelta++] = delta;
+}
+
+// Its attacks, the attacks on it, and the lines of the sliders that see sq,
+// which reach past sq exactly when the piece is not there.
+template<bool Add>
+__attribute__((always_inline))
+inline void Board::recordThreats(uint8_t piece, uint8_t sq) noexcept {
+    NNUE::Accumulator& f = frame(accTop);
+    const auto record = [&f](uint8_t attacker, uint8_t from, uint8_t victim, uint8_t to, bool add) {
+        if (!NNUE::threatPairIsFeature(attacker, victim)) return;
+        if (f.nthreat < NNUE::ACC_MAX_THREATS) f.threatDelta[f.nthreat++] = {attacker, from, victim, to, add};
+        else f.nthreat = NNUE::ACC_THREATS_OVERFLOW;
+    };
+    const uint64_t rookRays = pieces::Rook::attacks(sq, occupancy);
+    const uint64_t bishopRays = pieces::Bishop::attacks(sq, occupancy);
+    const uint64_t sliders = (rookRays & (bb[ROOK][0] | bb[ROOK][1] | bb[QUEEN][0] | bb[QUEEN][1]))
+                           | (bishopRays & (bb[BISHOP][0] | bb[BISHOP][1] | bb[QUEEN][0] | bb[QUEEN][1]));
+    uint64_t attackers = sliders
+                       | (pieces::PAWN_ATTACKS[1][sq] & bb[PAWN][0]) | (pieces::PAWN_ATTACKS[0][sq] & bb[PAWN][1])
+                       | (pieces::KNIGHT_ATTACKS[sq] & (bb[KNIGHT][0] | bb[KNIGHT][1]))
+                       | (pieces::KING_ATTACKS[sq] & (bb[KING][0] | bb[KING][1]));
+    for (uint64_t victims = attacksFrom(piece, sq, occupancy) & occupancy; victims; ) {
+        const auto to = static_cast<uint8_t>(pieces::popLSB(victims));
+        record(piece, sq, get(to), to, Add);
+    }
+    while (attackers) {
+        const auto from = static_cast<uint8_t>(pieces::popLSB(attackers));
+        record(get(from), from, piece, sq, Add);
+    }
+    for (uint64_t s = sliders; s; ) {
+        const auto from = static_cast<uint8_t>(pieces::popLSB(s));
+        if (const uint64_t past = (rookRays | bishopRays) & BEYOND[from][sq] & occupancy) {
+            const auto to = static_cast<uint8_t>(std::countr_zero(past));
+            record(get(from), from, get(to), to, !Add);
+        }
+    }
 }
 
 template<bool Record>
@@ -128,23 +180,32 @@ inline void Board::passTurn(bool resetHalfMoves) noexcept {
 template<Board::MoveKind Kind>
 inline void Board::doMoveByKind(MoveState& st, uint8_t moving, uint8_t destBefore, uint8_t fromIndex,
                                 uint8_t toIndex, uint8_t promotionType, uint64_t& key) noexcept {
+    // Every recordThreats sees the board between two of these steps, the piece
+    // it records standing on its square.
     if constexpr (Kind == MoveKind::EnPassant) {
         const uint8_t capIndex = enPassantVictim(moving, toIndex);
         st.capturedPiece = get(capIndex);
+        recordThreats<false>(st.capturedPiece, capIndex);
         set(capIndex, EMPTY);
         occupancy &= ~(1ULL << capIndex);
         removePieceFromBB<true>(st.capturedPiece, capIndex);
         key ^= zobrist::TABLES.pieces[st.capturedPiece][capIndex];
     }
     if constexpr (isCaptureKind(Kind)) {
+        recordThreats<false>(destBefore, toIndex);
         removePieceFromBB<true>(destBefore, toIndex);
+        occupancy &= ~(1ULL << toIndex);
         key ^= zobrist::TABLES.pieces[destBefore][toIndex];
     }
+    recordThreats<false>(moving, fromIndex);
     relocate<true>(moving, fromIndex, toIndex);
     if constexpr (Kind == MoveKind::Castling) {
         const Castling& c = castlingTo(toIndex);
         const uint8_t rook = get(c.rook);
+        recordThreats<true>(moving, toIndex);
+        recordThreats<false>(rook, c.rook);
         relocate<true>(rook, c.rook, c.rookTo);
+        recordThreats<true>(rook, c.rookTo);
         key ^= zobrist::TABLES.pieces[rook][c.rook] ^ zobrist::TABLES.pieces[rook][c.rookTo];
     }
     state.castle &= CASTLING_KEEP[fromIndex] & CASTLING_KEEP[toIndex];
@@ -156,8 +217,10 @@ inline void Board::doMoveByKind(MoveState& st, uint8_t moving, uint8_t destBefor
         removePieceFromBB<true>(moving, toIndex);
         addPieceToBB<true>(promoted, toIndex);
         set(toIndex, static_cast<piece_id>(promoted));
+        recordThreats<true>(promoted, toIndex);
         key ^= zobrist::TABLES.pieces[promoted][toIndex];
     } else {
+        if constexpr (Kind != MoveKind::Castling) recordThreats<true>(moving, toIndex);
         key ^= zobrist::TABLES.pieces[moving][toIndex];
     }
 }

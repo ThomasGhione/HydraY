@@ -116,7 +116,7 @@ int main(int argc, char** argv) {
     static FloatNet fl;
     if (!loadWeights(argv[1], fl)) { std::fprintf(stderr, "cannot read %s as bullet weights\n", argv[1]); return 1; }
     static NetworkDeep q;
-    if (!loadFromFile(argv[2], q)) { std::fprintf(stderr, "cannot load %s\n", argv[2]); return 1; }
+    if (!loadFromFile(argv[2], q) || q.fileThreats) { std::fprintf(stderr, "cannot load %s (threat inputs are not supported here)\n", argv[2]); return 1; }
     if (fl.ob != q.fileBuckets) {
         std::fprintf(stderr, "%d output buckets in the weights, %d in the net\n", fl.ob, q.fileBuckets);
         return 1;
@@ -200,7 +200,7 @@ int main(int argc, char** argv) {
             yC += screlu(static_cast<float>(zC) / static_cast<float>(QA * QB) + q.l1b[bucket][o]) * q.l2w[bucket][o];
         }
         y[A] = yA; y[D] = yD; y[B] = yB; y[C] = yC;
-        if (std::lround(static_cast<float>(yC) * SCALE) != forwardScalar(q, iUs.data(), iThem.data(), bucket)) ++mismatches;
+        if (std::lround(static_cast<float>(yC) * SCALE) != forwardScalar(q, iUs.data(), iThem.data(), NO_THREATS, NO_THREATS, bucket)) ++mismatches;
 
         const double target = 0.3 * (r.result / 2.0) + 0.7 * sigmoid(r.score / 400.0);
         for (int k = 0; k < N; ++k) {

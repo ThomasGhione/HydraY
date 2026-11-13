@@ -203,6 +203,17 @@ public:
     void               ensureNnueAccumulatorClean() const noexcept;
     // The current position's accumulator, valid after ensureNnueAccumulatorClean.
     const NNUE::Accumulator& accumulator() const noexcept { return frame(accTop); }
+    // The squares `piece` on sq attacks with `occ` as the blockers.
+    static uint64_t attacksFrom(uint8_t piece, uint8_t sq, uint64_t occ) noexcept {
+        switch (piece & MASK_PIECE_TYPE) {
+            case PAWN:   return pieces::PAWN_ATTACKS[colorToIndex(piece)][sq];
+            case KNIGHT: return pieces::KNIGHT_ATTACKS[sq];
+            case BISHOP: return pieces::Bishop::attacks(sq, occ);
+            case ROOK:   return pieces::Rook::attacks(sq, occ);
+            case QUEEN:  return pieces::Rook::attacks(sq, occ) | pieces::Bishop::attacks(sq, occ);
+            default:     return pieces::KING_ATTACKS[sq];
+        }
+    }
 
     // --- FEN ---
     // False on malformed input, and the board is then left as it was.
@@ -220,6 +231,11 @@ private:
     NNUE::Accumulator& frame(int i) const noexcept { return accFrames[static_cast<size_t>(i & (NNUE::ACC_FRAMES - 1))]; }
     inline void pushAccFrame() noexcept;
     inline void recordAcc(NNUE::AccDelta delta) noexcept;
+    // Logs the threats that `piece` on sq takes part in as appearing (Add) or
+    // vanishing, with the board as it stands and the piece on sq.
+    template<bool Add> inline void recordThreats(uint8_t piece, uint8_t sq) noexcept;
+    // Perspective p's threat values of the current position, from nothing.
+    void computeThreats(int16_t* row, int p, int flip) const noexcept;
 
     // --- Private helpers: move execution ---
     // Record: doMove logs the change in the new frame; undoMove only pops it.

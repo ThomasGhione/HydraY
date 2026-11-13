@@ -23,6 +23,7 @@ bool accumulatorMatchesScratch(const chess::Board& b, const char* context, int g
     const Accumulator& inc = b.accumulator();
     const Accumulator& ref = scratch.accumulator();
     const bool same = std::memcmp(inc.v, ref.v, sizeof(inc.v)) == 0
+                   && std::memcmp(inc.threat, ref.threat, sizeof(inc.threat)) == 0
                    && inc.base[0] == ref.base[0] && inc.base[1] == ref.base[1]
                    && inc.flip[0] == ref.flip[0] && inc.flip[1] == ref.flip[1]
                    && !inc.dirty[0] && !inc.dirty[1];

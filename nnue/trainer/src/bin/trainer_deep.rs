@@ -1,5 +1,10 @@
-// HydraY NNUE: the deep net, (768x4kb_hm -> 1024)x2 -> pairwise -> 1024 -> 16 -> 1,
+// HydraY NNUE: the deep net, (768x4kb_hm + threats -> 1024)x2 -> pairwise -> 1024 -> 16 -> 1,
 // with material-count output buckets on BOTH layers after the feature transformer.
+//
+// THREAT INPUTS (../threats.rs): 70,050 more features, "piece a on s attacks
+// piece v on t", summed into the same 1024 accumulator. Their weights l0t are a
+// matrix of their own: no factoriser, a clip of ±127/QA and a save in i8, so
+// that the engine's accumulator still sees QA-scaled values.
 //
 // One hidden layer, not bullet's 16 -> 32 -> 1 example: the second layer costs
 // little but was never validated on a net this size. Adapted from bullet
@@ -26,9 +31,10 @@
 //   l1b  [OB][16]       f32
 //   l2w  [OB][1][16]    f32           (transposed)
 //   l2b  [OB]           f32
+//   l0t  [70050][1024]  i8   QA=255
 //
-//   OB = 16: 6,557,760 B (a multiple of 64: bullet adds no padding)
-//   OB = 8:  6,425,632 B, padded to 6,425,664
+//   OB = 16: 78,288,960 B (a multiple of 64: bullet adds no padding)
+//   OB = 8:  78,156,832 B, padded to 78,156,864
 //
 // Only l0 and l1w are quantised; the 16 -> 1 tail stays float. sanity_deep.rs is
 // the reference reader, and the C++ must agree with it byte for byte.
@@ -56,7 +62,8 @@
 //   HYDRAY_L1B_INIT         initial l1 bias, default 0 (bullet zeroes it)
 //   HYDRAY_FLOAT_CLIP       weight clip of the float tail l1b, l2w, l2b; default
 //                           bullet's 1.98, which only the quantised layers need
-//   HYDRAY_INIT_NET         start from this quantised net (same layout) instead of
+//   HYDRAY_INIT_NET         start from this quantised net (same layout, or one
+//                           without threats: l0t starts at zero) instead of
 //                           random weights; the run checks it evaluates the same
 //   HYDRAY_REVIVE=1         with HYDRAY_INIT_NET: re-initialise its dead l1 neurons
 //                           (bias HYDRAY_L1B_INIT, default 0.1), see sanity_deep.rs
@@ -66,7 +73,7 @@
 // QAT: bullet's faux_quantise puts a value on the grid of step 1/q in the forward
 // and passes the gradient through unchanged (straight-through). Four places, the
 // four roundings of network_deep.hpp: l0's saved weight (l0w + l0f, which is what
-// the save rounds) and l0b to 1/QA, the pairwise product truncated to 1/QA (the
+// the save rounds), l0t and l0b to 1/QA, the pairwise product truncated to 1/QA (the
 // engine's integer division, nudged by half a step of the float error margin),
 // l1w to 1/QB. The tail stays float. Measured on antidead-160sb, 600k holdout
 // positions, float checkpoint against the engine: l1w rounding 14.8 cp rms, l0
@@ -75,7 +82,8 @@
 use bullet_compiler::tensor::TValue;
 use bullet_lib::{
     game::{
-        inputs::{get_num_buckets, ChessBucketsMirrored},
+        formats::bulletformat::ChessBoard,
+        inputs::{get_num_buckets, ChessBucketsMirrored, SparseInputType},
         outputs::MaterialCount,
     },
     nn::{
@@ -94,6 +102,7 @@ use bullet_lib::{
 #[allow(dead_code)]
 #[path = "sanity_deep.rs"]
 mod sanity_deep;
+use sanity_deep::threats;
 
 const HIDDEN_SIZE: usize = 1024;
 // Width of the hidden layer; the forward's cost scales linearly with it.
@@ -123,6 +132,61 @@ const BUCKET_LAYOUT: [usize; 32] = [
     3, 3, 3, 3,
 ];
 const INPUT_BUCKETS: usize = get_num_buckets(&BUCKET_LAYOUT);
+const PIECE_INPUTS: usize = 768 * INPUT_BUCKETS;
+
+// The piece features of ChessBucketsMirrored, then the threat features from
+// PIECE_INPUTS on. bullet takes the features of the two perspectives in pairs:
+// their threat counts are always equal (a pair of pieces that attack each other
+// is one feature in each perspective, if not always the same one).
+#[derive(Clone, Copy)]
+struct Inputs(ChessBucketsMirrored);
+
+impl SparseInputType for Inputs {
+    type RequiredDataType = ChessBoard;
+
+    fn num_inputs(&self) -> usize {
+        PIECE_INPUTS + threats::FEATURES
+    }
+
+    fn max_active(&self) -> usize {
+        32 + threats::MAX_ACTIVE
+    }
+
+    fn map_features<F: FnMut(usize, usize)>(&self, pos: &ChessBoard, mut f: F) {
+        self.0.map_features(pos, &mut f);
+        let mut lists = [[0usize; threats::MAX_ACTIVE]; 2];
+        let mut counts = [0usize; 2];
+        // The record is stored from the side to move, the opponent's king already in
+        // the opponent's own view.
+        for (i, stm) in [true, false].into_iter().enumerate() {
+            let ksq = if stm { pos.our_ksq() } else { pos.opp_ksq() };
+            let to_view = if stm { 0 } else { 56 } ^ if ksq % 8 > 3 { 7 } else { 0 };
+            let mut board = [threats::NONE; 64];
+            let mut occ = 0u64;
+            for (piece, sq) in pos.into_iter() {
+                let sq = usize::from(sq) ^ to_view;
+                board[sq] = (usize::from((piece & 8 != 0) == stm) * 6 + usize::from(piece & 7)) as u8;
+                occ |= 1 << sq;
+            }
+            threats::map(&board, occ, |feature| {
+                lists[i][counts[i]] = feature;
+                counts[i] += 1;
+            });
+        }
+        assert_eq!(counts[0], counts[1], "threat counts differ between the perspectives");
+        for k in 0..counts[0] {
+            f(PIECE_INPUTS + lists[0][k], PIECE_INPUTS + lists[1][k]);
+        }
+    }
+
+    fn shorthand(&self) -> String {
+        format!("{}+threats", self.0.shorthand())
+    }
+
+    fn description(&self) -> String {
+        "King bucketed, mirrored piece inputs with threat inputs".to_string()
+    }
+}
 
 const SANITY_FENS: [(&str, &str); 5] = [
     ("startpos (w)", "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w - - 0 1"),
@@ -190,7 +254,7 @@ fn main() {
         .and_then(|s| s.parse().ok())
         .unwrap_or(superbatches);
     // The notebook checks this line against the arm it means to train.
-    println!("trainer_deep: {HIDDEN_SIZE} -> {L1_SIZE} -> 1, {OUTPUT_BUCKETS} output buckets");
+    println!("trainer_deep: 768x{INPUT_BUCKETS}hm + threats -> {HIDDEN_SIZE} -> {L1_SIZE} -> 1, {OUTPUT_BUCKETS} output buckets");
 
     let lr_kind: String = env_or("HYDRAY_LR", "step".to_string());
     let lr_start: f32 = env_or("HYDRAY_LR_START", 0.001);
@@ -232,7 +296,7 @@ fn main() {
     let mut trainer = ValueTrainerBuilder::default()
         .dual_perspective()
         .optimiser(AdamW)
-        .inputs(ChessBucketsMirrored::new(BUCKET_LAYOUT))
+        .inputs(Inputs(ChessBucketsMirrored::new(BUCKET_LAYOUT)))
         .output_buckets(MaterialCount::<OUTPUT_BUCKETS>)
         .save_format(&[
             SavedFormat::id("l0w")
@@ -249,6 +313,7 @@ fn main() {
             SavedFormat::id("l1b"),
             SavedFormat::id("l2w").transpose(),
             SavedFormat::id("l2b"),
+            SavedFormat::id("l0t").round().quantise::<i8>(QA),
         ])
         .loss_fn(if pow25 {
             |output, target| output.sigmoid().power_error(target, 2.5)
@@ -261,19 +326,28 @@ fn main() {
             let l0f_init = init.as_ref().map_or(InitSettings::Zeroed, |n| custom(&n.l0f));
             let l0f = builder.new_weights("l0f", Shape::new(HIDDEN_SIZE, 768), l0f_init);
             let mut l0 = match &init {
-                Some(n) => affine(builder, "l0", 768 * INPUT_BUCKETS, HIDDEN_SIZE, custom(&n.l0w), custom(&n.l0b)),
+                Some(n) => affine(builder, "l0", PIECE_INPUTS, HIDDEN_SIZE, custom(&n.l0w), custom(&n.l0b)),
                 None => {
-                    let l0 = builder.new_affine("l0", 768 * INPUT_BUCKETS, HIDDEN_SIZE);
+                    let l0 = builder.new_affine("l0", PIECE_INPUTS, HIDDEN_SIZE);
                     l0.init_with_effective_input_size(32);
                     l0
                 }
             };
+            let l0t_init = init.as_ref().map_or(InitSettings::Zeroed, |n| custom(&n.l0t));
+            let mut l0t = builder.new_weights("l0t", Shape::new(HIDDEN_SIZE, threats::FEATURES), l0t_init);
             l0.weights = l0.weights + l0f.repeat(INPUT_BUCKETS);
             let (qa, qb) = (QA as f32, QB as f32);
             if qat {
                 l0.weights = l0.weights.faux_quantise(qa, true);
                 l0.bias = l0.bias.faux_quantise(qa, true);
+                l0t = l0t.faux_quantise(qa, true);
             }
+            // The threat columns after the piece columns: bullet keeps a matrix
+            // column-major, so that is the two buffers end to end.
+            l0.weights = l0.weights
+                .reshape((HIDDEN_SIZE * PIECE_INPUTS, 1))
+                .concat(l0t.reshape((HIDDEN_SIZE * threats::FEATURES, 1)))
+                .reshape((HIDDEN_SIZE, PIECE_INPUTS + threats::FEATURES));
 
             // l1's inputs are all >= 0, so with a zero bias a neuron can fall below
             // zero for every input and never fire again: HYDRAY_L1B_INIT.
@@ -318,6 +392,8 @@ fn main() {
     let stricter = AdamWParams { max_weight: 0.99, min_weight: -0.99, ..Default::default() };
     trainer.optimiser.set_params_for_weight("l0w", stricter);
     trainer.optimiser.set_params_for_weight("l0f", stricter);
+    let threat_clip = f32::from(i8::MAX) / f32::from(QA);
+    trainer.optimiser.set_params_for_weight("l0t", AdamWParams { max_weight: threat_clip, min_weight: -threat_clip, ..Default::default() });
     let float_tail = AdamWParams { max_weight: float_clip, min_weight: -float_clip, ..Default::default() };
     for id in ["l1b", "l2w", "l2b"] {
         trainer.optimiser.set_params_for_weight(id, float_tail);
@@ -338,7 +414,8 @@ fn main() {
     };
 
     let settings = LocalSettings {
-        threads: 2,
+        // Finding the threats makes preparing a batch CPU work worth spreading.
+        threads: std::thread::available_parallelism().map_or(2, |n| n.get().clamp(2, 8)),
         test_set: None, // not implemented by bullet at the pinned rev: see trainer.rs
         output_directory: "checkpoints",
         batch_queue_size: 64,
@@ -367,5 +444,38 @@ fn main() {
     println!("=== sanity evals (stm-relative) ===");
     for (label, fen) in SANITY_FENS {
         println!("{label}: {}", trainer.eval(fen));
+    }
+}
+
+// The inputs bullet trains on must be the oracle's: cargo test --features train --bin trainer_deep
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn inputs_match_the_oracle() {
+        let extra = [
+            "r2q1rk1/pp1nbppp/2p1pn2/3p4/2PP1B2/2N1PN2/PP3PPP/R2QKB1R b KQ - 0 1",
+            "8/5k2/3p4/2pPp3/2P1P3/5K2/8/8 b - - 0 1",
+            "4r1k1/1q3ppp/8/3Q4/8/6P1/5PKP/4R3 w - - 0 1",
+            "2kr3r/ppp2ppp/2n5/2b1q3/4n3/2N2N2/PPPBQPPP/R3K2R w KQ - 0 1",
+        ];
+        for fen in SANITY_FENS.iter().map(|(_, fen)| *fen).chain(extra) {
+            let pos: ChessBoard = format!("{fen} | 0 | 0.5").parse().unwrap();
+            let (mut stm, mut ntm) = (Vec::new(), Vec::new());
+            Inputs(ChessBucketsMirrored::new(BUCKET_LAYOUT)).map_features(&pos, |s, n| {
+                stm.push(s);
+                ntm.push(n);
+            });
+            let (mut us, mut them, _) = sanity_deep::features(OUTPUT_BUCKETS, fen);
+            let (us_threats, them_threats) = sanity_deep::threat_features(fen);
+            us.extend(us_threats.iter().map(|f| PIECE_INPUTS + f));
+            them.extend(them_threats.iter().map(|f| PIECE_INPUTS + f));
+            for list in [&mut stm, &mut ntm, &mut us, &mut them] {
+                list.sort_unstable();
+            }
+            assert!(us_threats.len() > 4, "{fen}: too few threats to test anything");
+            assert_eq!((stm, ntm), (us, them), "{fen}");
+        }
     }
 }

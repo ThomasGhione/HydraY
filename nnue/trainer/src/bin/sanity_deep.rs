@@ -2,9 +2,10 @@
 // trainer_deep.rs: it is the ORACLE. The C++ must agree with this file, not the
 // other way round.
 //
-// Net: (768x4kb_hm -> 1024)x2 -> pairwise -> 1024 -> 16 -> 1, with OB
+// Net: (768x4kb_hm + threats -> 1024)x2 -> pairwise -> 1024 -> 16 -> 1, with OB
 // material-count output buckets on l1 and l2. QA=255 QB=64 SCALE=400. OB is 16
-// or 8, recognised by the file size; the inputs are those of sanity.rs.
+// or 8, and the threat inputs (../threats.rs) present or not, recognised by
+// the file size; the piece inputs are those of sanity.rs.
 //
 // LAYOUT (little-endian, save_format order, padded to 64 B with "bullet"):
 //
@@ -15,10 +16,12 @@
 //   + OB*16384          l1b [OB][16]           f32    real
 //   + OB*64             l2w [OB][1][16]        f32    real
 //   + OB*64             l2b [OB]               f32    real
-//   OB = 16: payload and file 6,557,760; OB = 8: payload 6,425,632, file 6,425,664
+//   + OB*4              l0t [70050][1024]      i8     QA     threat nets only
+//   OB = 16: payload 6,557,760; OB = 8: payload 6,425,632; l0t adds 71,731,200
 //
 // ARITHMETIC, the delicate part:
 //
+//   acc[i] = piece accumulator (i16) + threat accumulator (i16), summed in i32
 //   c[i]  = clamp(acc[i], 0, QA)                    QA scale, fits in u8
 //   p[j]  = c[j] * c[j + 512] / QA                  pairwise, back in u8
 //   hl1   = [p_stm (512), p_ntm (512)]              1024 values, QA scale
@@ -28,6 +31,9 @@
 //   cp    = y * SCALE
 //
 // Usage: cargo run -r --bin sanity_deep -- <quantised.bin> [fen... | --init-check]
+
+#[path = "../threats.rs"]
+pub mod threats;
 
 const HIDDEN: usize = 1024;
 const L1_SIZE: usize = 16;
@@ -64,28 +70,28 @@ pub struct Network {
     pub l1b: Vec<f32>,  // [OB * L1]
     pub l2w: Vec<f32>,  // [OB * L1]
     pub l2b: Vec<f32>,  // [OB]
+    pub l0t: Vec<i8>,   // [threats::FEATURES * HIDDEN], empty for a net without threats
 }
 
 pub const L0W: usize = INPUT_BUCKETS * 768 * HIDDEN;
+pub const L0T: usize = threats::FEATURES * HIDDEN;
 
-pub const fn payload(ob: usize) -> usize {
+pub const fn payload(ob: usize, has_threats: bool) -> usize {
     L0W * 2 + HIDDEN * 2 + ob * L1_SIZE * HIDDEN + ob * L1_SIZE * 4 + ob * L1_SIZE * 4 + ob * 4
+        + if has_threats { L0T } else { 0 }
 }
 
 pub fn load(path: &str) -> Network {
     let bytes = std::fs::read(path).unwrap_or_else(|e| panic!("cannot read {path}: {e}"));
-    let ob = OUTPUT_BUCKET_COUNTS
-        .into_iter()
-        .find(|&ob| bytes.len() == payload(ob).div_ceil(64) * 64)
+    let layouts = OUTPUT_BUCKET_COUNTS.into_iter().flat_map(|ob| [(ob, true), (ob, false)]);
+    let (ob, has_threats) = layouts
+        .clone()
+        .find(|&(ob, t)| bytes.len() == payload(ob, t).div_ceil(64) * 64)
         .unwrap_or_else(|| {
-            panic!(
-                "size mismatch: got {} bytes, expected {} (16 buckets) or {} (8 buckets)",
-                bytes.len(),
-                payload(16).div_ceil(64) * 64,
-                payload(8).div_ceil(64) * 64
-            )
+            let sizes: Vec<_> = layouts.map(|(ob, t)| payload(ob, t).div_ceil(64) * 64).collect();
+            panic!("size mismatch: got {} bytes, expected one of {sizes:?}", bytes.len())
         });
-    let end = payload(ob);
+    let end = payload(ob, has_threats);
     // bullet fills the tail with "bullet" repeated: anything else means the
     // layout has drifted.
     assert!(
@@ -120,9 +126,12 @@ pub fn load(path: &str) -> Network {
     let l1b = f32s(ob * L1_SIZE, &mut off);
     let l2w = f32s(ob * L1_SIZE, &mut off);
     let l2b = f32s(ob, &mut off);
+    let l0t_len = if has_threats { L0T } else { 0 };
+    let l0t: Vec<i8> = bytes[off..off + l0t_len].iter().map(|&b| b as i8).collect();
+    off += l0t_len;
     assert_eq!(off, end, "parsing did not consume exactly the payload");
 
-    Network { ob, l0w, l0b, l1w, l1b, l2w, l2b }
+    Network { ob, l0w, l0b, l1w, l1b, l2w, l2b, l0t }
 }
 
 fn screlu_f32(x: f32) -> f32 {
@@ -130,9 +139,8 @@ fn screlu_f32(x: f32) -> f32 {
     y * y
 }
 
-/// The active features of both perspectives and the output bucket (of `ob`), from
-/// the FEN. Identical to sanity.rs: the part the two architectures share.
-pub fn features(ob: usize, fen: &str) -> (Vec<usize>, Vec<usize>, usize) {
+/// The pieces of a FEN as (type, black, square), the side to move and the king squares.
+fn parse(fen: &str) -> (Vec<(usize, bool, usize)>, bool, usize, usize) {
     let mut fields = fen.split_whitespace();
     let board = fields.next().expect("empty FEN");
     let black_to_move = fields.next() == Some("b");
@@ -161,14 +169,21 @@ pub fn features(ob: usize, fen: &str) -> (Vec<usize>, Vec<usize>, usize) {
         }
     }
     assert!(wk != usize::MAX && bk != usize::MAX, "FEN without both kings");
+    (pieces, black_to_move, wk, bk)
+}
 
-    let params = |from_black_view: bool| {
-        let own = if from_black_view { bk ^ 56 } else { wk };
-        let flip = if own % 8 > 3 { 7 } else { 0 };
-        (768 * king_bucket(own), flip)
-    };
-    let (us_base, us_flip) = params(black_to_move);
-    let (them_base, them_flip) = params(!black_to_move);
+/// Bucket base and file mirror of the perspective of black (or white), from its king.
+fn king_params(from_black_view: bool, wk: usize, bk: usize) -> (usize, usize) {
+    let own = if from_black_view { bk ^ 56 } else { wk };
+    (768 * king_bucket(own), if own % 8 > 3 { 7 } else { 0 })
+}
+
+/// The active features of both perspectives and the output bucket (of `ob`), from
+/// the FEN. Identical to sanity.rs: the part the two architectures share.
+pub fn features(ob: usize, fen: &str) -> (Vec<usize>, Vec<usize>, usize) {
+    let (pieces, black_to_move, wk, bk) = parse(fen);
+    let (us_base, us_flip) = king_params(black_to_move, wk, bk);
+    let (them_base, them_flip) = king_params(!black_to_move, wk, bk);
 
     let mut us = Vec::with_capacity(pieces.len());
     let mut them = Vec::with_capacity(pieces.len());
@@ -189,33 +204,60 @@ pub fn features(ob: usize, fen: &str) -> (Vec<usize>, Vec<usize>, usize) {
     (us, them, out_bucket)
 }
 
-/// The two perspectives' accumulators and the output bucket (of `ob`), from the FEN.
-pub fn accumulate(net_l0w: &[i16], net_l0b: &[i16], ob: usize, fen: &str) -> (Vec<i16>, Vec<i16>, usize) {
-    let (us, them, out_bucket) = features(ob, fen);
-    let sum = |list: &[usize]| {
-        let mut acc = net_l0b.to_vec();
+/// The active threat features of both perspectives (side to move first), from the FEN.
+pub fn threat_features(fen: &str) -> (Vec<usize>, Vec<usize>) {
+    let (pieces, black_to_move, wk, bk) = parse(fen);
+    let view = |from_black_view: bool| {
+        let (_, flip) = king_params(from_black_view, wk, bk);
+        let mut board = [threats::NONE; 64];
+        let mut occ = 0u64;
+        for &(piece_type, is_black_piece, sq) in &pieces {
+            let sq_view = (if from_black_view { sq ^ 56 } else { sq }) ^ flip;
+            board[sq_view] = (usize::from(is_black_piece != from_black_view) * 6 + piece_type) as u8;
+            occ |= 1 << sq_view;
+        }
+        let mut list = Vec::new();
+        threats::map(&board, occ, |f| list.push(f));
+        list
+    };
+    (view(black_to_move), view(!black_to_move))
+}
+
+/// The two perspectives' accumulators, threats included, and the output bucket
+/// (of `ob`), from the FEN. The pieces' part is summed in i16, as in the engine.
+pub fn accumulate(net: &Network, fen: &str) -> (Vec<i32>, Vec<i32>, usize) {
+    let (us, them, out_bucket) = features(net.ob, fen);
+    let (us_threats, them_threats) = if net.l0t.is_empty() { Default::default() } else { threat_features(fen) };
+    let sum = |list: &[usize], threat_list: &[usize]| {
+        let mut acc = net.l0b.clone();
         for &f in list {
-            for (a, w) in acc.iter_mut().zip(&net_l0w[f * HIDDEN..(f + 1) * HIDDEN]) {
-                *a += *w;
+            for (a, w) in acc.iter_mut().zip(&net.l0w[f * HIDDEN..(f + 1) * HIDDEN]) {
+                *a = a.wrapping_add(*w);
+            }
+        }
+        let mut acc: Vec<i32> = acc.into_iter().map(i32::from).collect();
+        for &f in threat_list {
+            for (a, w) in acc.iter_mut().zip(&net.l0t[f * HIDDEN..(f + 1) * HIDDEN]) {
+                *a += i32::from(*w);
             }
         }
         acc
     };
-    (sum(&us), sum(&them), out_bucket)
+    (sum(&us, &us_threats), sum(&them, &them_threats), out_bucket)
 }
 
-/// CReLU + pairwise product: 1024 i16 values -> 512 values in [0, QA].
-fn pairwise(acc: &[i16], out: &mut [i32]) {
+/// CReLU + pairwise product: 1024 accumulators -> 512 values in [0, QA].
+fn pairwise(acc: &[i32], out: &mut [i32]) {
     let half = HIDDEN / 2;
     for j in 0..half {
-        let a = i32::from(acc[j]).clamp(0, QA);
-        let b = i32::from(acc[j + half]).clamp(0, QA);
+        let a = acc[j].clamp(0, QA);
+        let b = acc[j + half].clamp(0, QA);
         out[j] = a * b / QA;
     }
 }
 
 pub fn evaluate(net: &Network, fen: &str) -> i32 {
-    let (acc_us, acc_them, ob) = accumulate(&net.l0w, &net.l0b, net.ob, fen);
+    let (acc_us, acc_them, ob) = accumulate(net, fen);
 
     let half = HIDDEN / 2;
     let mut hl1 = vec![0i32; HIDDEN];
@@ -258,6 +300,7 @@ pub struct BulletInit {
     pub l1b: Vec<f32>, // [OB*L1]
     pub l2w: Vec<f32>, // [L1][OB]
     pub l2b: Vec<f32>, // [OB]
+    pub l0t: Vec<f32>, // [threats::FEATURES][HIDDEN], zero for a net without threats
     pub clipped: usize, // l0 values past the trainer's ±0.99 clip
     pub revived: usize,
 }
@@ -342,7 +385,8 @@ pub fn to_bullet(net: &Network, revive_bias: Option<f32>) -> BulletInit {
     }
 
     let l0b = net.l0b.iter().map(|&w| f32::from(w) / qa).collect();
-    BulletInit { ob: net.ob, l0w, l0f, l0b, l1w, l1b, l2w, l2b: net.l2b.clone(), clipped, revived }
+    let l0t = if net.l0t.is_empty() { vec![0.0; L0T] } else { net.l0t.iter().map(|&w| f32::from(w) / qa).collect() };
+    BulletInit { ob: net.ob, l0w, l0f, l0b, l1w, l1b, l2w, l2b: net.l2b.clone(), l0t, clipped, revived }
 }
 
 /// Under QAT, added to the pairwise product before it is truncated. The exact
@@ -365,14 +409,20 @@ fn faux(x: f32, q: i32, round: bool) -> f32 {
 /// the quantised net's arithmetic in float.
 pub fn evaluate_bullet(b: &BulletInit, fen: &str, qat: bool) -> f32 {
     let (us, them, ob) = features(b.ob, fen);
+    let (us_threats, them_threats) = threat_features(fen);
     let half = HIDDEN / 2;
     let q = |x: f32, scale: i32, round: bool| if qat { faux(x, scale, round) } else { x };
-    let ft = |list: &[usize]| -> Vec<f32> {
+    let ft = |list: &[usize], threat_list: &[usize]| -> Vec<f32> {
         let mut acc: Vec<f32> = b.l0b.iter().map(|&w| q(w, QA, true)).collect();
         for &f in list {
             let (w, fac) = (&b.l0w[f * HIDDEN..(f + 1) * HIDDEN], &b.l0f[(f % 768) * HIDDEN..(f % 768 + 1) * HIDDEN]);
             for h in 0..HIDDEN {
                 acc[h] += q(w[h] + fac[h], QA, true);
+            }
+        }
+        for &f in threat_list {
+            for (a, &w) in acc.iter_mut().zip(&b.l0t[f * HIDDEN..(f + 1) * HIDDEN]) {
+                *a += q(w, QA, true);
             }
         }
         (0..half)
@@ -382,7 +432,7 @@ pub fn evaluate_bullet(b: &BulletInit, fen: &str, qat: bool) -> f32 {
             })
             .collect()
     };
-    let hl1: Vec<f32> = ft(&us).into_iter().chain(ft(&them)).collect();
+    let hl1: Vec<f32> = ft(&us, &us_threats).into_iter().chain(ft(&them, &them_threats)).collect();
 
     let n1 = b.ob * L1_SIZE;
     let mut y = b.l2b[ob];
@@ -398,7 +448,13 @@ fn main() {
     let args: Vec<String> = std::env::args().collect();
     let path = args.get(1).map(String::as_str).unwrap_or("quantised.bin");
     let net = load(path);
-    println!("{path}: layout OK ({} output buckets, {} B payload)", net.ob, payload(net.ob));
+    let has_threats = !net.l0t.is_empty();
+    println!(
+        "{path}: layout OK ({} output buckets, {}threat inputs, {} B payload)",
+        net.ob,
+        if has_threats { "" } else { "no " },
+        payload(net.ob, has_threats)
+    );
     println!("dead l1 neurons (all-zero rows) per output bucket: {:?}", dead_rows(&net));
 
     let default_fens = [

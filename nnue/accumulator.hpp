@@ -1,9 +1,11 @@
 #pragma once
 
-// Dual-perspective NNUE accumulator: v[0] = white's view, v[1] = black's view.
+// Dual-perspective NNUE accumulator: v[0] = white's view, v[1] = black's view,
+// and the same for the threat inputs in threat[], which the forward adds.
 //
 // Every feature of perspective p depends on the bucket and flip of p's own
-// king, its basis (base = 768 * bucket, flip). Board keeps one accumulator per
+// king, its basis (base = 768 * bucket, flip); a threat feature on the flip
+// alone. Board keeps one accumulator per
 // position along the current line, a frame: doMove pushes a frame holding the
 // move's feature changes, undoMove pops it, and the values are computed only
 // when something reads them, from the nearest computed ancestor under the
@@ -26,8 +28,21 @@ struct AccDelta {
     uint8_t to;     // Move only
 };
 
+// A threat that appears or vanishes with a move, in Board's pieces and squares.
+struct ThreatDelta {
+    uint8_t attacker;
+    uint8_t from;
+    uint8_t victim;
+    uint8_t to;
+    bool    add;
+};
+
 // A move changes at most four features: a promotion capture.
 inline constexpr int ACC_MAX_DELTAS = 4;
+// Threats change by the dozen. A move that changes more leaves its frame's
+// list at ACC_THREATS_OVERFLOW, and the frames after it start from scratch.
+inline constexpr int ACC_MAX_THREATS = 64;
+inline constexpr uint8_t ACC_THREATS_OVERFLOW = 255;
 // Frames in Board's ring: a power of two, at least MAX_PLY (a search line
 // longer than the ring would overwrite its own ancestors).
 inline constexpr int ACC_FRAMES = 128;
@@ -37,12 +52,15 @@ inline constexpr int ACC_MAX_WALK = 8;
 
 struct alignas(64) Accumulator {
     int16_t v[2][HIDDEN];
+    int16_t threat[2][HIDDEN];
     int32_t base[2];   // 768 * king bucket, per perspective
     uint8_t flip[2];   // 0 or 7 (file mirror), per perspective
-    bool    dirty[2];  // true = v[p] not computed for this position yet
+    bool    dirty[2];  // true = v[p] and threat[p] not computed for this position yet
     // The move from the previous frame, in the same cache line as the flags.
     uint8_t  ndelta;
     AccDelta delta[ACC_MAX_DELTAS];
+    uint8_t     nthreat;
+    ThreatDelta threatDelta[ACC_MAX_THREATS];
 
     // Both perspectives in one traversal of the rows, writing d0/d1 from
     // s0/s1 (another frame) when From, in place otherwise (s0/s1 unused).
@@ -78,6 +96,10 @@ struct alignas(64) Accumulator {
         return activeNetwork->l0w[rowBase + (feat768 ^ rowFlip)];
     }
 
+    [[nodiscard]] static inline const int8_t* threatRow(int feature) noexcept {
+        return activeNetwork->l0t.get() + static_cast<size_t>(feature) * HIDDEN;
+    }
+
     // Single-row counterpart of fusePair.
     template<int NS, int NA, bool From = false>
     static inline void fuseRows(int16_t* __restrict row, const int16_t* __restrict src,
@@ -111,6 +133,25 @@ struct alignas(64) Accumulator {
             }
             si += s;
             ai += a;
+        }
+    }
+
+    // row = src (zero when null) - sub + add, over threat rows of i8 weights.
+    // Any number of rows costs one pass over the destination: each tile of it
+    // stays in registers while every row is added in.
+    static inline void applyThreatRows(int16_t* __restrict row, const int16_t* __restrict src,
+                                       const int8_t* const* sub, int ns,
+                                       const int8_t* const* add, int na) noexcept {
+        constexpr int TILE = 64;
+        static_assert(HIDDEN % TILE == 0);
+        for (int b = 0; b < HIDDEN; b += TILE) {
+            int16_t x[TILE];
+            for (int i = 0; i < TILE; ++i) x[i] = src != nullptr ? src[b + i] : 0;
+            for (int k = 0; k < ns; ++k)
+                for (int i = 0; i < TILE; ++i) x[i] = static_cast<int16_t>(x[i] - sub[k][b + i]);
+            for (int k = 0; k < na; ++k)
+                for (int i = 0; i < TILE; ++i) x[i] = static_cast<int16_t>(x[i] + add[k][b + i]);
+            for (int i = 0; i < TILE; ++i) row[b + i] = x[i];
         }
     }
 

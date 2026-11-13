@@ -86,7 +86,7 @@ struct Evaluator {
     const ShallowNet*  shallow = nullptr;
 
     [[nodiscard]] int32_t eval(const int16_t* us, const int16_t* them, int bucket) const noexcept {
-        if (deep != nullptr) return forwardSimd(*deep, us, them, bucket);
+        if (deep != nullptr) return forwardSimd(*deep, us, them, NO_THREATS, NO_THREATS, bucket);
         const int sb = bucket / (OUTPUT_BUCKETS / SHALLOW_OUTPUT_BUCKETS);
         int32_t out = shallowHalf(us, shallow->outputWeights[sb][0])
                     + shallowHalf(them, shallow->outputWeights[sb][1]);
@@ -235,7 +235,7 @@ bool selfcheck(const Evaluator& ev, const std::string& path, uint64_t n) {
         const int bucket = accumulateRecord(*ev.l0, r, accUs.data(), accThem.data());
         const int32_t simd = ev.eval(accUs.data(), accThem.data(), bucket);
         if (ev.deep != nullptr) {
-            const int32_t scal = forwardScalar(*ev.deep, accUs.data(), accThem.data(), bucket);
+            const int32_t scal = forwardScalar(*ev.deep, accUs.data(), accThem.data(), NO_THREATS, NO_THREATS, bucket);
             if (simd != scal) {
                 std::fprintf(stderr, "record %llu: simd %d != scalar %d\n",
                              static_cast<unsigned long long>(i), simd, scal);
@@ -308,9 +308,9 @@ int main(int argc, char** argv) {
 
         // The per-bucket table always has OUTPUT_BUCKETS rows: with a legacy
         // net, consecutive rows share a head but still split the piece counts.
-        if (bucketsForFileSize(netBytes) != 0) {
-            if (!loadFromFile(netPath.c_str(), net)) {
-                std::fprintf(stderr, "cannot load deep net: %s\n", netPath.c_str());
+        if (layoutForFileSize(netBytes).buckets != 0) {
+            if (!loadFromFile(netPath.c_str(), net) || net.fileThreats) {
+                std::fprintf(stderr, "cannot load deep net (threat inputs are not supported here): %s\n", netPath.c_str());
                 return 1;
             }
             ev.l0 = &net;
@@ -341,8 +341,8 @@ int main(int argc, char** argv) {
             std::printf("format:  single layer (1024 -> 1)\n");
         } else {
             std::fprintf(stderr, "%s: %zu bytes is no known format (%zu or %zu deep, %zu single)\n",
-                         netPath.c_str(), netBytes, fileBytes(OUTPUT_BUCKETS),
-                         fileBytes(LEGACY_OUTPUT_BUCKETS), SHALLOW_PAYLOAD_BYTES);
+                         netPath.c_str(), netBytes, fileBytes(OUTPUT_BUCKETS, false),
+                         fileBytes(LEGACY_OUTPUT_BUCKETS, false), SHALLOW_PAYLOAD_BYTES);
             return 1;
         }
     }

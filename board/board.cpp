@@ -225,6 +225,20 @@ inline void syncRow(const Board& b, int16_t* row, uint64_t (&cached)[2][6], int 
 
 } // namespace
 
+void Board::computeThreats(int16_t* row, int p, int flip) const noexcept {
+    const int8_t* add[NNUE::MAX_ACTIVE_THREATS];
+    int na = 0;
+    for (uint64_t attackers = occupancy; attackers; ) {
+        const auto from = static_cast<uint8_t>(pieces::popLSB(attackers));
+        for (uint64_t victims = attacksFrom(get(from), from, occupancy) & occupancy; victims; ) {
+            const auto to = static_cast<uint8_t>(pieces::popLSB(victims));
+            if (const int feature = NNUE::threatFeature(p, flip, get(from), from, get(to), to); feature >= 0)
+                add[na++] = NNUE::Accumulator::threatRow(feature);
+        }
+    }
+    NNUE::Accumulator::applyThreatRows(row, nullptr, nullptr, 0, add, na);
+}
+
 // From-scratch rebuild of the current frame, which becomes the oldest one of
 // the line: a diff from the empty board, whose values are the bias.
 // rebuildBitboardsFromSquares sets the bitboards directly (NOT through
@@ -234,6 +248,7 @@ void Board::refreshNnueAccumulator() noexcept {
     accFloor = accTop;
     NNUE::Accumulator& acc = frame(accTop);
     acc.ndelta = 0;
+    acc.nthreat = 0;
     // No kings (unit-test fragments, mid-load states): no values; evaluation
     // is guarded upstream by the kings-missing check.
     acc.dirty[0] = acc.dirty[1] = true;
@@ -246,6 +261,7 @@ void Board::refreshNnueAccumulator() noexcept {
         uint64_t empty[2][6] = {};
         std::memcpy(acc.v[p], NNUE::activeNetwork->l0b, sizeof(acc.v[p]));
         syncRow(*this, acc.v[p], empty, p, acc.base[p], acc.flip[p]);
+        computeThreats(acc.threat[p], p, acc.flip[p]);
     }
 }
 
@@ -253,10 +269,12 @@ void Board::refreshNnueAccumulator() noexcept {
 // ACC_MAX_WALK moves back, is a valid start for a perspective whose king still
 // stands on the same basis: the changes logged since sum to the feature
 // difference whatever the king did in between. Rows that appear on both sides
-// cancel, and int16 is modular, so the rest applies in any order. A
-// perspective without such a start is rebuilt as a diff against the Finny
-// table. Called from consistent-board points only (NNUE::evaluate, a copy,
-// the selftest), never mid-doMove.
+// cancel, and int16 is modular, so the rest applies in any order. The same
+// holds for the threats under the same flip alone, unless a move in between
+// logged too many. A perspective without such a start is rebuilt as a diff
+// against the Finny table, and its threats from nothing. Called from
+// consistent-board points only (NNUE::evaluate, a copy, the selftest), never
+// mid-doMove.
 __attribute__((hot))
 void Board::ensureNnueAccumulatorClean() const noexcept {
     if (NNUE::activeNetwork == nullptr) return;
@@ -279,11 +297,44 @@ void Board::ensureNnueAccumulatorClean() const noexcept {
             break;
         }
     }
+    const int origin = from;
     bool usable[2] = {false, false};
+    bool threatsUsable[2] = {false, false};
     if (from >= 0) {
+        bool threatsLogged = true;
+        for (int i = from + 1; i <= accTop; ++i) threatsLogged &= frame(i).nthreat != NNUE::ACC_THREATS_OVERFLOW;
         const NNUE::Accumulator& src = frame(from);
-        for (int p = 0; p < 2; ++p) usable[p] = src.base[p] == rowBase[p] && src.flip[p] == rowFlip[p];
+        for (int p = 0; p < 2; ++p) {
+            threatsUsable[p] = threatsLogged && src.flip[p] == rowFlip[p];
+            usable[p] = threatsUsable[p] && src.base[p] == rowBase[p];
+        }
     }
+
+    // Perspective p's threats of frame `target` from those of frame `start`.
+    // A row added and removed on the way is 1 KiB not read twice.
+    const auto incrementalThreats = [&](int p, int start, int target) __attribute__((hot)) {
+        constexpr int CAP = NNUE::ACC_MAX_WALK * NNUE::ACC_MAX_THREATS;
+        const int8_t* sub[CAP];
+        const int8_t* add[CAP];
+        int ns = 0;
+        int na = 0;
+        for (int i = start + 1; i <= target; ++i) {
+            const NNUE::Accumulator& f = frame(i);
+            for (int k = 0; k < f.nthreat; ++k) {
+                const NNUE::ThreatDelta& d = f.threatDelta[k];
+                const int feature = NNUE::threatFeature(p, rowFlip[p], d.attacker, d.from, d.victim, d.to);
+                if (feature >= 0) (d.add ? add[na++] : sub[ns++]) = NNUE::Accumulator::threatRow(feature);
+            }
+        }
+        for (int i = 0; i < ns; ) {
+            int j = 0;
+            while (j < na && add[j] != sub[i]) ++j;
+            if (j == na) { ++i; continue; }
+            sub[i] = sub[--ns];
+            add[j] = add[--na];
+        }
+        NNUE::Accumulator::applyThreatRows(frame(target).threat[p], frame(start).threat[p], sub, ns, add, na);
+    };
 
     // Frame `target` from frame `start` for the usable perspectives, through
     // the changes logged in the frames between.
@@ -347,6 +398,8 @@ void Board::ensureNnueAccumulatorClean() const noexcept {
             for (int k = 0; k < na; ++k) addRow[k] = row(p, add[k]);
             NNUE::Accumulator::applyRows(dst.v[p], subRow, ns, addRow, na, src.v[p]);
         }
+        for (int p = 0; p < 2; ++p)
+            if (usable[p]) incrementalThreats(p, start, target);
     };
 
     if (usable[0] || usable[1]) {
@@ -390,6 +443,8 @@ void Board::ensureNnueAccumulatorClean() const noexcept {
         NNUE::FinnyEntry& e = finny.entry[p][NNUE::KING_BUCKET_MAP[kingView[p]]][rowFlip[p] ? 1 : 0];
         syncRow(*this, e.v, e.bb, p, rowBase[p], rowFlip[p]);
         std::memcpy(top.v[p], e.v, sizeof(e.v));
+        if (threatsUsable[p]) incrementalThreats(p, origin, accTop);
+        else computeThreats(top.threat[p], p, rowFlip[p]);
     }
 }
 

@@ -23,12 +23,12 @@ namespace {
     return static_cast<int32_t>(std::lround(y * net.outputScale));
 }
 
-// CReLU + pairwise product: 1024 i16 accumulators -> 512 values in [0, QA].
-// The division by QA is integer and truncating, as in sanity_deep.rs.
-inline void pairwise(const int16_t* acc, int32_t* out) noexcept {
+// CReLU + pairwise product: 1024 piece + threat accumulators -> 512 values in
+// [0, QA]. The division by QA is integer and truncating, as in sanity_deep.rs.
+inline void pairwise(const int16_t* acc, const int16_t* thr, int32_t* out) noexcept {
     for (int j = 0; j < PAIRWISE_OUT; ++j) {
-        const int32_t a = std::clamp<int32_t>(acc[j], 0, QA);
-        const int32_t b = std::clamp<int32_t>(acc[j + PAIRWISE_OUT], 0, QA);
+        const int32_t a = std::clamp<int32_t>(acc[j] + thr[j], 0, QA);
+        const int32_t b = std::clamp<int32_t>(acc[j + PAIRWISE_OUT] + thr[j + PAIRWISE_OUT], 0, QA);
         out[j] = a * b / QA;
     }
 }
@@ -36,12 +36,12 @@ inline void pairwise(const int16_t* acc, int32_t* out) noexcept {
 } // namespace
 
 int32_t forwardScalar(const NetworkDeep& net,
-                      const int16_t* accStm,
-                      const int16_t* accNtm,
+                      const int16_t* accStm, const int16_t* accNtm,
+                      const int16_t* thrStm, const int16_t* thrNtm,
                       int outputBucket) noexcept {
     int32_t hl1[HIDDEN];
-    pairwise(accStm, hl1);
-    pairwise(accNtm, hl1 + PAIRWISE_OUT);
+    pairwise(accStm, thrStm, hl1);
+    pairwise(accNtm, thrNtm, hl1 + PAIRWISE_OUT);
 
     float a1[L1_SIZE];
     for (int o = 0; o < L1_SIZE; ++o) {
@@ -84,12 +84,19 @@ int32_t forwardScalar(const NetworkDeep& net,
 
 namespace {
 
+// 16 piece + threat accumulators, read with a saturating add: past QA or below
+// zero the clamp gives the same as the exact sum.
+inline __m256i loadSum(const int16_t* acc, const int16_t* thr, int j) noexcept {
+    return _mm256_adds_epi16(_mm256_loadu_si256(reinterpret_cast<const __m256i*>(acc + j)),
+                             _mm256_loadu_si256(reinterpret_cast<const __m256i*>(thr + j)));
+}
+
 // 32 i16 accumulators -> 32 pairwise values in [0, QA], in i16 lanes.
-[[maybe_unused]] inline __m256i pairwiseBlock(const int16_t* acc, int j) noexcept {
+[[maybe_unused]] inline __m256i pairwiseBlock(const int16_t* acc, const int16_t* thr, int j) noexcept {
     const __m256i zero = _mm256_setzero_si256();
     const __m256i qa   = _mm256_set1_epi16(static_cast<int16_t>(QA));
-    const __m256i lo = _mm256_loadu_si256(reinterpret_cast<const __m256i*>(acc + j));
-    const __m256i hi = _mm256_loadu_si256(reinterpret_cast<const __m256i*>(acc + j + PAIRWISE_OUT));
+    const __m256i lo = loadSum(acc, thr, j);
+    const __m256i hi = loadSum(acc, thr, j + PAIRWISE_OUT);
     const __m256i a  = _mm256_min_epi16(_mm256_max_epi16(lo, zero), qa);
     const __m256i b  = _mm256_min_epi16(_mm256_max_epi16(hi, zero), qa);
     const __m256i p  = _mm256_mullo_epi16(a, b);              // <= 65025, exact in u16
@@ -156,11 +163,11 @@ bool hasVnniPath() noexcept {
 }
 
 int32_t forwardSimd(const NetworkDeep& net,
-                    const int16_t* accStm,
-                    const int16_t* accNtm,
+                    const int16_t* accStm, const int16_t* accNtm,
+                    const int16_t* thrStm, const int16_t* thrNtm,
                     int outputBucket) noexcept {
 #if !defined(__AVX2__)
-    return forwardScalar(net, accStm, accNtm, outputBucket);
+    return forwardScalar(net, accStm, accNtm, thrStm, thrNtm, outputBucket);
 #else
     alignas(32) int32_t sums[L1_SIZE];
 
@@ -197,17 +204,14 @@ int32_t forwardSimd(const NetworkDeep& net,
         const __m256i ones  = _mm256_set1_epi8(1);
         const __m128i eight = _mm_set1_epi16(8);
 
-        const auto block = [&](const int16_t* acc, int j) noexcept {
-            // loadu, not load: the accumulators come from outside and the
-            // signature promises no 32-byte alignment. On x86 it costs nothing
-            // when they are aligned anyway, and with `load` a single caller
-            // passing a vector was enough to crash.
-            const auto ld = [](const int16_t* p) noexcept {
-                return _mm256_loadu_si256(reinterpret_cast<const __m256i*>(p));
-            };
-            const __m256i a = _mm256_packus_epi16(ld(acc + j), ld(acc + j + 16));
-            const __m256i b = _mm256_packus_epi16(ld(acc + j + PAIRWISE_OUT),
-                                                 ld(acc + j + PAIRWISE_OUT + 16));
+        // loadSum uses loadu, not load: the accumulators come from outside and
+        // the signature promises no 32-byte alignment. On x86 it costs nothing
+        // when they are aligned anyway, and with `load` a single caller passing
+        // a vector was enough to crash.
+        const auto block = [&](const int16_t* acc, const int16_t* thr, int j) noexcept {
+            const __m256i a = _mm256_packus_epi16(loadSum(acc, thr, j), loadSum(acc, thr, j + 16));
+            const __m256i b = _mm256_packus_epi16(loadSum(acc, thr, j + PAIRWISE_OUT),
+                                                 loadSum(acc, thr, j + PAIRWISE_OUT + 16));
             // unpack per lane: lo covers outputs j..j+15, hi covers j+16..j+31.
             // With a, b in [0, 255], a*b/255 (truncating) equals
             // (257a * (256b + 1)) >> 24, checked for all 65,536 pairs. Both
@@ -240,8 +244,8 @@ int32_t forwardSimd(const NetworkDeep& net,
         uint32_t* dstStm = h32;
         uint32_t* dstNtm = h32 + PAIRWISE_OUT / 4;
         for (int j = 0; j < PAIRWISE_OUT; j += 32) {
-            emit(block(accStm, j), dstStm, baseStm);
-            emit(block(accNtm, j), dstNtm, baseNtm);
+            emit(block(accStm, thrStm, j), dstStm, baseStm);
+            emit(block(accNtm, thrNtm, j), dstNtm, baseNtm);
             dstStm += 8;
             dstNtm += 8;
             baseStm = _mm_add_epi16(baseStm, eight);
@@ -309,8 +313,8 @@ int32_t forwardSimd(const NetworkDeep& net,
     static_assert(L1_SIZE % GROUP == 0, "the loop handles GROUP outputs at a time");
     alignas(32) int16_t h16[HIDDEN];
     for (int j = 0; j < PAIRWISE_OUT; j += 16) {
-        _mm256_store_si256(reinterpret_cast<__m256i*>(h16 + j), pairwiseBlock(accStm, j));
-        _mm256_store_si256(reinterpret_cast<__m256i*>(h16 + PAIRWISE_OUT + j), pairwiseBlock(accNtm, j));
+        _mm256_store_si256(reinterpret_cast<__m256i*>(h16 + j), pairwiseBlock(accStm, thrStm, j));
+        _mm256_store_si256(reinterpret_cast<__m256i*>(h16 + PAIRWISE_OUT + j), pairwiseBlock(accNtm, thrNtm, j));
     }
 
     for (int o = 0; o < L1_SIZE; o += GROUP) {
@@ -335,13 +339,15 @@ int32_t forwardSimd(const NetworkDeep& net,
 }
 
 bool loadFromMemory(const unsigned char* data, size_t size, NetworkDeep& net) noexcept {
-    const int buckets = bucketsForFileSize(size);
+    const FileLayout layout = layoutForFileSize(size);
+    const int buckets = layout.buckets;
+    const bool threats = layout.threats;
     if (buckets == 0) return false;
 
     // The tail is "bullet" repeated: anything else means the layout has
     // drifted, and it is better to find out here than as a net that plays badly
     // for no apparent reason.
-    const size_t payload = payloadBytes(buckets);
+    const size_t payload = payloadBytes(buckets, threats);
     static const char kTag[] = "bullet";
     for (size_t i = payload; i < size; ++i) {
         if (data[i] != static_cast<unsigned char>(kTag[(i - payload) % 6])) return false;
@@ -371,6 +377,11 @@ bool loadFromMemory(const unsigned char* data, size_t size, NetworkDeep& net) no
     heads(net.l2w);
     heads(net.l2b);
     net.fileBuckets = buckets;
+    net.fileThreats = threats;
+    net.l0t = allocateHugePages<int8_t>(THREAT_BYTES);
+    if (net.l0t == nullptr) return false;
+    if (threats) rd(net.l0t.get(), THREAT_BYTES);
+    else std::memset(net.l0t.get(), 0, THREAT_BYTES);
 
     // Derived, not read from the file.
     for (int b = 0; b < OUTPUT_BUCKETS; ++b)
@@ -406,7 +417,7 @@ bool loadFromFile(const char* path, NetworkDeep& net) noexcept {
     if (std::fseek(f, 0, SEEK_END) != 0) { std::fclose(f); return false; }
     const long size = std::ftell(f);
     std::rewind(f);
-    if (size < 0 || bucketsForFileSize(static_cast<size_t>(size)) == 0) {
+    if (size < 0 || layoutForFileSize(static_cast<size_t>(size)).buckets == 0) {
         std::fclose(f);
         return false;
     }

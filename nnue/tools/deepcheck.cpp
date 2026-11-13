@@ -91,7 +91,7 @@ void bench(const NetworkDeep& net, const std::vector<int16_t>& us,
         auto t0 = std::chrono::steady_clock::now();
         for (int i = 0; i < N; ++i) sink = singleLayerForward(us.data(), them.data(), w.data());
         auto t1 = std::chrono::steady_clock::now();
-        for (int i = 0; i < N; ++i) sink = forwardSimd(net, us.data(), them.data(), bucket);
+        for (int i = 0; i < N; ++i) sink = forwardSimd(net, us.data(), them.data(), NO_THREATS, NO_THREATS, bucket);
         auto t2 = std::chrono::steady_clock::now();
         a = std::min(a, std::chrono::duration<double, std::nano>(t1 - t0).count() / N);
         b = std::min(b, std::chrono::duration<double, std::nano>(t2 - t1).count() / N);
@@ -110,12 +110,12 @@ int main(int argc, char** argv) {
         return 2;
     }
     static NetworkDeep net;
-    if (!loadFromFile(argv[1], net)) {
-        std::fprintf(stderr, "cannot load %s\n", argv[1]);
+    if (!loadFromFile(argv[1], net) || net.fileThreats) {
+        std::fprintf(stderr, "cannot load %s (threat inputs are not supported here)\n", argv[1]);
         return 1;
     }
     std::printf("%s: layout OK (%d output buckets, %zu B payload)\n", argv[1],
-                net.fileBuckets, payloadBytes(net.fileBuckets));
+                net.fileBuckets, payloadBytes(net.fileBuckets, false));
 
     std::vector<Case> cases;
     std::vector<std::string> owned;
@@ -133,8 +133,8 @@ int main(int argc, char** argv) {
             std::fprintf(stderr, "invalid FEN: %s\n", c.fen);
             return 1;
         }
-        const int32_t sc = forwardScalar(net, accUs.data(), accThem.data(), bucket);
-        const int32_t sd = forwardSimd(net, accUs.data(), accThem.data(), bucket);
+        const int32_t sc = forwardScalar(net, accUs.data(), accThem.data(), NO_THREATS, NO_THREATS, bucket);
+        const int32_t sd = forwardSimd(net, accUs.data(), accThem.data(), NO_THREATS, NO_THREATS, bucket);
         if (sc != sd) {
             std::fprintf(stderr, "scalar/SIMD MISMATCH on '%s': %d vs %d\n", c.label, sc, sd);
             return 1;
