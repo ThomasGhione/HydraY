@@ -383,6 +383,8 @@ SearchMoveResult searchMoves(Board& b, MovePicker& movePicker, const SearchConte
     const Board::HashPrefetch ttPrefetch{
         runtime.transpositionTable->rawTableBase(),
         runtime.transpositionTable->bucketByteMask(),
+        evalCache.rawBase(),
+        EvalCache::BYTE_MASK,
     };
 
     while (movePicker.hasNext()) {
@@ -727,7 +729,7 @@ int32_t searchPosition(Board& b, SearchRuntime& runtime, int depth, int32_t alph
             // Raw SEE on purpose: PROBCUT_MARGIN was tuned as a material threshold here.
             if (Sorter::staticExchangeEvaluation(b, mc) < PROBCUT_MARGIN) continue;
             Board::MoveState pcState;
-            b.doMove(mc, pcState, {tt.rawTableBase(), tt.bucketByteMask()});
+            b.doMove(mc, pcState, {tt.rawTableBase(), tt.bucketByteMask(), evalCache.rawBase(), EvalCache::BYTE_MASK});
             int32_t pcScore = probcutBound;
             if (depth > 4) pcScore = -quiescenceSearch(b, runtime, -probcutBound, -probcutBound + 1, ply + 1);
             if (pcScore >= probcutBound) {
@@ -850,7 +852,7 @@ int32_t quiescenceSearch(Board& b, SearchRuntime& runtime, int32_t alpha, int32_
             return evaluate(b);
         }
         Board::MoveState state;
-        b.doMove(m, state, {tt.rawTableBase(), tt.bucketByteMask()});
+        b.doMove(m, state, {tt.rawTableBase(), tt.bucketByteMask(), evalCache.rawBase(), EvalCache::BYTE_MASK});
         const int32_t score = -quiescenceSearch(b, runtime, -beta, -alpha, ply + 1);
         b.undoMove(m, state);
         best = std::max(best, score);

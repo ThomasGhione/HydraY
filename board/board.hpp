@@ -149,16 +149,19 @@ public:
     // --- Board access ---
     __attribute__((hot, always_inline)) constexpr uint8_t get(uint8_t index) const noexcept { return chessboard[index]; }
 
-    // The TT's bucket array, for doMove to prefetch the child's bucket as soon
-    // as its key is known.
+    // The TT's bucket array and the eval cache, for doMove to prefetch the
+    // child's lines as soon as its key is known.
     struct HashPrefetch {
         static constexpr uint8_t BUCKET_SHIFT = 6;
         const std::byte* base = nullptr;
         size_t byteMask = 0;
+        const std::byte* evalBase = nullptr;
+        size_t evalByteMask = 0;
 
         __attribute__((always_inline))
         void prefetch(uint64_t key) const noexcept {
             __builtin_prefetch(base + ((key << BUCKET_SHIFT) & byteMask), 0, 3);
+            __builtin_prefetch(evalBase + ((key << 3) & evalByteMask), 0, 3);
         }
     };
 

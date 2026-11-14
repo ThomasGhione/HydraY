@@ -20,12 +20,17 @@ namespace engine {
 // value. The 48-bit tag makes a false hit, empty slots included, a 2^-48 event.
 class EvalCache {
 public:
+    static constexpr size_t SLOTS = 1u << 21; // 16 MiB
+    static constexpr size_t BYTE_MASK = (SLOTS - 1) * sizeof(uint64_t);
+
     EvalCache() : table_(allocateHugePages<uint64_t>(SLOTS)) {
         if (!table_) throw std::bad_alloc{};
         clear();
     }
 
     void clear() noexcept { std::fill_n(table_.get(), SLOTS, 0); }
+
+    [[nodiscard]] const std::byte* rawBase() const noexcept { return reinterpret_cast<const std::byte*>(table_.get()); }
 
     [[nodiscard]] bool probe(uint64_t key, int32_t& outEval) const noexcept {
         const uint64_t slot = word(key).load(std::memory_order_relaxed);
@@ -39,7 +44,6 @@ public:
     }
 
 private:
-    static constexpr size_t SLOTS = 1u << 21; // 16 MiB
     HugePageArray<uint64_t> table_;
 
     [[nodiscard]] std::atomic_ref<uint64_t> word(uint64_t key) const noexcept {
