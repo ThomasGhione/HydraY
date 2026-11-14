@@ -60,6 +60,7 @@ public:
     };
 
     static constexpr size_t ENTRIES_PER_BUCKET = 4;
+    static constexpr size_t BUCKET_BYTES = ENTRIES_PER_BUCKET * sizeof(Entry);
     static constexpr size_t DEFAULT_HASH_MB = 64;
     static constexpr size_t MIN_HASH_MB = 1;
     static constexpr size_t MAX_HASH_MB = 4096;
@@ -71,6 +72,14 @@ public:
     }
 
     void prefetch(uint64_t key) const noexcept { __builtin_prefetch(bucketFor(key), 0, 3); }
+
+    [[nodiscard]] const std::byte* rawTableBase() const noexcept {
+        return reinterpret_cast<const std::byte*>(table_.get());
+    }
+    [[nodiscard]] size_t bucketByteMask() const noexcept {
+        static_assert(BUCKET_BYTES == 64);
+        return bucketMask_ << 6;
+    }
 
     // The one hot-path read: a single bucket snapshot per node feeds the TT
     // cutoff, static-eval tightening, singular-extension gate and hash-move

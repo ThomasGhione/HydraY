@@ -51,6 +51,8 @@ namespace Searcher {
 using chess::Board;
 using chess::Move;
 
+static_assert(TT::BUCKET_BYTES == (size_t{1} << Board::HashPrefetch::BUCKET_SHIFT));
+
 namespace {
 
 // A king can only vanish after an illegal FEN: losing ours is a mate, taking
@@ -378,6 +380,10 @@ SearchMoveResult searchMoves(Board& b, MovePicker& movePicker, const SearchConte
     const uint8_t oppColor = Board::oppositeColor(ctx.activeColor);
     bool prunedAny = false;
     bool lmpSkipTried = false;
+    const Board::HashPrefetch ttPrefetch{
+        runtime.transpositionTable->rawTableBase(),
+        runtime.transpositionTable->bucketByteMask(),
+    };
 
     while (movePicker.hasNext()) {
         const int moveIndex = movePicker.currentIndex;
@@ -435,9 +441,7 @@ SearchMoveResult searchMoves(Board& b, MovePicker& movePicker, const SearchConte
         }
 
         Board::MoveState state;
-        b.doMove(m, state);
-        // The child's TT bucket loads while the child checks its node entry.
-        runtime.transpositionTable->prefetch(b.getHash());
+        b.doMove(m, state, ttPrefetch);
 
         const bool forcing = t.isCapture || t.isPromotion || moveIndex < 3;
         const bool givesCheck = ctx.depth >= 2 && ctx.depth <= 4 && forcing && b.inCheck(oppColor);
@@ -723,7 +727,7 @@ int32_t searchPosition(Board& b, SearchRuntime& runtime, int depth, int32_t alph
             // Raw SEE on purpose: PROBCUT_MARGIN was tuned as a material threshold here.
             if (Sorter::staticExchangeEvaluation(b, mc) < PROBCUT_MARGIN) continue;
             Board::MoveState pcState;
-            b.doMove(mc, pcState);
+            b.doMove(mc, pcState, {tt.rawTableBase(), tt.bucketByteMask()});
             int32_t pcScore = probcutBound;
             if (depth > 4) pcScore = -quiescenceSearch(b, runtime, -probcutBound, -probcutBound + 1, ply + 1);
             if (pcScore >= probcutBound) {
@@ -846,8 +850,7 @@ int32_t quiescenceSearch(Board& b, SearchRuntime& runtime, int32_t alpha, int32_
             return evaluate(b);
         }
         Board::MoveState state;
-        b.doMove(m, state);
-        tt.prefetch(b.getHash());
+        b.doMove(m, state, {tt.rawTableBase(), tt.bucketByteMask()});
         const int32_t score = -quiescenceSearch(b, runtime, -beta, -alpha, ply + 1);
         b.undoMove(m, state);
         best = std::max(best, score);

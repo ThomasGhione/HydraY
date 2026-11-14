@@ -338,42 +338,62 @@ inline void Board::passTurn(bool resetHalfMoves) noexcept {
     activeColor = oppositeColor(activeColor);
 }
 
-template<Board::MoveKind Kind>
+template<Board::MoveKind Kind, bool WithPrefetch>
 inline void Board::doMoveByKind(MoveState& st, uint8_t moving, uint8_t destBefore, uint8_t fromIndex,
-                                uint8_t toIndex, uint8_t promotionType, uint64_t& key) noexcept {
-    // Every recordThreats sees the board between two of these steps, the piece
-    // it records standing on its square.
-    if constexpr (Kind == MoveKind::EnPassant) {
-        const uint8_t capIndex = enPassantVictim(moving, toIndex);
-        st.capturedPiece = get(capIndex);
-        recordThreats<false>(st.capturedPiece, capIndex);
-        set(capIndex, EMPTY);
-        occupancy &= ~(1ULL << capIndex);
-        removePieceFromBB<true>(st.capturedPiece, capIndex);
-        key ^= zobrist::TABLES.pieces[st.capturedPiece][capIndex];
-    }
-    recordThreats<false>(moving, fromIndex);
-    if constexpr (isCaptureKind(Kind)) {
-        removePieceFromBB<true>(destBefore, toIndex);
-        key ^= zobrist::TABLES.pieces[destBefore][toIndex];
-    }
-    relocate<true>(moving, fromIndex, toIndex);
-    if constexpr (Kind == MoveKind::Castling) {
-        const Castling& c = castlingTo(toIndex);
-        const uint8_t rook = get(c.rook);
-        recordThreats<true>(moving, toIndex);
-        recordThreats<false>(rook, c.rook);
-        relocate<true>(rook, c.rook, c.rookTo);
-        recordThreats<true>(rook, c.rookTo);
-        key ^= zobrist::TABLES.pieces[rook][c.rook] ^ zobrist::TABLES.pieces[rook][c.rookTo];
-    }
-    state.castle &= CASTLING_KEEP[fromIndex] & CASTLING_KEEP[toIndex];
-    if constexpr (Kind == MoveKind::DoublePawnPush) state.enPassant = (fromIndex + toIndex) >> 1;
+                                uint8_t toIndex, uint8_t promotionType, uint64_t& key, HashPrefetch tt) noexcept {
+    // Compute the child's Zobrist key and issue its TT bucket prefetch before
+    // recordThreats runs, hiding TT latency behind threat discovery and board
+    // updates while keeping every recordThreats call on the exact same board.
+    uint8_t capIndex = 0;
+    uint8_t rook = 0;
     uint8_t placed = moving;
     if constexpr (isPromotionKind(Kind)) {
         // A missing or invalid promotion piece means a queen.
         const uint8_t promo = (promotionType >= KNIGHT && promotionType <= QUEEN) ? promotionType : uint8_t{QUEEN};
         placed = static_cast<uint8_t>(promo | (moving & MASK_COLOR));
+    }
+    key ^= zobrist::TABLES.pieces[placed][toIndex];
+    if constexpr (Kind == MoveKind::EnPassant) {
+        capIndex = enPassantVictim(moving, toIndex);
+        st.capturedPiece = get(capIndex);
+        key ^= zobrist::TABLES.pieces[st.capturedPiece][capIndex];
+    } else if constexpr (isCaptureKind(Kind)) {
+        key ^= zobrist::TABLES.pieces[destBefore][toIndex];
+    } else if constexpr (Kind == MoveKind::Castling) {
+        const Castling& c = castlingTo(toIndex);
+        rook = get(c.rook);
+        key ^= zobrist::TABLES.pieces[rook][c.rook] ^ zobrist::TABLES.pieces[rook][c.rookTo];
+    } else if constexpr (Kind == MoveKind::DoublePawnPush) {
+        state.enPassant = static_cast<Square>((fromIndex + toIndex) >> 1);
+        const int us = colorToIndex(moving);
+        if ((pieces::PAWN_ATTACKS[us][state.enPassant] & bb[PAWN][us ^ 1]) != 0ULL) {
+            state.epHashFile = chess::file(state.enPassant);
+            key ^= zobrist::TABLES.enPassant[state.epHashFile];
+        }
+    }
+    if constexpr (WithPrefetch) tt.prefetch(key);
+
+    // Every recordThreats sees the board between two of these steps, the piece
+    // it records standing on its square.
+    if constexpr (Kind == MoveKind::EnPassant) {
+        recordThreats<false>(st.capturedPiece, capIndex);
+        set(capIndex, EMPTY);
+        occupancy &= ~(1ULL << capIndex);
+        removePieceFromBB<true>(st.capturedPiece, capIndex);
+    }
+    recordThreats<false>(moving, fromIndex);
+    if constexpr (isCaptureKind(Kind)) {
+        removePieceFromBB<true>(destBefore, toIndex);
+    }
+    relocate<true>(moving, fromIndex, toIndex);
+    if constexpr (Kind == MoveKind::Castling) {
+        const Castling& c = castlingTo(toIndex);
+        recordThreats<true>(moving, toIndex);
+        recordThreats<false>(rook, c.rook);
+        relocate<true>(rook, c.rook, c.rookTo);
+        recordThreats<true>(rook, c.rookTo);
+    }
+    if constexpr (isPromotionKind(Kind)) {
         removePieceFromBB<true>(moving, toIndex);
         addPieceToBB<true>(placed, toIndex);
         set(toIndex, static_cast<piece_id>(placed));
@@ -383,7 +403,6 @@ inline void Board::doMoveByKind(MoveState& st, uint8_t moving, uint8_t destBefor
     } else if constexpr (Kind != MoveKind::Castling) {
         recordThreats<true>(placed, toIndex);
     }
-    key ^= zobrist::TABLES.pieces[placed][toIndex];
 }
 
 template<Board::MoveKind Kind>
@@ -409,8 +428,8 @@ inline void Board::undoMoveByKind(const MoveState& st, uint8_t pieceOnTo, uint8_
 }
 
 // --- Incremental do/undo, no legality checks ---
-__attribute__((hot))
-void Board::doMove(const Move& m, MoveState& st) noexcept {
+template<bool WithPrefetch>
+inline void Board::doMoveImpl(const Move& m, MoveState& st, HashPrefetch tt) noexcept {
     pushAccFrame();
     const uint8_t moving     = get(m.from);
     const uint8_t destBefore = get(m.to);
@@ -420,22 +439,31 @@ void Board::doMove(const Move& m, MoveState& st) noexcept {
 
     uint64_t key = state.hash ^ zobrist::TABLES.pieces[moving][m.from] ^ zobrist::TABLES.sideToMove;
     if (st.prev.epHashFile < 8) key ^= zobrist::TABLES.enPassant[st.prev.epHashFile];
-    state.enPassant = NO_SQUARE;
+    const uint8_t newCastle = state.castle & CASTLING_KEEP[m.from] & CASTLING_KEEP[m.to];
+    if (newCastle != st.prev.castle) key ^= zobrist::TABLES.castling[st.prev.castle] ^ zobrist::TABLES.castling[newCastle];
+    state.castle     = newCastle;
+    state.enPassant  = NO_SQUARE;
+    state.epHashFile = 0xFF;
+
     visitKind(st.moveKind, [&]<MoveKind K>() {
-        doMoveByKind<K>(st, moving, destBefore, m.from, m.to, m.promotionType, key);
+        doMoveByKind<K, WithPrefetch>(st, moving, destBefore, m.from, m.to, m.promotionType, key, tt);
     });
 
     const bool resetHistory = (moving & MASK_PIECE_TYPE) == PAWN || destBefore != EMPTY;
     passTurn(resetHistory);
-    if (state.castle != st.prev.castle) key ^= zobrist::TABLES.castling[st.prev.castle] ^ zobrist::TABLES.castling[state.castle];
-    state.epHashFile = 0xFF;
-    if (isValidSquare(state.enPassant) && zobrist::hasPseudoLegalEnPassantCapture(*this, state.enPassant)) {
-        state.epHashFile = chess::file(state.enPassant);
-        key ^= zobrist::TABLES.enPassant[state.epHashFile];
-    }
     state.hash = key;
     if (state.pliesFromNull < 255) ++state.pliesFromNull;
     updateRepetitionAfterMove(resetHistory, st);
+}
+
+__attribute__((hot))
+void Board::doMove(const Move& m, MoveState& st) noexcept {
+    doMoveImpl<false>(m, st, {});
+}
+
+__attribute__((hot))
+void Board::doMove(const Move& m, MoveState& st, HashPrefetch tt) noexcept {
+    doMoveImpl<true>(m, st, tt);
 }
 
 __attribute__((hot))

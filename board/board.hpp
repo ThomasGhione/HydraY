@@ -149,8 +149,22 @@ public:
     // --- Board access ---
     __attribute__((hot, always_inline)) constexpr uint8_t get(uint8_t index) const noexcept { return chessboard[index]; }
 
+    // Non-owning handle to the TT's 64 B-aligned bucket array so doMove can
+    // prefetch the child's bucket as soon as the hash key is ready.
+    struct HashPrefetch {
+        static constexpr uint8_t BUCKET_SHIFT = 6;
+        const std::byte* base = nullptr;
+        size_t byteMask = 0;
+
+        __attribute__((always_inline))
+        void prefetch(uint64_t key) const noexcept {
+            __builtin_prefetch(base + ((key << BUCKET_SHIFT) & byteMask), 0, 3);
+        }
+    };
+
     // --- Move execution ---
     void doMove(const Move& m, MoveState& st) noexcept;
+    void doMove(const Move& m, MoveState& st, HashPrefetch tt) noexcept;
     void undoMove(const Move& m, const MoveState& st) noexcept;
     void doNullMove(MoveState& st) noexcept;
     void undoNullMove(const MoveState& st) noexcept;
@@ -260,9 +274,11 @@ private:
     inline void passTurn(bool resetHalfMoves) noexcept;
     template<typename F>
     static inline void visitKind(MoveKind kind, F&& f) noexcept;
-    template<MoveKind Kind>
+    template<bool WithPrefetch>
+    inline void doMoveImpl(const Move& m, MoveState& st, HashPrefetch tt) noexcept;
+    template<MoveKind Kind, bool WithPrefetch>
     inline void doMoveByKind(MoveState& st, uint8_t moving, uint8_t destBefore, uint8_t fromIndex,
-                             uint8_t toIndex, uint8_t promotionType, uint64_t& key) noexcept;
+                             uint8_t toIndex, uint8_t promotionType, uint64_t& key, HashPrefetch tt) noexcept;
     template<MoveKind Kind>
     inline void undoMoveByKind(const MoveState& st, uint8_t pieceOnTo, uint8_t fromIndex, uint8_t toIndex) noexcept;
 
