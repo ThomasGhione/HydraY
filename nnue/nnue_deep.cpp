@@ -382,6 +382,19 @@ bool loadFromMemory(const unsigned char* data, size_t size, NetworkDeep& net) no
     if (net.l0t == nullptr) return false;
     if (threats) rd(net.l0t.get(), THREAT_BYTES);
     else std::memset(net.l0t.get(), 0, THREAT_BYTES);
+#if defined(__AVX2__)
+    // The layout Accumulator::applyThreatList reads: each 32-weight block as
+    // 16-bit lanes holding weight i + 128 in the low byte, weight 16 + i in the high.
+    for (size_t block = 0; block < THREAT_BYTES; block += 32) {
+        int8_t* w = net.l0t.get() + block;
+        int8_t lanes[32];
+        for (int i = 0; i < 16; ++i) {
+            lanes[2 * i] = static_cast<int8_t>(static_cast<uint8_t>(w[i]) ^ 0x80);
+            lanes[2 * i + 1] = w[16 + i];
+        }
+        std::memcpy(w, lanes, sizeof(lanes));
+    }
+#endif
 
     // Derived, not read from the file.
     for (int b = 0; b < OUTPUT_BUCKETS; ++b)

@@ -144,25 +144,20 @@ struct alignas(64) Accumulator {
     // number of rows costs one pass over row: each tile of it stays in
     // registers while every row is added in.
 #if defined(__AVX2__)
-    template<bool Add, typename W>
+    template<bool Add>
     __attribute__((always_inline))
-    static inline void applyWeightList(const W* const* __restrict rows, int n, int b,
+    static inline void applyWeightList(const int16_t* const* __restrict rows, int n, int b,
                                        __m256i& x0, __m256i& x1, __m256i& x2, __m256i& x3,
                                        __m256i& x4, __m256i& x5, __m256i& x6, __m256i& x7) noexcept {
-        const auto loadVec = [](const W* p) noexcept {
-            if constexpr (std::is_same_v<W, int8_t>)
-                return _mm256_cvtepi8_epi16(_mm_loadu_si128(reinterpret_cast<const __m128i*>(p)));
-            else
-                return _mm256_loadu_si256(reinterpret_cast<const __m256i*>(p));
-        };
+        const auto loadVec = [](const int16_t* p) noexcept { return _mm256_loadu_si256(reinterpret_cast<const __m256i*>(p)); };
         const auto accum = [](__m256i acc, __m256i d) noexcept {
             if constexpr (Add) return _mm256_add_epi16(acc, d);
             else               return _mm256_sub_epi16(acc, d);
         };
         int k = 0;
         for (; k + 1 < n; k += 2) {
-            const W* p0 = rows[k]     + b;
-            const W* p1 = rows[k + 1] + b;
+            const int16_t* p0 = rows[k]     + b;
+            const int16_t* p1 = rows[k + 1] + b;
             auto step2 = [&](__m256i& x, int off) noexcept {
                 // Two rows summed first: half the dependency chain on x.
                 x = accum(x, _mm256_add_epi16(loadVec(p0 + off), loadVec(p1 + off)));
@@ -171,11 +166,40 @@ struct alignas(64) Accumulator {
             step2(x4,  64); step2(x5,  80); step2(x6,  96); step2(x7, 112);
         }
         if (k < n) {
-            const W* p = rows[k] + b;
+            const int16_t* p = rows[k] + b;
             auto step1 = [&](__m256i& x, int off) noexcept { x = accum(x, loadVec(p + off)); };
             step1(x0,   0); step1(x1,  16); step1(x2,  32); step1(x3,  48);
             step1(x4,  64); step1(x5,  80); step1(x6,  96); step1(x7, 112);
         }
+    }
+
+    // Threat rows in the layout loadFromMemory gives them: a lane of block j
+    // is 256 * w[16 + i] + w[i] + 128 exactly. r sums the lanes and q their
+    // high bytes, so no row is widened; applyWeightRows takes w[i] back as
+    // r - 256 q - 128 (adds - subs).
+    template<bool Add>
+    __attribute__((always_inline))
+    static inline void applyThreatList(const int8_t* const* __restrict rows, int n, int b,
+                                       __m256i (&r)[4], __m256i (&q)[4]) noexcept {
+        const auto accum = [](__m256i acc, __m256i d) noexcept {
+            if constexpr (Add) return _mm256_add_epi16(acc, d);
+            else               return _mm256_sub_epi16(acc, d);
+        };
+        const auto load = [](const int8_t* p) noexcept { return _mm256_loadu_si256(reinterpret_cast<const __m256i*>(p)); };
+        int k = 0;
+        for (; k + 1 < n; k += 2)
+            for (int j = 0; j < 4; ++j) {
+                const __m256i w0 = load(rows[k] + b + 32 * j);
+                const __m256i w1 = load(rows[k + 1] + b + 32 * j);
+                r[j] = accum(r[j], _mm256_add_epi16(w0, w1));
+                q[j] = accum(q[j], _mm256_add_epi16(_mm256_srai_epi16(w0, 8), _mm256_srai_epi16(w1, 8)));
+            }
+        if (k < n)
+            for (int j = 0; j < 4; ++j) {
+                const __m256i w = load(rows[k] + b + 32 * j);
+                r[j] = accum(r[j], w);
+                q[j] = accum(q[j], _mm256_srai_epi16(w, 8));
+            }
     }
 #endif
 
@@ -186,25 +210,47 @@ struct alignas(64) Accumulator {
 #if defined(__AVX2__)
         constexpr int TILE = 128;
         static_assert(HIDDEN % TILE == 0);
-        for (int b = 0; b < HIDDEN; b += TILE) {
-            __m256i x0, x1, x2, x3, x4, x5, x6, x7;
-            if constexpr (Init == RowInit::Zero) {
-                x0 = x1 = x2 = x3 = x4 = x5 = x6 = x7 = _mm256_setzero_si256();
-            } else {
-                const int16_t* base = (Init == RowInit::Src) ? src : row;
-                const auto* s = reinterpret_cast<const __m256i*>(base + b);
-                x0 = _mm256_loadu_si256(s + 0); x1 = _mm256_loadu_si256(s + 1);
-                x2 = _mm256_loadu_si256(s + 2); x3 = _mm256_loadu_si256(s + 3);
-                x4 = _mm256_loadu_si256(s + 4); x5 = _mm256_loadu_si256(s + 5);
-                x6 = _mm256_loadu_si256(s + 6); x7 = _mm256_loadu_si256(s + 7);
+        if constexpr (std::is_same_v<W, int8_t>) {
+            const __m256i bias = _mm256_set1_epi16(static_cast<int16_t>(128 * (na - (HasSub ? ns : 0))));
+            for (int b = 0; b < HIDDEN; b += TILE) {
+                __m256i r[4], q[4];
+                for (int j = 0; j < 4; ++j) r[j] = q[j] = _mm256_setzero_si256();
+                if constexpr (HasSub) applyThreatList<false>(sub, ns, b, r, q);
+                applyThreatList<true>(add, na, b, r, q);
+                for (int j = 0; j < 4; ++j) {
+                    __m256i lo = _mm256_sub_epi16(_mm256_sub_epi16(r[j], _mm256_slli_epi16(q[j], 8)), bias);
+                    __m256i hi = q[j];
+                    auto* d = reinterpret_cast<__m256i*>(row + b + 32 * j);
+                    if constexpr (Init != RowInit::Zero) {
+                        const auto* s = reinterpret_cast<const __m256i*>((Init == RowInit::Src ? src : row) + b + 32 * j);
+                        lo = _mm256_add_epi16(lo, _mm256_loadu_si256(s));
+                        hi = _mm256_add_epi16(hi, _mm256_loadu_si256(s + 1));
+                    }
+                    _mm256_storeu_si256(d, lo);
+                    _mm256_storeu_si256(d + 1, hi);
+                }
             }
-            if constexpr (HasSub) applyWeightList<false>(sub, ns, b, x0, x1, x2, x3, x4, x5, x6, x7);
-            applyWeightList<true>(add, na, b, x0, x1, x2, x3, x4, x5, x6, x7);
-            auto* d = reinterpret_cast<__m256i*>(row + b);
-            _mm256_storeu_si256(d + 0, x0); _mm256_storeu_si256(d + 1, x1);
-            _mm256_storeu_si256(d + 2, x2); _mm256_storeu_si256(d + 3, x3);
-            _mm256_storeu_si256(d + 4, x4); _mm256_storeu_si256(d + 5, x5);
-            _mm256_storeu_si256(d + 6, x6); _mm256_storeu_si256(d + 7, x7);
+        } else {
+            for (int b = 0; b < HIDDEN; b += TILE) {
+                __m256i x0, x1, x2, x3, x4, x5, x6, x7;
+                if constexpr (Init == RowInit::Zero) {
+                    x0 = x1 = x2 = x3 = x4 = x5 = x6 = x7 = _mm256_setzero_si256();
+                } else {
+                    const int16_t* base = (Init == RowInit::Src) ? src : row;
+                    const auto* s = reinterpret_cast<const __m256i*>(base + b);
+                    x0 = _mm256_loadu_si256(s + 0); x1 = _mm256_loadu_si256(s + 1);
+                    x2 = _mm256_loadu_si256(s + 2); x3 = _mm256_loadu_si256(s + 3);
+                    x4 = _mm256_loadu_si256(s + 4); x5 = _mm256_loadu_si256(s + 5);
+                    x6 = _mm256_loadu_si256(s + 6); x7 = _mm256_loadu_si256(s + 7);
+                }
+                if constexpr (HasSub) applyWeightList<false>(sub, ns, b, x0, x1, x2, x3, x4, x5, x6, x7);
+                applyWeightList<true>(add, na, b, x0, x1, x2, x3, x4, x5, x6, x7);
+                auto* d = reinterpret_cast<__m256i*>(row + b);
+                _mm256_storeu_si256(d + 0, x0); _mm256_storeu_si256(d + 1, x1);
+                _mm256_storeu_si256(d + 2, x2); _mm256_storeu_si256(d + 3, x3);
+                _mm256_storeu_si256(d + 4, x4); _mm256_storeu_si256(d + 5, x5);
+                _mm256_storeu_si256(d + 6, x6); _mm256_storeu_si256(d + 7, x7);
+            }
         }
 #else
         constexpr int TILE = 64;
