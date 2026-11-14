@@ -1,7 +1,7 @@
 #pragma once
 
 // Dual-perspective NNUE accumulator: v[0] = white's view, v[1] = black's view,
-// and the same for the threat inputs in threat[], which the forward adds.
+// each the sum of the piece and the threat features in one i16 row.
 //
 // Every feature of perspective p depends on the bucket and flip of p's own
 // king, its basis (base = 768 * bucket, flip); a threat feature on the flip
@@ -13,7 +13,6 @@
 
 #include <cstdint>
 #include <cstring>
-#include <type_traits>
 
 #if defined(__AVX2__)
 #include <immintrin.h>
@@ -67,35 +66,12 @@ struct alignas(64) Accumulator {
     int16_t v[2][HIDDEN];
     int32_t base[2];   // 768 * king bucket, per perspective
     uint8_t flip[2];   // 0 or 7 (file mirror), per perspective
-    bool    dirty[2];  // true = v[p] and threat[p] not computed for this position yet
+    bool    dirty[2];  // true = v[p] not computed for this position yet
     // The move from the previous frame, in the same cache line as the flags.
     uint8_t     ndelta;
     AccDelta    delta[ACC_MAX_DELTAS];
     uint8_t     nthreat;
     ThreatDelta threatDelta[ACC_MAX_THREATS];
-    // Not 4 KiB after v: the loads of both would 4K-alias.
-    alignas(64) int16_t threat[2][HIDDEN];
-
-    // Both perspectives in one traversal of the rows, writing d0/d1 from
-    // s0/s1 (another frame) when From, in place otherwise (s0/s1 unused).
-    // int16 is modular, so the order the contributions are summed in does not
-    // change the result. The accumulator rows never alias the weight rows:
-    // restrict-qualified parameters say so, or GCC versions the loop on
-    // runtime alias checks.
-    template<int NS, int NA, bool From = false>
-    static inline void fusePair(int16_t* __restrict d0, int16_t* __restrict d1,
-                                const int16_t* __restrict s0, const int16_t* __restrict s1,
-                                const int16_t* const (&sub)[2][2],
-                                const int16_t* const (&add)[2][2]) noexcept {
-        for (int i = 0; i < HIDDEN; ++i) {
-            int x0 = From ? s0[i] : d0[i];
-            int x1 = From ? s1[i] : d1[i];
-            for (int k = 0; k < NS; ++k) { x0 -= sub[0][k][i]; x1 -= sub[1][k][i]; }
-            for (int k = 0; k < NA; ++k) { x0 += add[0][k][i]; x1 += add[1][k][i]; }
-            d0[i] = static_cast<int16_t>(x0);
-            d1[i] = static_cast<int16_t>(x1);
-        }
-    }
 
     // Weight row for one piece feature under an explicit basis: the live
     // perspectives use their own, the Finny cache rows hold a different one.
@@ -114,35 +90,8 @@ struct alignas(64) Accumulator {
         return activeNetwork->l0t.get() + static_cast<size_t>(feature) * HIDDEN;
     }
 
-    // Walks a diff of ns subs and na adds in passes of at most two of each,
-    // calling f.template operator()<S, A>(si, ai) on each pass. The counts are
-    // template parameters so the kernels unroll: runtime bounds measured 50%
-    // slower than replaying the deltas one at a time.
-    template<class F>
-    static inline void forEachPass(int ns, int na, F&& f) noexcept {
-        for (int si = 0, ai = 0; si < ns || ai < na; ) {
-            const int s = (ns - si > 2) ? 2 : ns - si;
-            const int a = (na - ai > 2) ? 2 : na - ai;
-            switch (s * 4 + a) {
-                case 2 * 4 + 2: f.template operator()<2, 2>(si, ai); break;
-                case 2 * 4 + 1: f.template operator()<2, 1>(si, ai); break;
-                case 1 * 4 + 2: f.template operator()<1, 2>(si, ai); break;
-                case 1 * 4 + 1: f.template operator()<1, 1>(si, ai); break;
-                case 2 * 4 + 0: f.template operator()<2, 0>(si, ai); break;
-                case 0 * 4 + 2: f.template operator()<0, 2>(si, ai); break;
-                case 1 * 4 + 0: f.template operator()<1, 0>(si, ai); break;
-                default:        f.template operator()<0, 1>(si, ai); break;
-            }
-            si += s;
-            ai += a;
-        }
-    }
+    enum class RowInit { Src, InPlace };
 
-    enum class RowInit { Zero, Src, InPlace };
-
-    // row = init - sub + add over rows of i8 threat or i16 piece weights. Any
-    // number of rows costs one pass over row: each tile of it stays in
-    // registers while every row is added in.
 #if defined(__AVX2__)
     template<bool Add>
     __attribute__((always_inline))
@@ -175,7 +124,7 @@ struct alignas(64) Accumulator {
 
     // Threat rows in the layout loadFromMemory gives them: a lane of block j
     // is 256 * w[16 + i] + w[i] + 128 exactly. r sums the lanes and q their
-    // high bytes, so no row is widened; applyWeightRows takes w[i] back as
+    // high bytes, so no row is widened; applyMixedRows takes w[i] back as
     // r - 256 q - 128 (adds - subs).
     template<bool Add>
     __attribute__((always_inline))
@@ -203,70 +152,39 @@ struct alignas(64) Accumulator {
     }
 #endif
 
-    template<RowInit Init, bool HasSub, typename W>
+    // row = init - sub + add over rows of i16 piece weights. Any number of
+    // rows costs one pass over row: each tile of it stays in registers while
+    // every row is added in.
+    template<RowInit Init>
     static inline void applyWeightRows(int16_t* __restrict row, const int16_t* __restrict src,
-                                       const W* const* __restrict sub, int ns,
-                                       const W* const* __restrict add, int na) noexcept {
+                                       const int16_t* const* __restrict sub, int ns,
+                                       const int16_t* const* __restrict add, int na) noexcept {
+        const int16_t* base = (Init == RowInit::Src) ? src : row;
 #if defined(__AVX2__)
         constexpr int TILE = 128;
         static_assert(HIDDEN % TILE == 0);
-        if constexpr (std::is_same_v<W, int8_t>) {
-            const __m256i bias = _mm256_set1_epi16(static_cast<int16_t>(128 * (na - (HasSub ? ns : 0))));
-            for (int b = 0; b < HIDDEN; b += TILE) {
-                __m256i r[4], q[4];
-                for (int j = 0; j < 4; ++j) r[j] = q[j] = _mm256_setzero_si256();
-                if constexpr (HasSub) applyThreatList<false>(sub, ns, b, r, q);
-                applyThreatList<true>(add, na, b, r, q);
-                for (int j = 0; j < 4; ++j) {
-                    __m256i lo = _mm256_sub_epi16(_mm256_sub_epi16(r[j], _mm256_slli_epi16(q[j], 8)), bias);
-                    __m256i hi = q[j];
-                    auto* d = reinterpret_cast<__m256i*>(row + b + 32 * j);
-                    if constexpr (Init != RowInit::Zero) {
-                        const auto* s = reinterpret_cast<const __m256i*>((Init == RowInit::Src ? src : row) + b + 32 * j);
-                        lo = _mm256_add_epi16(lo, _mm256_loadu_si256(s));
-                        hi = _mm256_add_epi16(hi, _mm256_loadu_si256(s + 1));
-                    }
-                    _mm256_storeu_si256(d, lo);
-                    _mm256_storeu_si256(d + 1, hi);
-                }
-            }
-        } else {
-            for (int b = 0; b < HIDDEN; b += TILE) {
-                __m256i x0, x1, x2, x3, x4, x5, x6, x7;
-                if constexpr (Init == RowInit::Zero) {
-                    x0 = x1 = x2 = x3 = x4 = x5 = x6 = x7 = _mm256_setzero_si256();
-                } else {
-                    const int16_t* base = (Init == RowInit::Src) ? src : row;
-                    const auto* s = reinterpret_cast<const __m256i*>(base + b);
-                    x0 = _mm256_loadu_si256(s + 0); x1 = _mm256_loadu_si256(s + 1);
-                    x2 = _mm256_loadu_si256(s + 2); x3 = _mm256_loadu_si256(s + 3);
-                    x4 = _mm256_loadu_si256(s + 4); x5 = _mm256_loadu_si256(s + 5);
-                    x6 = _mm256_loadu_si256(s + 6); x7 = _mm256_loadu_si256(s + 7);
-                }
-                if constexpr (HasSub) applyWeightList<false>(sub, ns, b, x0, x1, x2, x3, x4, x5, x6, x7);
-                applyWeightList<true>(add, na, b, x0, x1, x2, x3, x4, x5, x6, x7);
-                auto* d = reinterpret_cast<__m256i*>(row + b);
-                _mm256_storeu_si256(d + 0, x0); _mm256_storeu_si256(d + 1, x1);
-                _mm256_storeu_si256(d + 2, x2); _mm256_storeu_si256(d + 3, x3);
-                _mm256_storeu_si256(d + 4, x4); _mm256_storeu_si256(d + 5, x5);
-                _mm256_storeu_si256(d + 6, x6); _mm256_storeu_si256(d + 7, x7);
-            }
+        for (int b = 0; b < HIDDEN; b += TILE) {
+            const auto* s = reinterpret_cast<const __m256i*>(base + b);
+            __m256i x0 = _mm256_loadu_si256(s + 0), x1 = _mm256_loadu_si256(s + 1);
+            __m256i x2 = _mm256_loadu_si256(s + 2), x3 = _mm256_loadu_si256(s + 3);
+            __m256i x4 = _mm256_loadu_si256(s + 4), x5 = _mm256_loadu_si256(s + 5);
+            __m256i x6 = _mm256_loadu_si256(s + 6), x7 = _mm256_loadu_si256(s + 7);
+            applyWeightList<false>(sub, ns, b, x0, x1, x2, x3, x4, x5, x6, x7);
+            applyWeightList<true>(add, na, b, x0, x1, x2, x3, x4, x5, x6, x7);
+            auto* d = reinterpret_cast<__m256i*>(row + b);
+            _mm256_storeu_si256(d + 0, x0); _mm256_storeu_si256(d + 1, x1);
+            _mm256_storeu_si256(d + 2, x2); _mm256_storeu_si256(d + 3, x3);
+            _mm256_storeu_si256(d + 4, x4); _mm256_storeu_si256(d + 5, x5);
+            _mm256_storeu_si256(d + 6, x6); _mm256_storeu_si256(d + 7, x7);
         }
 #else
         constexpr int TILE = 64;
         static_assert(HIDDEN % TILE == 0);
         for (int b = 0; b < HIDDEN; b += TILE) {
             int16_t x[TILE];
-            if constexpr (Init == RowInit::Zero) {
-                for (int i = 0; i < TILE; ++i) x[i] = 0;
-            } else {
-                const int16_t* base = (Init == RowInit::Src) ? src : row;
-                for (int i = 0; i < TILE; ++i) x[i] = base[b + i];
-            }
-            if constexpr (HasSub) {
-                for (int k = 0; k < ns; ++k)
-                    for (int i = 0; i < TILE; ++i) x[i] = static_cast<int16_t>(x[i] - sub[k][b + i]);
-            }
+            for (int i = 0; i < TILE; ++i) x[i] = base[b + i];
+            for (int k = 0; k < ns; ++k)
+                for (int i = 0; i < TILE; ++i) x[i] = static_cast<int16_t>(x[i] - sub[k][b + i]);
             for (int k = 0; k < na; ++k)
                 for (int i = 0; i < TILE; ++i) x[i] = static_cast<int16_t>(x[i] + add[k][b + i]);
             for (int i = 0; i < TILE; ++i) row[b + i] = x[i];
@@ -274,13 +192,51 @@ struct alignas(64) Accumulator {
 #endif
     }
 
-    // From zero without HasSrc (a refresh), with no subs without HasSub.
-    template<bool HasSrc = true, bool HasSub = true>
-    static inline void applyThreatRows(int16_t* __restrict row, const int16_t* __restrict src,
-                                       const int8_t* const* __restrict sub, int ns,
-                                       const int8_t* const* __restrict add, int na) noexcept {
-        constexpr RowInit Init = HasSrc ? RowInit::Src : RowInit::Zero;
-        applyWeightRows<Init, HasSub>(row, src, sub, ns, add, na);
+    // row = src - psub + padd - tsub + tadd in one pass: S and A piece rows
+    // (i16) and any number of threat rows (i8).
+    template<int S, int A>
+    static inline void applyMixedRows(int16_t* __restrict row, const int16_t* __restrict src,
+                                      const int16_t* const* psub, const int16_t* const* padd,
+                                      const int8_t* const* __restrict tsub, int tns,
+                                      const int8_t* const* __restrict tadd, int tna) noexcept {
+#if defined(__AVX2__)
+        constexpr int TILE = 128;
+        static_assert(HIDDEN % TILE == 0);
+        const auto loadVec = [](const int16_t* p) noexcept { return _mm256_loadu_si256(reinterpret_cast<const __m256i*>(p)); };
+        const __m256i bias = _mm256_set1_epi16(static_cast<int16_t>(128 * (tna - tns)));
+        for (int b = 0; b < HIDDEN; b += TILE) {
+            __m256i r[4], q[4];
+            for (int j = 0; j < 4; ++j) r[j] = q[j] = _mm256_setzero_si256();
+            applyThreatList<false>(tsub, tns, b, r, q);
+            applyThreatList<true>(tadd, tna, b, r, q);
+            for (int j = 0; j < 4; ++j) {
+                const int o = b + 32 * j;
+                __m256i lo = _mm256_sub_epi16(_mm256_sub_epi16(r[j], _mm256_slli_epi16(q[j], 8)), bias);
+                __m256i hi = q[j];
+                lo = _mm256_add_epi16(lo, loadVec(src + o));
+                hi = _mm256_add_epi16(hi, loadVec(src + o + 16));
+                for (int k = 0; k < S; ++k) {
+                    lo = _mm256_sub_epi16(lo, loadVec(psub[k] + o));
+                    hi = _mm256_sub_epi16(hi, loadVec(psub[k] + o + 16));
+                }
+                for (int k = 0; k < A; ++k) {
+                    lo = _mm256_add_epi16(lo, loadVec(padd[k] + o));
+                    hi = _mm256_add_epi16(hi, loadVec(padd[k] + o + 16));
+                }
+                _mm256_storeu_si256(reinterpret_cast<__m256i*>(row + o), lo);
+                _mm256_storeu_si256(reinterpret_cast<__m256i*>(row + o + 16), hi);
+            }
+        }
+#else
+        for (int i = 0; i < HIDDEN; ++i) {
+            int x = src[i];
+            for (int k = 0; k < S; ++k) x -= psub[k][i];
+            for (int k = 0; k < A; ++k) x += padd[k][i];
+            for (int k = 0; k < tns; ++k) x -= tsub[k][i];
+            for (int k = 0; k < tna; ++k) x += tadd[k][i];
+            row[i] = static_cast<int16_t>(x);
+        }
+#endif
     }
 
     // Applies a whole piece-feature diff to one row in one pass, from src (a
@@ -293,8 +249,8 @@ struct alignas(64) Accumulator {
             if (src != nullptr) std::memcpy(row, src, HIDDEN * sizeof(int16_t));
             return;
         }
-        if (src != nullptr) applyWeightRows<RowInit::Src, true>(row, src, sub, ns, add, na);
-        else                applyWeightRows<RowInit::InPlace, true>(row, nullptr, sub, ns, add, na);
+        if (src != nullptr) applyWeightRows<RowInit::Src>(row, src, sub, ns, add, na);
+        else                applyWeightRows<RowInit::InPlace>(row, nullptr, sub, ns, add, na);
     }
 };
 

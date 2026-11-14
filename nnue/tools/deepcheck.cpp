@@ -91,7 +91,7 @@ void bench(const NetworkDeep& net, const std::vector<int16_t>& us,
         auto t0 = std::chrono::steady_clock::now();
         for (int i = 0; i < N; ++i) sink = singleLayerForward(us.data(), them.data(), w.data());
         auto t1 = std::chrono::steady_clock::now();
-        for (int i = 0; i < N; ++i) sink = forwardSimd(net, us.data(), them.data(), NO_THREATS, NO_THREATS, bucket);
+        for (int i = 0; i < N; ++i) sink = forwardSimd(net, us.data(), them.data(), bucket);
         auto t2 = std::chrono::steady_clock::now();
         a = std::min(a, std::chrono::duration<double, std::nano>(t1 - t0).count() / N);
         b = std::min(b, std::chrono::duration<double, std::nano>(t2 - t1).count() / N);
@@ -133,8 +133,8 @@ int main(int argc, char** argv) {
             std::fprintf(stderr, "invalid FEN: %s\n", c.fen);
             return 1;
         }
-        const int32_t sc = forwardScalar(net, accUs.data(), accThem.data(), NO_THREATS, NO_THREATS, bucket);
-        const int32_t sd = forwardSimd(net, accUs.data(), accThem.data(), NO_THREATS, NO_THREATS, bucket);
+        const int32_t sc = forwardScalar(net, accUs.data(), accThem.data(), bucket);
+        const int32_t sd = forwardSimd(net, accUs.data(), accThem.data(), bucket);
         if (sc != sd) {
             std::fprintf(stderr, "scalar/SIMD MISMATCH on '%s': %d vs %d\n", c.label, sc, sd);
             return 1;

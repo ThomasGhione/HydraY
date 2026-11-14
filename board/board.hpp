@@ -263,8 +263,8 @@ private:
                                          uint8_t newPiece, uint8_t sq, uint64_t oldVictims,
                                          uint64_t newVictims, uint64_t oldAttackers,
                                          uint64_t newAttackers) const noexcept;
-    // Perspective p's threat values of the current position, from nothing.
-    void computeThreats(int16_t* row, int p, int flip) const noexcept;
+    // row = src + perspective p's threat values of the current position.
+    void computeThreats(int16_t* row, const int16_t* src, int p, int flip) const noexcept;
 
     // --- Private helpers: move execution ---
     // Record: doMove logs the change in the new frame; undoMove only pops it.

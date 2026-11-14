@@ -223,76 +223,95 @@ inline void syncRow(const Board& b, int16_t* row, uint64_t (&cached)[2][6], int 
     NNUE::Accumulator::applyRows(row, sub, ns, add, na);
 }
 
-// dst = src - sub + add, a row in both lists cancelled first; add needs 8 spare
-// slots past na. Out of line: every caller shares one copy.
+// Drops the rows that appear in both lists; add needs 8 spare slots past na.
+// Out of line: every caller shares one copy.
 __attribute__((noinline, hot))
-void cancelAndApplyThreats(int16_t* __restrict dst, const int16_t* __restrict src,
-                           const int8_t** sub, int ns, const int8_t** add, int na) noexcept {
-    if (ns > 0 && na > 0) {
+void cancelThreats(const int8_t** sub, int& ns, const int8_t** add, int& na) noexcept {
+    if (ns == 0 || na == 0) return;
 #if defined(__AVX2__)
-        // A fixed-size store: clang turns a variable-length one into a memset call.
-        std::memset(add + na, 0, 8 * sizeof(const int8_t*));
-        const auto matchMask8 = [](const __m256i key, const __m256i a0, const __m256i a1) noexcept {
-            const int m0 = _mm256_movemask_pd(_mm256_castsi256_pd(_mm256_cmpeq_epi64(key, a0)));
-            const int m1 = _mm256_movemask_pd(_mm256_castsi256_pd(_mm256_cmpeq_epi64(key, a1)));
-            return m0 | (m1 << 4);
-        };
-        const auto swapRemove = [&](int i, int j) noexcept {
-            sub[i] = sub[--ns];
-            add[j] = add[--na];
-            add[na] = nullptr;
-        };
-        if (na <= 8) {
-            __m256i a0 = _mm256_loadu_si256(reinterpret_cast<const __m256i*>(add));
-            __m256i a1 = _mm256_loadu_si256(reinterpret_cast<const __m256i*>(add + 4));
-            for (int i = 0; i < ns; ) {
-                const int mask = matchMask8(_mm256_set1_epi64x(reinterpret_cast<int64_t>(sub[i])), a0, a1);
-                if (mask == 0) { ++i; continue; }
-                swapRemove(i, std::countr_zero(static_cast<unsigned>(mask)));
-                if (na == 0) break;
-                a0 = _mm256_loadu_si256(reinterpret_cast<const __m256i*>(add));
-                a1 = _mm256_loadu_si256(reinterpret_cast<const __m256i*>(add + 4));
-            }
-        } else {
-            for (int i = 0; i < ns; ) {
-                const __m256i key = _mm256_set1_epi64x(reinterpret_cast<int64_t>(sub[i]));
-                int hit = -1;
-                for (int base = 0; base < na; base += 8) {
-                    const int mask = matchMask8(
-                        key,
-                        _mm256_loadu_si256(reinterpret_cast<const __m256i*>(add + base)),
-                        _mm256_loadu_si256(reinterpret_cast<const __m256i*>(add + base + 4)));
-                    if (mask != 0) {
-                        hit = base + std::countr_zero(static_cast<unsigned>(mask));
-                        break;
-                    }
-                }
-                if (hit < 0) { ++i; continue; }
-                swapRemove(i, hit);
-                if (na == 0) break;
-            }
-        }
-#else
+    // A fixed-size store: clang turns a variable-length one into a memset call.
+    std::memset(add + na, 0, 8 * sizeof(const int8_t*));
+    const auto matchMask8 = [](const __m256i key, const __m256i a0, const __m256i a1) noexcept {
+        const int m0 = _mm256_movemask_pd(_mm256_castsi256_pd(_mm256_cmpeq_epi64(key, a0)));
+        const int m1 = _mm256_movemask_pd(_mm256_castsi256_pd(_mm256_cmpeq_epi64(key, a1)));
+        return m0 | (m1 << 4);
+    };
+    const auto swapRemove = [&](int i, int j) noexcept {
+        sub[i] = sub[--ns];
+        add[j] = add[--na];
+        add[na] = nullptr;
+    };
+    if (na <= 8) {
+        __m256i a0 = _mm256_loadu_si256(reinterpret_cast<const __m256i*>(add));
+        __m256i a1 = _mm256_loadu_si256(reinterpret_cast<const __m256i*>(add + 4));
         for (int i = 0; i < ns; ) {
-            int j = 0;
-            while (j < na && add[j] != sub[i]) ++j;
-            if (j == na) { ++i; continue; }
-            sub[i] = sub[--ns];
-            add[j] = add[--na];
+            const int mask = matchMask8(_mm256_set1_epi64x(reinterpret_cast<int64_t>(sub[i])), a0, a1);
+            if (mask == 0) { ++i; continue; }
+            swapRemove(i, std::countr_zero(static_cast<unsigned>(mask)));
+            if (na == 0) break;
+            a0 = _mm256_loadu_si256(reinterpret_cast<const __m256i*>(add));
+            a1 = _mm256_loadu_si256(reinterpret_cast<const __m256i*>(add + 4));
         }
-#endif
+    } else {
+        for (int i = 0; i < ns; ) {
+            const __m256i key = _mm256_set1_epi64x(reinterpret_cast<int64_t>(sub[i]));
+            int hit = -1;
+            for (int base = 0; base < na; base += 8) {
+                const int mask = matchMask8(
+                    key,
+                    _mm256_loadu_si256(reinterpret_cast<const __m256i*>(add + base)),
+                    _mm256_loadu_si256(reinterpret_cast<const __m256i*>(add + base + 4)));
+                if (mask != 0) {
+                    hit = base + std::countr_zero(static_cast<unsigned>(mask));
+                    break;
+                }
+            }
+            if (hit < 0) { ++i; continue; }
+            swapRemove(i, hit);
+            if (na == 0) break;
+        }
     }
-    if (ns == 0 && na == 0) {
+#else
+    for (int i = 0; i < ns; ) {
+        int j = 0;
+        while (j < na && add[j] != sub[i]) ++j;
+        if (j == na) { ++i; continue; }
+        sub[i] = sub[--ns];
+        add[j] = add[--na];
+    }
+#endif
+}
+
+// dst = src - psub + padd - tsub + tadd (piece rows i16, threat rows i8) in
+// one pass when the piece rows fit the kernel's shapes. Out of line: one copy
+// of the kernels.
+__attribute__((noinline, hot))
+void applyMixed(int16_t* __restrict dst, const int16_t* __restrict src,
+                const int16_t* const* psub, int pns, const int16_t* const* padd, int pna,
+                const int8_t* const* tsub, int tns, const int8_t* const* tadd, int tna) noexcept {
+    using Acc = NNUE::Accumulator;
+    if (pns + pna + tns + tna == 0) {
         std::memcpy(dst, src, NNUE::HIDDEN * sizeof(int16_t));
         return;
     }
-    NNUE::Accumulator::applyThreatRows(dst, src, sub, ns, add, na);
+    switch (pns * 4 + pna) {
+        case 1 * 4 + 1: Acc::applyMixedRows<1, 1>(dst, src, psub, padd, tsub, tns, tadd, tna); return;
+        case 2 * 4 + 1: Acc::applyMixedRows<2, 1>(dst, src, psub, padd, tsub, tns, tadd, tna); return;
+        case 2 * 4 + 2: Acc::applyMixedRows<2, 2>(dst, src, psub, padd, tsub, tns, tadd, tna); return;
+        case 0:         Acc::applyMixedRows<0, 0>(dst, src, psub, padd, tsub, tns, tadd, tna); return;
+        default:
+            Acc::applyMixedRows<0, 0>(dst, src, psub, padd, tsub, tns, tadd, tna);
+            Acc::applyRows(dst, psub, pns, padd, pna);
+    }
 }
 
-// Both perspectives' threats of a frame from the one before it. One move
-// rarely adds and removes the same feature, so nothing is cancelled.
+// Both perspectives of a frame from the one before it, the move's piece rows
+// given. One move rarely adds and removes the same threat, so nothing is
+// cancelled.
 __attribute__((noinline, hot))
-void applyThreatPair1(NNUE::Accumulator& dst, const NNUE::Accumulator& src, int flip0, int flip1) noexcept {
+void applyFramePair1(NNUE::Accumulator& dst, const NNUE::Accumulator& src, int flip0, int flip1,
+                     const int16_t* const (&psub)[2][NNUE::ACC_MAX_DELTAS], int pns,
+                     const int16_t* const (&padd)[2][NNUE::ACC_MAX_DELTAS], int pna) noexcept {
     const int8_t* sub[2][NNUE::ACC_MAX_THREATS];
     const int8_t* add[2][NNUE::ACC_MAX_THREATS];
     int ns[2] = {0, 0};
@@ -314,41 +333,13 @@ void applyThreatPair1(NNUE::Accumulator& dst, const NNUE::Accumulator& src, int 
         pushRow(0, f0);
         pushRow(1, f1);
     }
-    for (int p = 0; p < 2; ++p) {
-        if (ns[p] == 0 && na[p] == 0) std::memcpy(dst.threat[p], src.threat[p], sizeof(dst.threat[p]));
-        else NNUE::Accumulator::applyThreatRows(dst.threat[p], src.threat[p], sub[p], ns[p], add[p], na[p]);
-    }
-}
-
-// A piece diff of more than one pass, out of line to keep incremental() small.
-__attribute__((noinline))
-void fusePairFallback(NNUE::Accumulator& dst, const NNUE::Accumulator& src,
-                      const int rowBase[2], const int rowFlip[2],
-                      const uint16_t* sub, int ns, const uint16_t* add, int na) noexcept {
-    const auto row = [&](int p, uint16_t c) {
-        return NNUE::Accumulator::rowFor(rowBase[p], rowFlip[p], p, static_cast<uint8_t>(c >> 8),
-                                         static_cast<uint8_t>(c));
-    };
-    bool first = true;
-    NNUE::Accumulator::forEachPass(ns, na, [&]<int S, int A>(int si, int ai) {
-        const int16_t* subRow[2][2];
-        const int16_t* addRow[2][2];
-        for (int p = 0; p < 2; ++p) {
-            for (int k = 0; k < S; ++k) subRow[p][k] = row(p, sub[si + k]);
-            for (int k = 0; k < A; ++k) addRow[p][k] = row(p, add[ai + k]);
-        }
-        if (first) {
-            NNUE::Accumulator::fusePair<S, A, true>(dst.v[0], dst.v[1], src.v[0], src.v[1], subRow, addRow);
-            first = false;
-        } else {
-            NNUE::Accumulator::fusePair<S, A>(dst.v[0], dst.v[1], nullptr, nullptr, subRow, addRow);
-        }
-    });
+    for (int p = 0; p < 2; ++p)
+        applyMixed(dst.v[p], src.v[p], psub[p], pns, padd[p], pna, sub[p], ns[p], add[p], na[p]);
 }
 
 } // namespace
 
-void Board::computeThreats(int16_t* row, int p, int flip) const noexcept {
+void Board::computeThreats(int16_t* row, const int16_t* src, int p, int flip) const noexcept {
     const int8_t* add[NNUE::MAX_ACTIVE_THREATS];
     int na = 0;
     const NNUE::ThreatPerspective tp(p, flip);
@@ -397,7 +388,7 @@ void Board::computeThreats(int16_t* row, int p, int flip) const noexcept {
             emit(baseA + (KING - 1), from, pieces::KING_ATTACKS[from] & kingVictims);
         }
     }
-    NNUE::Accumulator::applyThreatRows<false, false>(row, nullptr, nullptr, 0, add, na);
+    applyMixed(row, src, nullptr, 0, nullptr, 0, nullptr, 0, add, na);
 }
 
 // From-scratch rebuild of the current frame, which becomes the oldest one of
@@ -420,22 +411,23 @@ void Board::refreshNnueAccumulator() noexcept {
         acc.flip[p] = static_cast<uint8_t>(NNUE::kingFlip(view));
         acc.dirty[p] = false;
         uint64_t empty[2][6] = {};
-        std::memcpy(acc.v[p], NNUE::activeNetwork->l0b, sizeof(acc.v[p]));
-        syncRow(*this, acc.v[p], empty, p, acc.base[p], acc.flip[p]);
-        computeThreats(acc.threat[p], p, acc.flip[p]);
+        alignas(64) int16_t pieceRow[NNUE::HIDDEN];
+        std::memcpy(pieceRow, NNUE::activeNetwork->l0b, sizeof(pieceRow));
+        syncRow(*this, pieceRow, empty, p, acc.base[p], acc.flip[p]);
+        computeThreats(acc.v[p], pieceRow, p, acc.flip[p]);
     }
 }
 
 // Computes the current frame. Its nearest computed ancestor, at most
 // ACC_MAX_WALK moves back, is a valid start for a perspective whose king still
-// stands on the same basis: the changes logged since sum to the feature
-// difference whatever the king did in between. Rows that appear on both sides
-// cancel, and int16 is modular, so the rest applies in any order. The same
-// holds for the threats under the same flip alone, unless a move in between
-// logged too many. A perspective without such a start is rebuilt as a diff
-// against the Finny table, and its threats from nothing. Called from
-// consistent-board points only (NNUE::evaluate, a copy, the selftest), never
-// mid-doMove.
+// stands on the same basis, unless a move in between logged too many threats:
+// the changes logged since sum to the feature difference whatever the king did
+// in between. Rows that appear on both sides cancel, and int16 is modular, so
+// the rest applies in any order. A perspective without such a start is
+// rebuilt from the Finny table and its threats from nothing (cheaper than
+// carrying them over a change of bucket: the old basis's Finny entry is
+// rarely close to the ancestor's pieces). Called from consistent-board points
+// only (NNUE::evaluate, a copy, the selftest), never mid-doMove.
 __attribute__((hot))
 void Board::ensureNnueAccumulatorClean() const noexcept {
     if (NNUE::activeNetwork == nullptr) return;
@@ -463,24 +455,16 @@ void Board::ensureNnueAccumulatorClean() const noexcept {
         // Here, not in a loop of its own: clang vectorised that one.
         threatsLogged &= f.nthreat != NNUE::ACC_THREATS_OVERFLOW;
     }
-    const int origin = from;
     bool usable[2] = {false, false};
-    bool threatsUsable[2] = {false, false};
-    if (from >= 0) {
+    if (from >= 0 && threatsLogged) {
         const NNUE::Accumulator& src = frame(from);
-        for (int p = 0; p < 2; ++p) {
-            threatsUsable[p] = threatsLogged && src.flip[p] == rowFlip[p];
-            usable[p] = threatsUsable[p] && src.base[p] == rowBase[p];
-        }
+        for (int p = 0; p < 2; ++p) usable[p] = src.flip[p] == rowFlip[p] && src.base[p] == rowBase[p];
     }
 
-    // Perspective p's threats of frame `target` from those of frame `start`.
-    // A row added and removed on the way is 1 KiB not read twice.
-    const auto applyThreatRange = [&]<int Cap>(int p, int start, int target) __attribute__((hot)) {
-        const int8_t* sub[Cap];
-        const int8_t* add[Cap + 8];
-        int ns = 0;
-        int na = 0;
+    // Perspective p's threat rows of the moves after frame `start` up to frame
+    // `target`. A row added and removed on the way is 1 KiB not read twice.
+    const auto collectThreats = [&](int p, int start, int target, const int8_t** sub, int& ns,
+                                    const int8_t** add, int& na) __attribute__((hot)) {
         const NNUE::ThreatPerspective tp(p, rowFlip[p]);
         for (int i = start + 1; i <= target; ++i) {
             const NNUE::Accumulator& f = frame(i);
@@ -497,11 +481,7 @@ void Board::ensureNnueAccumulatorClean() const noexcept {
                 }
             }
         }
-        cancelAndApplyThreats(frame(target).threat[p], frame(start).threat[p], sub, ns, add, na);
-    };
-    const auto incrementalThreats = [&](int p, int start, int target) noexcept {
-        if (target == start + 1) applyThreatRange.template operator()<NNUE::ACC_MAX_THREATS>(p, start, target);
-        else applyThreatRange.template operator()<NNUE::ACC_MAX_WALK * NNUE::ACC_MAX_THREATS>(p, start, target);
+        cancelThreats(sub, ns, add, na);
     };
 
     // Frame `target` from frame `start` for the usable perspectives, through
@@ -538,38 +518,28 @@ void Board::ensureNnueAccumulatorClean() const noexcept {
             return NNUE::Accumulator::rowFor(rowBase[p], rowFlip[p], p, static_cast<uint8_t>(c >> 8),
                                              static_cast<uint8_t>(c));
         };
-        if (usable[0] && usable[1]) {
-            const auto singlePass = [&]<int S, int A>() {
-                const int16_t* subRow[2][2];
-                const int16_t* addRow[2][2];
-                for (int p = 0; p < 2; ++p) {
-                    for (int k = 0; k < S; ++k) subRow[p][k] = row(p, sub[k]);
-                    for (int k = 0; k < A; ++k) addRow[p][k] = row(p, add[k]);
-                }
-                NNUE::Accumulator::fusePair<S, A, true>(dst.v[0], dst.v[1], src.v[0], src.v[1], subRow, addRow);
-            };
-            if (ns == 0 && na == 0) {
-                std::memcpy(dst.v, src.v, sizeof(dst.v));
-            } else if (ns == 1 && na == 1) {
-                singlePass.template operator()<1, 1>();
-            } else if (ns == 2 && na == 1) {
-                singlePass.template operator()<2, 1>();
-            } else {
-                fusePairFallback(dst, src, rowBase, rowFlip, sub, ns, add, na);
+        if (usable[0] && usable[1] && target == start + 1) {
+            const int16_t* subRow[2][NNUE::ACC_MAX_DELTAS];
+            const int16_t* addRow[2][NNUE::ACC_MAX_DELTAS];
+            for (int p = 0; p < 2; ++p) {
+                for (int k = 0; k < ns; ++k) subRow[p][k] = row(p, sub[k]);
+                for (int k = 0; k < na; ++k) addRow[p][k] = row(p, add[k]);
             }
-        } else {
-            const int p = usable[0] ? 0 : 1;
+            applyFramePair1(dst, src, rowFlip[0], rowFlip[1], subRow, ns, addRow, na);
+            return;
+        }
+        for (int p = 0; p < 2; ++p) {
+            if (!usable[p]) continue;
             const int16_t* subRow[CAP];
             const int16_t* addRow[CAP];
             for (int k = 0; k < ns; ++k) subRow[k] = row(p, sub[k]);
             for (int k = 0; k < na; ++k) addRow[k] = row(p, add[k]);
-            NNUE::Accumulator::applyRows(dst.v[p], subRow, ns, addRow, na, src.v[p]);
-        }
-        if (usable[0] && usable[1] && target == start + 1) {
-            applyThreatPair1(dst, src, rowFlip[0], rowFlip[1]);
-        } else {
-            for (int p = 0; p < 2; ++p)
-                if (usable[p]) incrementalThreats(p, start, target);
+            const int8_t* tsub[NNUE::ACC_MAX_WALK * NNUE::ACC_MAX_THREATS];
+            const int8_t* tadd[NNUE::ACC_MAX_WALK * NNUE::ACC_MAX_THREATS + 8];
+            int tns = 0;
+            int tna = 0;
+            collectThreats(p, start, target, tsub, tns, tadd, tna);
+            applyMixed(dst.v[p], src.v[p], subRow, ns, addRow, na, tsub, tns, tadd, tna);
         }
     };
 
@@ -613,9 +583,7 @@ void Board::ensureNnueAccumulatorClean() const noexcept {
         finny.ensureInitialised();
         NNUE::FinnyEntry& e = finny.entry[p][NNUE::KING_BUCKET_MAP[kingView[p]]][rowFlip[p] ? 1 : 0];
         syncRow(*this, e.v, e.bb, p, rowBase[p], rowFlip[p]);
-        std::memcpy(top.v[p], e.v, sizeof(e.v));
-        if (threatsUsable[p]) incrementalThreats(p, origin, accTop);
-        else computeThreats(top.threat[p], p, rowFlip[p]);
+        computeThreats(top.v[p], e.v, p, rowFlip[p]);
     }
 }
 

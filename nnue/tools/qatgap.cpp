@@ -200,7 +200,7 @@ int main(int argc, char** argv) {
             yC += screlu(static_cast<float>(zC) / static_cast<float>(QA * QB) + q.l1b[bucket][o]) * q.l2w[bucket][o];
         }
         y[A] = yA; y[D] = yD; y[B] = yB; y[C] = yC;
-        if (std::lround(static_cast<float>(yC) * SCALE) != forwardScalar(q, iUs.data(), iThem.data(), NO_THREATS, NO_THREATS, bucket)) ++mismatches;
+        if (std::lround(static_cast<float>(yC) * SCALE) != forwardScalar(q, iUs.data(), iThem.data(), bucket)) ++mismatches;
 
         const double target = 0.3 * (r.result / 2.0) + 0.7 * sigmoid(r.score / 400.0);
         for (int k = 0; k < N; ++k) {

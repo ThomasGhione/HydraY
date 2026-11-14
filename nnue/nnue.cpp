@@ -103,7 +103,7 @@ int32_t evaluate(const chess::Board& b) noexcept {
     // [2, 32] and the bucket in [0, OUTPUT_BUCKETS).
     const int bucket = (std::popcount(b.getPiecesBitMap()) - 2) / Deep::BUCKET_DIVISOR;
 
-    return Deep::forwardSimd(*activeNetwork, acc.v[stm], acc.v[stm ^ 1], acc.threat[stm], acc.threat[stm ^ 1], bucket);
+    return Deep::forwardSimd(*activeNetwork, acc.v[stm], acc.v[stm ^ 1], bucket);
 }
 
 } // namespace NNUE

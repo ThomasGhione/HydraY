@@ -86,7 +86,7 @@ struct Evaluator {
     const ShallowNet*  shallow = nullptr;
 
     [[nodiscard]] int32_t eval(const int16_t* us, const int16_t* them, int bucket) const noexcept {
-        if (deep != nullptr) return forwardSimd(*deep, us, them, NO_THREATS, NO_THREATS, bucket);
+        if (deep != nullptr) return forwardSimd(*deep, us, them, bucket);
         const int sb = bucket / (OUTPUT_BUCKETS / SHALLOW_OUTPUT_BUCKETS);
         int32_t out = shallowHalf(us, shallow->outputWeights[sb][0])
                     + shallowHalf(them, shallow->outputWeights[sb][1]);
@@ -235,7 +235,7 @@ bool selfcheck(const Evaluator& ev, const std::string& path, uint64_t n) {
         const int bucket = accumulateRecord(*ev.l0, r, accUs.data(), accThem.data());
         const int32_t simd = ev.eval(accUs.data(), accThem.data(), bucket);
         if (ev.deep != nullptr) {
-            const int32_t scal = forwardScalar(*ev.deep, accUs.data(), accThem.data(), NO_THREATS, NO_THREATS, bucket);
+            const int32_t scal = forwardScalar(*ev.deep, accUs.data(), accThem.data(), bucket);
             if (simd != scal) {
                 std::fprintf(stderr, "record %llu: simd %d != scalar %d\n",
                              static_cast<unsigned long long>(i), simd, scal);

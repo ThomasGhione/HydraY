@@ -28,7 +28,7 @@
 //
 // ARITHMETIC (must match sanity_deep.rs line for line):
 //
-//   acc[i] = pieces[i] + threats[i]              two i16 accumulators, saturating
+//   acc[i] = pieces[i] + threats[i]              one i16 accumulator, modular
 //   c[i] = clamp(acc[i], 0, QA)                  QA scale, fits in u8
 //   p[j] = c[j] * c[j+512] / QA                  TRUNCATING INTEGER division
 //   z[o] = SUM(p[i] * l1w[o][i]) / (QA*QB) + l1b[o]   FLOAT division
@@ -159,22 +159,16 @@ static_assert(payloadBytes(OUTPUT_BUCKETS, false) == 6'557'760, "layout changed:
 static_assert(payloadBytes(LEGACY_OUTPUT_BUCKETS, false) == 6'425'632, "legacy layout changed");
 static_assert(payloadBytes(LEGACY_OUTPUT_BUCKETS, true) == 78'156'832, "threat layout changed: update sanity_deep.rs");
 
-// Threat accumulator of a net without threat weights, for the tools.
-alignas(64) inline constexpr int16_t NO_THREATS[HIDDEN] = {};
-
-// Scalar forward, from the two perspectives' piece and threat accumulators to
-// the evaluation in centipawns. The correctness reference for the vectorised
-// version.
+// Scalar forward, from the two perspectives' accumulators to the evaluation
+// in centipawns. The correctness reference for the vectorised version.
 [[nodiscard]] int32_t forwardScalar(const NetworkDeep& net,
                                     const int16_t* accStm, const int16_t* accNtm,
-                                    const int16_t* thrStm, const int16_t* thrNtm,
                                     int outputBucket) noexcept;
 
 // The same function, vectorised. It MUST return the same value as
 // forwardScalar for every input: it is an optimisation, not a different net.
 [[nodiscard]] int32_t forwardSimd(const NetworkDeep& net,
                                   const int16_t* accStm, const int16_t* accNtm,
-                                  const int16_t* thrStm, const int16_t* thrNtm,
                                   int outputBucket) noexcept;
 
 // Whether the binary has AVX-VNNI (vpdpbusd). Without it forwardSimd takes an

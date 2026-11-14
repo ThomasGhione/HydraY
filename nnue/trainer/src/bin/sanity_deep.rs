@@ -21,7 +21,7 @@
 //
 // ARITHMETIC, the delicate part:
 //
-//   acc[i] = piece accumulator (i16) + threat accumulator (i16), summed in i32
+//   acc[i] = piece + threat features, one i16 accumulator, wrapping
 //   c[i]  = clamp(acc[i], 0, QA)                    QA scale, fits in u8
 //   p[j]  = c[j] * c[j + 512] / QA                  pairwise, back in u8
 //   hl1   = [p_stm (512), p_ntm (512)]              1024 values, QA scale
@@ -224,7 +224,7 @@ pub fn threat_features(fen: &str) -> (Vec<usize>, Vec<usize>) {
 }
 
 /// The two perspectives' accumulators, threats included, and the output bucket
-/// (of `ob`), from the FEN. The pieces' part is summed in i16, as in the engine.
+/// (of `ob`), from the FEN. Summed in i16, wrapping, as in the engine.
 pub fn accumulate(net: &Network, fen: &str) -> (Vec<i32>, Vec<i32>, usize) {
     let (us, them, out_bucket) = features(net.ob, fen);
     let (us_threats, them_threats) = if net.l0t.is_empty() { Default::default() } else { threat_features(fen) };
@@ -235,13 +235,12 @@ pub fn accumulate(net: &Network, fen: &str) -> (Vec<i32>, Vec<i32>, usize) {
                 *a = a.wrapping_add(*w);
             }
         }
-        let mut acc: Vec<i32> = acc.into_iter().map(i32::from).collect();
         for &f in threat_list {
             for (a, w) in acc.iter_mut().zip(&net.l0t[f * HIDDEN..(f + 1) * HIDDEN]) {
-                *a += i32::from(*w);
+                *a = a.wrapping_add(i16::from(*w));
             }
         }
-        acc
+        acc.into_iter().map(i32::from).collect::<Vec<i32>>()
     };
     (sum(&us, &us_threats), sum(&them, &them_threats), out_bucket)
 }

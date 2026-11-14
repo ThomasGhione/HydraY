@@ -244,8 +244,8 @@ int main(int argc, char** argv) {
             pb[q] = b[perm[q]]; pb[q + PAIRWISE_OUT] = b[perm[q] + PAIRWISE_OUT];
         }
         for (int bk = 0; bk < OUTPUT_BUCKETS; ++bk, ++checks)
-            if (forwardSimd(net, a.data(), b.data(), NO_THREATS, NO_THREATS, bk)
-                != forwardSimd(back, pa.data(), pb.data(), NO_THREATS, NO_THREATS, bk)) ++bad;
+            if (forwardSimd(net, a.data(), b.data(), bk)
+                != forwardSimd(back, pa.data(), pb.data(), bk)) ++bad;
     }
     if (bad != 0) {
         std::fprintf(stderr, "\nCHECK FAILED: %ld mismatches in %ld - the file is NOT valid\n", bad, checks);
