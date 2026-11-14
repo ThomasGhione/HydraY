@@ -51,10 +51,14 @@
 // RECIPE: read from the environment at run time, so one build trains every arm of
 // a recipe test. Each variable left unset keeps the recipe of the 4.2.0 net, and
 // every stage of a run must see the same values (the notebook passes them).
-//   HYDRAY_LR=step|cosine   step: x0.1 at superbatches/2 (default); cosine: down to
-//                           HYDRAY_LR_FINAL at the last superbatch
+//   HYDRAY_LR=step|cosine|steps
+//                           step: x0.1 at superbatches/2 (default); cosine: down to
+//                           HYDRAY_LR_FINAL at the last superbatch; steps: piecewise
+//                           constant schedule read from HYDRAY_LR_STEPS
 //   HYDRAY_LR_START         default 0.001
 //   HYDRAY_LR_FINAL         cosine only, default HYDRAY_LR_START * 0.3^5 (bullet's examples)
+//   HYDRAY_LR_STEPS         steps only, comma-separated `after_sb:lr` pairs in strictly
+//                           increasing superbatch order (e.g. `60:0.0001,240:0.00003`)
 //   HYDRAY_WARMUP           batches of LR warmup in superbatch 1 (bullet's lr::Warmup), default 0
 //   HYDRAY_WDL              weight of the game result in the target, default 0.3
 //   HYDRAY_EVAL_SCALE       sigmoid scale of the labels, default 400
@@ -203,12 +207,67 @@ fn env_or<T: std::str::FromStr>(name: &str, default: T) -> T {
     }
 }
 
-// Both delegate to bullet: Step is the 4.2.0 recipe, Cosine bullet's own default
-// for this architecture (examples/progression/4_multi_layer.rs).
+/// Piecewise-constant LR schedule switching after each `(after_sb, lr)` boundary.
+#[derive(Clone, Debug)]
+struct MultiStepLR {
+    start: f32,
+    drops: Vec<(usize, f32)>,
+}
+
+impl MultiStepLR {
+    fn parse(start: f32, spec: &str) -> Self {
+        let trimmed = spec.trim();
+        assert!(!trimmed.is_empty(), "HYDRAY_LR=steps requires HYDRAY_LR_STEPS=sb:lr,...");
+        let mut drops = Vec::new();
+        let mut prev_sb = 0usize;
+        for part in trimmed.split(',') {
+            let (sb_str, lr_str) = part
+                .trim()
+                .split_once(':')
+                .unwrap_or_else(|| panic!("HYDRAY_LR_STEPS entry '{part}' must be sb:lr"));
+            let sb: usize = sb_str
+                .trim()
+                .parse()
+                .unwrap_or_else(|_| panic!("HYDRAY_LR_STEPS invalid superbatch '{sb_str}'"));
+            let val: f32 = lr_str
+                .trim()
+                .parse()
+                .unwrap_or_else(|_| panic!("HYDRAY_LR_STEPS invalid lr '{lr_str}'"));
+            assert!(sb > prev_sb, "HYDRAY_LR_STEPS boundaries must strictly increase (> {prev_sb}, got {sb})");
+            assert!(val.is_finite() && val > 0.0, "HYDRAY_LR_STEPS lr must be positive and finite (got {val})");
+            drops.push((sb, val));
+            prev_sb = sb;
+        }
+        Self { start, drops }
+    }
+}
+
+impl LrScheduler for MultiStepLR {
+    fn lr(&self, _batch: usize, superbatch: usize) -> f32 {
+        let mut current = self.start;
+        for &(after_sb, val) in &self.drops {
+            if superbatch > after_sb {
+                current = val;
+            }
+        }
+        current
+    }
+
+    fn colourful(&self) -> String {
+        let mut desc = format!("start {}", self.start);
+        for &(after_sb, val) in &self.drops {
+            desc.push_str(&format!(", after sb {after_sb} -> {val}"));
+        }
+        desc
+    }
+}
+
+// Both Step and Cosine delegate to bullet; MultiStep supports asymmetric phases.
 #[derive(Clone, Debug)]
 enum Lr {
     Step(lr::StepLR),
     Cosine(lr::CosineDecayLR),
+    MultiStep(MultiStepLR),
 }
 
 impl LrScheduler for Lr {
@@ -216,6 +275,7 @@ impl LrScheduler for Lr {
         match self {
             Lr::Step(s) => s.lr(batch, superbatch),
             Lr::Cosine(c) => c.lr(batch, superbatch),
+            Lr::MultiStep(m) => m.lr(batch, superbatch),
         }
     }
 
@@ -223,6 +283,7 @@ impl LrScheduler for Lr {
         match self {
             Lr::Step(s) => s.colourful(),
             Lr::Cosine(c) => c.colourful(),
+            Lr::MultiStep(m) => m.colourful(),
         }
     }
 }
@@ -259,6 +320,7 @@ fn main() {
     let lr_kind: String = env_or("HYDRAY_LR", "step".to_string());
     let lr_start: f32 = env_or("HYDRAY_LR_START", 0.001);
     let lr_final: f32 = env_or("HYDRAY_LR_FINAL", lr_start * 0.3f32.powi(5));
+    let lr_steps: String = env_or("HYDRAY_LR_STEPS", String::new());
     let warmup: usize = env_or("HYDRAY_WARMUP", 0);
     let wdl_weight: f32 = env_or("HYDRAY_WDL", 0.3);
     let eval_scale: f32 = env_or("HYDRAY_EVAL_SCALE", SCALE as f32);
@@ -270,9 +332,16 @@ fn main() {
     let qat = env_or("HYDRAY_QAT", 0) != 0;
     assert!(!revive || !init_net.is_empty(), "HYDRAY_REVIVE needs HYDRAY_INIT_NET");
     let lr_scheduler = match lr_kind.as_str() {
-        "step" => Lr::Step(lr::StepLR { start: lr_start, gamma: 0.1, step: (superbatches / 2).max(1) }),
-        "cosine" => Lr::Cosine(lr::CosineDecayLR { initial_lr: lr_start, final_lr: lr_final, final_superbatch: superbatches }),
-        other => panic!("HYDRAY_LR={other}: step or cosine"),
+        "step" => {
+            assert!(lr_steps.is_empty(), "HYDRAY_LR_STEPS requires HYDRAY_LR=steps");
+            Lr::Step(lr::StepLR { start: lr_start, gamma: 0.1, step: (superbatches / 2).max(1) })
+        }
+        "cosine" => {
+            assert!(lr_steps.is_empty(), "HYDRAY_LR_STEPS requires HYDRAY_LR=steps");
+            Lr::Cosine(lr::CosineDecayLR { initial_lr: lr_start, final_lr: lr_final, final_superbatch: superbatches })
+        }
+        "steps" => Lr::MultiStep(MultiStepLR::parse(lr_start, &lr_steps)),
+        other => panic!("HYDRAY_LR={other}: step, cosine or steps"),
     };
     let pow25 = match loss.as_str() {
         "mse" => false,
@@ -281,8 +350,9 @@ fn main() {
     };
     // One line with the whole recipe: the notebook checks it against the arm.
     println!(
-        "recipe: lr {lr_kind} {lr_start} (final {lr_final}), warmup {warmup}, wdl {wdl_weight}, eval_scale {eval_scale}, \
-         loss {loss}, l1b_init {l1b_init}, float_clip {float_clip}, init_net '{init_net}', revive {revive}, qat {qat}"
+        "recipe: lr {lr_kind} {lr_start} (final {lr_final}), lr_steps '{lr_steps}', warmup {warmup}, wdl {wdl_weight}, \
+         eval_scale {eval_scale}, loss {loss}, l1b_init {l1b_init}, float_clip {float_clip}, init_net '{init_net}', \
+         revive {revive}, qat {qat}"
     );
 
     let init = (!init_net.is_empty()).then(|| {
@@ -477,5 +547,25 @@ mod tests {
             assert!(us_threats.len() > 4, "{fen}: too few threats to test anything");
             assert_eq!((stm, ntm), (us, them), "{fen}");
         }
+    }
+
+    #[test]
+    fn multistep_lr_schedule_boundaries_and_display() {
+        let s = MultiStepLR::parse(0.001, "60:0.0001,240:0.00003");
+        assert_eq!(s.lr(0, 1), 0.001);
+        assert_eq!(s.lr(6103, 60), 0.001);
+        assert_eq!(s.lr(0, 61), 0.0001);
+        assert_eq!(s.lr(0, 240), 0.0001);
+        assert_eq!(s.lr(0, 241), 0.00003);
+        assert_eq!(s.lr(0, 320), 0.00003);
+        // Check decimal formatting used by the notebook's recipe-line assertion.
+        assert_eq!(format!("{}", "0.00005".parse::<f32>().unwrap()), "0.00005");
+        assert_eq!(format!("{}", "0.0000025".parse::<f32>().unwrap()), "0.0000025");
+    }
+
+    #[test]
+    #[should_panic(expected = "strictly increase")]
+    fn multistep_lr_rejects_non_increasing_boundaries() {
+        MultiStepLR::parse(0.001, "80:0.0001,80:0.00003");
     }
 }
