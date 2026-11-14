@@ -289,11 +289,12 @@ void cancelAndApplyThreats(int16_t* __restrict dst, const int16_t* __restrict sr
     NNUE::Accumulator::applyThreatRows(dst, src, sub, ns, add, na);
 }
 
-// Both perspectives' threats of a frame from the one before it.
+// Both perspectives' threats of a frame from the one before it. One move
+// rarely adds and removes the same feature, so nothing is cancelled.
 __attribute__((noinline, hot))
 void applyThreatPair1(NNUE::Accumulator& dst, const NNUE::Accumulator& src, int flip0, int flip1) noexcept {
     const int8_t* sub[2][NNUE::ACC_MAX_THREATS];
-    const int8_t* add[2][NNUE::ACC_MAX_THREATS + 8];
+    const int8_t* add[2][NNUE::ACC_MAX_THREATS];
     int ns[2] = {0, 0};
     int na[2] = {0, 0};
     const int toView0 = 56 ^ flip0;
@@ -313,8 +314,10 @@ void applyThreatPair1(NNUE::Accumulator& dst, const NNUE::Accumulator& src, int 
         pushRow(0, f0);
         pushRow(1, f1);
     }
-    for (int p = 0; p < 2; ++p)
-        cancelAndApplyThreats(dst.threat[p], src.threat[p], sub[p], ns[p], add[p], na[p]);
+    for (int p = 0; p < 2; ++p) {
+        if (ns[p] == 0 && na[p] == 0) std::memcpy(dst.threat[p], src.threat[p], sizeof(dst.threat[p]));
+        else NNUE::Accumulator::applyThreatRows(dst.threat[p], src.threat[p], sub[p], ns[p], add[p], na[p]);
+    }
 }
 
 // A piece diff of more than one pass, out of line to keep incremental() small.
