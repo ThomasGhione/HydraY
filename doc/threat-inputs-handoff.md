@@ -5,14 +5,16 @@ the audits and the architecture changes (more output buckets, more king buckets,
 layers) gave nothing. The code is complete and verified for correctness; **no net has
 been trained** and **nothing was SPRT'd**. The open question is whether the eval gain
 pays for the cost per node: x2.15 at first, x1.76 after your six speed patches,
-**x1.70** (bench6) and **x1.60** (datagen) after the engine campaign of section 4. What is
+**x1.67** (bench6, P-core), **x1.84** (bench6, E-core) and **x1.59** (datagen) after the
+engine campaign of section 4. What is
 left is set by the feature set and the threat width, that is by training: section 5
 gives the exact speed of each training-side option.
 
 On `threat-inputs`, branched from `dev` at `fdf4756`: `64fcf83` (threat inputs),
 `beb787d`..`b909626` (your six patches, applied with `git am`), `4ca1354` (helpers they
 left unused, shorter comments; `.text` byte-identical), `3dc0dff` (deferred-decode
-kernel), `9b94adb` (no cancellation in one-move updates). `dev` is untouched.
+kernel), `9b94adb` (no cancellation in one-move updates), `4cd4179` (eval cache slot
+prefetched in `doMove`). `dev` is untouched.
 
 ## 1. What a threat feature is
 
@@ -81,8 +83,9 @@ Invariants worth knowing:
   with the 4.4.0 net, with the synthetic net above (580,995) and with yours (734,233);
   seeded datagen SHA (40 games, 8,000 nodes) with all three nets; raweval == oracle on
   the 2,048 FENs with both synthetic nets; selftest; perft. All identical, so no SPRT.
-  The same checks for `3dc0dff` and `9b94adb`, and for every prototype of section 5 the
-  4.4.0 bench6 (448,769). Final tree (`9b94adb` and before it `4ca1354`): x86-64-v2 build
+  The same checks for `3dc0dff`, `9b94adb` and `4cd4179`, and for every prototype of
+  section 5 the 4.4.0 bench6 (448,769). Final tree (`4cd4179`, and before it `9b94adb` and
+  `4ca1354`): x86-64-v2 build
   (scalar paths: bench6 with both nets, raweval == oracle),
   Windows build under wine (bench6 with both nets), `make test`, and GCC ASan+UBSan on
   bench6, selftest, perft, seeded datagen and the 37 UCI corner cases: clean but for the
@@ -142,7 +145,29 @@ Kept (each identical as in section 3, bench6:13 CPU time against the commit befo
   sums raw lanes and their `vpsraw 8` and decodes once per tile. No row is widened:
   3 vector ops per 32 weights and row instead of 2 `vpmovsxbw` + 2 adds.
 - `9b94adb` **no cancellation in one-move updates, +1.39%** (19/20).
-Together +3.3% on bench6, +3.1% on datagen: x1.70 and x1.60 against `dev`.
+- `4cd4179` **eval cache slot prefetched in `doMove` with the TT bucket, +1.00%** (16/16;
+  +0.35% on datagen, +0.15% on an E-core). Not threat code, but an evaluation now costs
+  1.7x and the probe was 5.8% of the samples.
+Together +5.1% on bench6: x1.757 -> **x1.672** on a P-core; datagen x1.635 -> x1.594.
+
+**On an E-core** (cpu 6, where `share/scripts/sprt.sh` plays: `CPUS=4-11`) threats cost
+more: `4ca1354` x1.893, `4cd4179` **x1.844**. The same oracles there: kernel 0.552, index
+0.119, recording 0.078, forward 0.026, rest 0.118. The rest is the copy of the threat
+accumulator: without the dst = src copy as well, the engine with all threat work off is
+as fast as `dev` (x0.995 E-core, x0.992 P-core). Reading src and writing dst is 4 KiB
+per update; on a P-core it is 0.05 of `dev`'s time.
+
+Also measured and dropped in a second round: the check features (a piece on the other
+side's king, 6,496 of the 70,050) are never active in training data, because the
+datagen records no position in check (`datagen.cpp:579`), so their rows stay zero in a
+trained net; skipping them in the engine when the rows are zero is exact but -0.27%
+(they only appear in frames in check, rare in search; patch kept outside the branch).
+A Finny table for threat rebuilds (the diff against the last same-flip rebuild is 18.3
+rows against 39.7) -0.35%, datagen -1.09%: the rebuild cost is the enumeration. Both
+perspectives in one kernel call -0.2%. Eval cache of 8, 32, 64, 128 MiB: +-0.3% on
+replayed games. clang PGO: +0.65% on the threat branch but +1.9% on `dev` too, so it
+does not change the ratio (a build option for both, not a threat fix). Ceiling of
+removing threat rebuilds entirely: +2.3% (P-core), +3.0% (E-core).
 
 Measured and dropped (against the deferred kernel unless said): `vpmaddubsw`/shift
 interleaves (+1.2% against the old kernel, below deferred); i16 rows (in-cache equal,
@@ -229,7 +254,7 @@ short schedule on v10 (e.g. 40 SB from scratch, the antidead phase settings), wi
 without threats. For the arm without threats use `dev`'s trainer (same recipe), since this
 branch's trainer always trains threats. Then:
 1. SPRT at fixed nodes: does the threat net evaluate better, and by how much?
-2. SPRT at 4+0.04, Threads=1: does it pay the x1.70?
+2. SPRT at 4+0.04, Threads=1: does it pay the x1.67 (x1.84 on the E-cores the SPRT uses)?
 If (1) is large and (2) is positive or close, go to C. If (1) is small, stop or try E.
 Costs ~40% of a full run.
 
@@ -241,10 +266,10 @@ nets), and `holdoutloss` needs threat accumulators to compare losses.
 
 **D. Cut the engine overhead (no retraining, identity-checkable): done, 2026-11-14.**
 Your six patches took bench6 from x2.15 to x1.76 against `dev`, the campaign of section 4
-to x1.70; what is left in the engine is listed there with what was tried.
+to x1.67; what is left in the engine is listed there with what was tried.
 
 **E/F/H. Fewer features or a narrower threat layer (retraining needed): measured.**
-Each option below was built as the real engine change and timed with the 4.4.0 net,
+Each option below was built as the real engine change (on `9b94adb`) and timed with the 4.4.0 net,
 whose zero threat weights keep the tree identical (bench6 448,769 for all; the reduced
 sets pass the selftest with your synthetic net), so the times are those a net trained
 that way would have. bench6:13 CPU time against `dev`, 12 pairs, same session:
@@ -317,7 +342,7 @@ Also: `./chess nnue-selftest synth.nnue 200`, `./chess perft suite`,
   UBSan shows it is also an out-of-bounds read: with `BUCKET_DIVISOR` 2 the empty board
   gets output bucket (0 - 2) / 2 = -1. The search never gets there (the missing-king
   guard returns first); only this selftest line does.
-- Until a threat net exists, this branch is ~x1.70 slower than `dev` with the same evals
-  (x1.60 in datagen): do not merge it for speed-neutral reasons.
+- Until a threat net exists, this branch is ~x1.67 slower than `dev` with the same evals
+  (x1.84 on an E-core, x1.59 in datagen): do not merge it for speed-neutral reasons.
 - Threat nets are ~78 MB: the embedded binary grows by the same amount, and the release
   workflow and the lichess bot copy should be checked for size limits.
