@@ -5,16 +5,19 @@ the audits and the architecture changes (more output buckets, more king buckets,
 layers) gave nothing. The code is complete and verified for correctness; **no net has
 been trained** and **nothing was SPRT'd**. The open question is whether the eval gain
 pays for the cost per node: x2.15 at first, x1.76 after your six speed patches,
-**x1.67** (bench6, P-core), **x1.84** (bench6, E-core) and **x1.59** (datagen) after the
-engine campaign of section 4. What is
-left is set by the feature set and the threat width, that is by training: section 5
-gives the exact speed of each training-side option.
+x1.67 after the engine campaign of section 4, and **x1.60** (bench6, P-core), **x1.76**
+(bench6, E-core) and **x1.51** (datagen) with one accumulator for pieces and threats, as
+Stockfish and PlentyChess have it. What is left is set by the feature set and the width
+of the first layer, that is by training: Stockfish and PlentyChess both made the first
+layer narrower when they added threats (section 4, "Other engines"), and section 5 gives
+the speed of each training-side option, widths included.
 
 On `threat-inputs`, branched from `dev` at `fdf4756`: `64fcf83` (threat inputs),
 `beb787d`..`b909626` (your six patches, applied with `git am`), `4ca1354` (helpers they
 left unused, shorter comments; `.text` byte-identical), `3dc0dff` (deferred-decode
 kernel), `9b94adb` (no cancellation in one-move updates), `4cd4179` (eval cache slot
-prefetched in `doMove`). `dev` is untouched.
+prefetched in `doMove`), `8d45227` (one accumulator for piece and threat features).
+`dev` is untouched.
 
 ## 1. What a threat feature is
 
@@ -46,10 +49,10 @@ bullet's example drop them; see option E). **70,050 features.**
 | `nnue/trainer/src/bin/trainer_deep.rs` | `Inputs`: piece features, then threat features from `768*4` on; `l0t` weights `(1024, 70050)`, clip ±127/255, QAT rounding, zero init (or from `HYDRAY_INIT_NET`); concatenated to `l0w` in the graph; saved as i8 after `l2b`. Loader threads now `available_parallelism` clamped to 2..8. Test `inputs_match_the_oracle`. |
 | `nnue/trainer/src/bin/sanity_deep.rs` | oracle: reads 4 layouts (8/16 buckets, with/without threats), `threat_features(fen)`, threats in `evaluate` and `evaluate_bullet`, zero `l0t` in `to_bullet` for an old net |
 | `board/boardapi.cpp` | `recordThreats<Add>(piece, sq)` in `doMoveByKind`: the piece's attacks, the attacks on it, and the slider lines it cuts (`BEYOND` table), with the never-feature pairs masked out before the pops; `recordReplacedThreats` for the square of a capture; the child's key and TT prefetch come before all of it |
-| `board/board.cpp` | `computeThreats` (from scratch, by piece type); in `ensureNnueAccumulatorClean` the threats of a perspective are incremental whenever the ancestor has the same flip (even if the king bucket changed), with add/sub cancellation (`cancelAndApplyThreats`, AVX2) and `applyThreatPair1` for one move on both perspectives |
-| `nnue/accumulator.hpp` | `threat[2][1024]` and `ThreatDelta threatDelta[64]` (4 bytes each) per frame; `applyWeightRows`: register-tiled AVX2 kernels, the deferred-decode one (`applyThreatList`) for i8 threat rows and the plain one for i16 piece rows |
+| `board/board.cpp` | `computeThreats` (Finny entry + every active threat, by piece type); in `ensureNnueAccumulatorClean` a perspective is incremental when the ancestor has the same basis (bucket and flip), its piece and threat rows in one pass (`applyMixed`), threat rows cancelled across a walk (`cancelThreats`, AVX2) and `applyFramePair1` for one move on both perspectives; a change of bucket or flip rebuilds from the Finny table and the threats from nothing |
+| `nnue/accumulator.hpp` | `v[2][1024]` holds pieces + threats; `ThreatDelta threatDelta[64]` (4 bytes each) per frame; `applyMixedRows`: the deferred-decode kernel (`applyThreatList`) for the i8 threat rows with the source row and up to two i16 piece rows of each sign folded into the same tile pass; `applyWeightRows` for piece rows alone (Finny sync) |
 | `engine/sort/movepicker.hpp`, `engine/search/searcher.cpp`, `tt/tt.hpp` | AVX2 max in `nextMove`; `doMove(m, st, HashPrefetch)` in search, qsearch and ProbCut |
-| `nnue/network_deep.hpp`, `nnue_deep.cpp` | `l0t` on huge pages (zero for an old net), re-laid out at load for the AVX2 kernel (the file keeps the bullet layout), `layoutForFileSize`, forward takes the two threat accumulators and adds them with `adds_epi16` (scalar: int32 sum, same result) |
+| `nnue/network_deep.hpp`, `nnue_deep.cpp` | `l0t` on huge pages (zero for an old net), re-laid out at load for the AVX2 kernel (the file keeps the bullet layout), `layoutForFileSize`; the forward reads one accumulator per perspective. The sum is modular i16 (Stockfish's too): it differs from an exact sum only where pieces + threats overflow i16, and `sanity_deep.rs` sums the same way |
 | `huge_pages.hpp` | the huge-page allocator, moved out of `tt/tt.hpp` unchanged |
 | `nnue/tools/*` | deepcheck, holdoutloss, qatgap, reorder still build piece-only accumulators: they **refuse** threat nets instead of computing something wrong |
 
@@ -66,7 +69,7 @@ Invariants worth knowing:
   after the move; castling records king off, king on, rook off, rook on;
 - a frame whose move logged more than 64 threat deltas is marked
   `ACC_THREATS_OVERFLOW` and no later frame starts from before it. Never seen in tests;
-- the psq and threat values of a frame share the `dirty` flag.
+- a frame's row holds the piece and the threat values together, under one `dirty` flag.
 
 ## 3. What was verified
 
@@ -90,6 +93,11 @@ Invariants worth knowing:
   Windows build under wine (bench6 with both nets), `make test`, and GCC ASan+UBSan on
   bench6, selftest, perft, seeded datagen and the 37 UCI corner cases: clean but for the
   first issue of section 7.
+- `8d45227` (one accumulator) against `4cd4179`: bench6 per position with the 4.4.0 net
+  and with your synthetic net, seeded datagen SHA (4.4.0 and both synthetic nets),
+  raweval == oracle on the 2,048 FENs, selftest, perft, `make test`; x86-64-v2 and
+  Windows (wine) bench6 identical; ASan+UBSan clean (bench, perft, uci_edge 37/37). The
+  oracle with the new wrapping sum gives the same 2,048 values as before.
 
 **Not verified: the trainer graph on a GPU.** Without `cuda` bullet compiles a mock
 device, so the `reshape`/`concat` of `l0w` and `l0t` is only type-checked. See option A.
@@ -217,10 +225,40 @@ Rows by attacker (row) and victim (column), share of all incremental rows:
 
 The king as attacker or victim is ~22%, P->P 4.5%, pawn victims ~50%.
 
-Other engines (gains net of their own slowdown, which none of them states): Alexandria
-+15.53 ±5.50 at 8+0.08 and +13.43 ±4.96 at 40+0.4 (PR #630); Stockfish SFNNv10 passed
-STC, LTC and VVLTC, ARM LTC estimate +13.9; PlentyChess was first. Their piece
-accumulators are wider than ours, so the relative cost of threats is likely smaller there.
+**Other engines (read from their sources and PRs, 2026-11-14).** None of them states its
+slowdown, but the two that brought threats in also shrank the first layer at the same
+time, so that the cost per node did not grow by much:
+
+| engine | first layer before -> with threats | threat features | accumulators |
+|---|---|---|---|
+| Stockfish (SFNNv10, PR #6411, Nov 2025) | 3072 -> **1024** | 79,856 then; today 59,808 (no king as attacker or victim, P->P moved to a pawn-pair set of 4,560) | one, pieces + threats + pawn pairs |
+| PlentyChess (PR #400, Oct 2025) | 1792 -> **640** (today 1024, 12 king buckets) | 79,856 then; today 59,808, the same as Stockfish | one |
+| Reckless | 768 | 66,864: ours without the king as victim | two, as ours was |
+| HydraY | 1024 -> 1024 | 70,050 | one since `8d45227` |
+
+PlentyChess's PR #400 (1792 without threats against 640 with): +45.5 at fixed nodes,
+-3.1 at 8+0.08 (H0), +1.8 at 40+0.4; merged on the LTC. Stockfish: STC, LTC and VVLTC
+passed, +13.9 on ARM LTC. Alexandria +15.53 ±5.50 at 8+0.08 (PR #630). Our engine also
+starts from a cheaper node (HydraY is about 2x Stockfish 18's nps per thread), so the same
+absolute cost per update is a larger fraction of our time.
+
+**Third round (2026-11-14), from what they do.**
+- Kept: `8d45227` **one accumulator for pieces and threats** (Stockfish, PlentyChess):
+  one row loaded and stored per update instead of two, frames 4 KiB smaller, the forward
+  reads one row. +4.24% P-core (16/16), +4.49% E-core (12/12), datagen x1.566 -> x1.508.
+  With it, a change of king bucket under the same flip rebuilds the threats too (before,
+  they carried over): 66k rebuilds in bench6:13, 40 threat rows each, 20% of all threat
+  rows (incremental updates: 8.9 threat rows and 2.5 piece rows).
+- Stockfish's hybrid update (ancestor - old Finny entry + new entry, so the threats carry
+  over a bucket change): -1.2% on an E-core, +-0.1% when limited to old entries within 2
+  or 6 pieces of the ancestor. The old entry is rarely close.
+- Finny entries that hold the threats too (bitset diff of the features): -0.79% P-core,
+  +0.31% E-core.
+- i8 piece weights in the same kernel (Stockfish's quantisation): on a copy of 4.4.0
+  clipped to ±127, same tree, +0.06% P-core, -0.43% E-core. Nothing for us.
+- ACC_MAX_WALK 4 -1.85%, 16 -0.35%; computing the top frame only -13.9%.
+- Recording the threats lazily (at evaluation, not in `doMove`): 27% of the pushed frames
+  are never computed, so at most ~1%: not built.
 
 ## 5. Options to continue
 
@@ -254,7 +292,7 @@ short schedule on v10 (e.g. 40 SB from scratch, the antidead phase settings), wi
 without threats. For the arm without threats use `dev`'s trainer (same recipe), since this
 branch's trainer always trains threats. Then:
 1. SPRT at fixed nodes: does the threat net evaluate better, and by how much?
-2. SPRT at 4+0.04, Threads=1: does it pay the x1.67 (x1.84 on the E-cores the SPRT uses)?
+2. SPRT at 4+0.04, Threads=1: does it pay the x1.60 (x1.76 on the E-cores the SPRT uses)?
 If (1) is large and (2) is positive or close, go to C. If (1) is small, stop or try E.
 Costs ~40% of a full run.
 
@@ -266,40 +304,54 @@ nets), and `holdoutloss` needs threat accumulators to compare losses.
 
 **D. Cut the engine overhead (no retraining, identity-checkable): done, 2026-11-14.**
 Your six patches took bench6 from x2.15 to x1.76 against `dev`, the campaign of section 4
-to x1.67; what is left in the engine is listed there with what was tried.
+to x1.67 and the single accumulator to x1.60; what is left in the engine is listed there
+with what was tried.
 
-**E/F/H. Fewer features or a narrower threat layer (retraining needed): measured.**
-Each option below was built as the real engine change (on `9b94adb`) and timed with the 4.4.0 net,
-whose zero threat weights keep the tree identical (bench6 448,769 for all; the reduced
-sets pass the selftest with your synthetic net), so the times are those a net trained
-that way would have. bench6:13 CPU time against `dev`, 12 pairs, same session:
+**E/F/H. Fewer features or a narrower first layer (retraining needed): measured.**
+Feature sets: each option built as the real engine change on `8d45227` and timed with
+the 4.4.0 net, whose zero threat weights keep the tree identical (bench6 448,769 for
+all; the reduced sets pass the selftest with your synthetic net), so the times are those
+a net trained that way would have. bench6:13 CPU time against `dev`:
 
-| option | x dev |
-|---|---|
-| full set (today, `9b94adb`) | 1.707 |
-| no king as attacker or victim | 1.627 |
-| no P->P | 1.665 |
-| no king, no P->P (E; close to bullet's example) | 1.598 |
-| threats on half the accumulator, 512 of 1024 (F) | 1.528 |
-| half + no king + no P->P | 1.455 |
-| **H: attacks only, victims of the other colour (34,990 features)** | **1.363** |
-| H + no king + no P->P | 1.354 |
-| H + half | 1.317 |
-| H + half + no king + no P->P | 1.303 |
-| threat weights clipped to ±31 / ±15, 4 / 8 rows per `vpsraw` | 1.715 / 1.747 (worse) |
+| feature set | features | P-core (10 pairs) | E-core (8 pairs) |
+|---|---:|---:|---:|
+| full (today) | 70,050 | 1.603 | 1.757 |
+| no king as victim (Reckless) | 57,058 | 1.575 | 1.722 |
+| no P->P | 69,840 | 1.570 | |
+| no king as attacker or victim | 50,626 | 1.539 | 1.669 |
+| **no king, no P->P (E; Stockfish's and PlentyChess's set)** | 50,416 | **1.507** | **1.631** |
+| H: attacks only, victims of the other colour | 34,990 | 1.266 | 1.311 |
+| H + no king + no P->P | 25,208 | 1.251 | |
 
-Defences are about half of the threat cost; the king and P->P are small. H is the set
-that was offered at the start next to the full one. For any of them change `threats.rs`
-and `threats.hpp` together (the C++ static_assert pins the count) and re-run the checks
-of section 3; F needs `l0t` of 512 columns in the trainer and the engine. Strength is
-the open question: B with H as a third arm would answer it.
+Widths (what Stockfish and PlentyChess did): the engine built with `HIDDEN` = 768, 640,
+512 and the 4.4.0 net cut to those widths (pairs k and k + 512 kept, l1 columns with them),
+with and without threat code on the same cut net: same tree, so the threat overhead at
+each width is exact. The cut nets search other trees than 4.4.0 (1.5-2.8M nodes against
+0.88M at depth 13), so across widths the comparison is per node, not exact:
+
+| first layer | dev, ns/node vs dev-1024 (P / E) | full set (P / E) | no king, no P->P (P / E) |
+|---|---|---|---|
+| 1024 | 1.000 / 1.000 | 1.61 / 1.76 | 1.51 / 1.64 |
+| 768 | 0.88 / 0.86 | 1.37 / 1.50 | 1.29 / 1.39 |
+| 640 | 0.86 / 0.82 | 1.32 / 1.44 | 1.24 / 1.33 |
+| 512 | 0.80 / 0.75 | 1.21 / 1.27 | 1.13 / 1.18 |
+
+The engine side of a width change is `HIDDEN` in `network.hpp` (every kernel and the
+forward build at 768/640/512; the payload `static_assert`s must follow); the trainer and
+`threats.rs`/`sanity_deep.rs` need the same width. For a feature set change `threats.rs`
+and `threats.hpp` change together (the C++ static_assert pins the count) and the checks of
+section 3 are re-run. Strength is the open question: PlentyChess's 640 threat net beat its
+1792 net by 45 Elo at fixed nodes, which suggests a narrower threat net can pay at TC
+where ours at 1024 may not. B with a 640 or 768 arm (set E) next to the 1024 full set
+would answer it.
 
 **G. Warm start from 4.4.0 (quick signal, lower ceiling).** `HYDRAY_INIT_NET` on the
 shipped net works as is: `l0t` starts at zero and the start is the same function. A 40 SB
 fine-tune gives a threat net within a day, but it is likely below what a run from scratch
 reaches; it can serve as the threat arm of B if time is short.
 
-Suggested order: A, then B (with an H arm if time allows), then C on the set B favours.
+Suggested order: A, then B (with a narrower arm, 640 or 768 with set E, if time allows),
+then C on the shape B favours.
 
 ## 6. How to check a change
 
