@@ -236,7 +236,7 @@ void Board::computeThreats(int16_t* row, int p, int flip) const noexcept {
                 add[na++] = NNUE::Accumulator::threatRow(feature);
         }
     }
-    NNUE::Accumulator::applyThreatRows(row, nullptr, nullptr, 0, add, na);
+    NNUE::Accumulator::applyThreatRows<false, false>(row, nullptr, nullptr, 0, add, na);
 }
 
 // From-scratch rebuild of the current frame, which becomes the oldest one of

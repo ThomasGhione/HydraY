@@ -13,6 +13,11 @@
 
 #include <cstdint>
 #include <cstring>
+#include <type_traits>
+
+#if defined(__AVX2__)
+#include <immintrin.h>
+#endif
 
 #include "network.hpp"
 #include "network_deep.hpp"
@@ -100,18 +105,6 @@ struct alignas(64) Accumulator {
         return activeNetwork->l0t.get() + static_cast<size_t>(feature) * HIDDEN;
     }
 
-    // Single-row counterpart of fusePair.
-    template<int NS, int NA, bool From = false>
-    static inline void fuseRows(int16_t* __restrict row, const int16_t* __restrict src,
-                                const int16_t* const* sub, const int16_t* const* add) noexcept {
-        for (int i = 0; i < HIDDEN; ++i) {
-            int x = From ? src[i] : row[i];
-            for (int k = 0; k < NS; ++k) x -= sub[k][i];
-            for (int k = 0; k < NA; ++k) x += add[k][i];
-            row[i] = static_cast<int16_t>(x);
-        }
-    }
-
     // Walks a diff of ns subs and na adds in passes of at most two of each,
     // calling f.template operator()<S, A>(si, ai) on each pass. The counts are
     // template parameters so the kernels unroll: runtime bounds measured 50%
@@ -136,44 +129,119 @@ struct alignas(64) Accumulator {
         }
     }
 
-    // row = src (zero when null) - sub + add, over threat rows of i8 weights.
-    // Any number of rows costs one pass over the destination: each tile of it
-    // stays in registers while every row is added in.
-    static inline void applyThreatRows(int16_t* __restrict row, const int16_t* __restrict src,
-                                       const int8_t* const* sub, int ns,
-                                       const int8_t* const* add, int na) noexcept {
+    enum class RowInit { Zero, Src, InPlace };
+
+    // Single-pass register-tiled accumulator update shared by i8 threat weights
+    // (16->16 sign-extended) and i16 piece weights. Any number of rows costs one
+    // pass over the destination: each tile stays in registers while all rows apply.
+#if defined(__AVX2__)
+    template<bool Add, typename W>
+    __attribute__((always_inline))
+    static inline void applyWeightList(const W* const* __restrict rows, int n, int b,
+                                       __m256i& x0, __m256i& x1, __m256i& x2, __m256i& x3,
+                                       __m256i& x4, __m256i& x5, __m256i& x6, __m256i& x7) noexcept {
+        const auto loadVec = [](const W* p) noexcept {
+            if constexpr (std::is_same_v<W, int8_t>)
+                return _mm256_cvtepi8_epi16(_mm_loadu_si128(reinterpret_cast<const __m128i*>(p)));
+            else
+                return _mm256_loadu_si256(reinterpret_cast<const __m256i*>(p));
+        };
+        const auto accum = [](__m256i acc, __m256i d) noexcept {
+            if constexpr (Add) return _mm256_add_epi16(acc, d);
+            else               return _mm256_sub_epi16(acc, d);
+        };
+        int k = 0;
+        for (; k + 1 < n; k += 2) {
+            const W* p0 = rows[k]     + b;
+            const W* p1 = rows[k + 1] + b;
+            auto step2 = [&](__m256i& x, int off) noexcept {
+                // Pair p0+p1 before accumulating into x to halve the dependency chain length
+                // while keeping 8 ymm tile accumulators (16-bit modular arithmetic is exact).
+                x = accum(x, _mm256_add_epi16(loadVec(p0 + off), loadVec(p1 + off)));
+            };
+            step2(x0,   0); step2(x1,  16); step2(x2,  32); step2(x3,  48);
+            step2(x4,  64); step2(x5,  80); step2(x6,  96); step2(x7, 112);
+        }
+        if (k < n) {
+            const W* p = rows[k] + b;
+            auto step1 = [&](__m256i& x, int off) noexcept { x = accum(x, loadVec(p + off)); };
+            step1(x0,   0); step1(x1,  16); step1(x2,  32); step1(x3,  48);
+            step1(x4,  64); step1(x5,  80); step1(x6,  96); step1(x7, 112);
+        }
+    }
+#endif
+
+    template<RowInit Init, bool HasSub, typename W>
+    static inline void applyWeightRows(int16_t* __restrict row, const int16_t* __restrict src,
+                                       const W* const* __restrict sub, int ns,
+                                       const W* const* __restrict add, int na) noexcept {
+#if defined(__AVX2__)
+        constexpr int TILE = 128;
+        static_assert(HIDDEN % TILE == 0);
+        for (int b = 0; b < HIDDEN; b += TILE) {
+            __m256i x0, x1, x2, x3, x4, x5, x6, x7;
+            if constexpr (Init == RowInit::Zero) {
+                x0 = x1 = x2 = x3 = x4 = x5 = x6 = x7 = _mm256_setzero_si256();
+            } else {
+                const int16_t* base = (Init == RowInit::Src) ? src : row;
+                const auto* s = reinterpret_cast<const __m256i*>(base + b);
+                x0 = _mm256_loadu_si256(s + 0); x1 = _mm256_loadu_si256(s + 1);
+                x2 = _mm256_loadu_si256(s + 2); x3 = _mm256_loadu_si256(s + 3);
+                x4 = _mm256_loadu_si256(s + 4); x5 = _mm256_loadu_si256(s + 5);
+                x6 = _mm256_loadu_si256(s + 6); x7 = _mm256_loadu_si256(s + 7);
+            }
+            if constexpr (HasSub) applyWeightList<false>(sub, ns, b, x0, x1, x2, x3, x4, x5, x6, x7);
+            applyWeightList<true>(add, na, b, x0, x1, x2, x3, x4, x5, x6, x7);
+            auto* d = reinterpret_cast<__m256i*>(row + b);
+            _mm256_storeu_si256(d + 0, x0); _mm256_storeu_si256(d + 1, x1);
+            _mm256_storeu_si256(d + 2, x2); _mm256_storeu_si256(d + 3, x3);
+            _mm256_storeu_si256(d + 4, x4); _mm256_storeu_si256(d + 5, x5);
+            _mm256_storeu_si256(d + 6, x6); _mm256_storeu_si256(d + 7, x7);
+        }
+#else
         constexpr int TILE = 64;
         static_assert(HIDDEN % TILE == 0);
         for (int b = 0; b < HIDDEN; b += TILE) {
             int16_t x[TILE];
-            for (int i = 0; i < TILE; ++i) x[i] = src != nullptr ? src[b + i] : 0;
-            for (int k = 0; k < ns; ++k)
-                for (int i = 0; i < TILE; ++i) x[i] = static_cast<int16_t>(x[i] - sub[k][b + i]);
+            if constexpr (Init == RowInit::Zero) {
+                for (int i = 0; i < TILE; ++i) x[i] = 0;
+            } else {
+                const int16_t* base = (Init == RowInit::Src) ? src : row;
+                for (int i = 0; i < TILE; ++i) x[i] = base[b + i];
+            }
+            if constexpr (HasSub) {
+                for (int k = 0; k < ns; ++k)
+                    for (int i = 0; i < TILE; ++i) x[i] = static_cast<int16_t>(x[i] - sub[k][b + i]);
+            }
             for (int k = 0; k < na; ++k)
                 for (int i = 0; i < TILE; ++i) x[i] = static_cast<int16_t>(x[i] + add[k][b + i]);
             for (int i = 0; i < TILE; ++i) row[b + i] = x[i];
         }
+#endif
     }
 
-    // Applies a whole feature diff to one row, the first pass reading src (a
-    // different row) when it is given. A refresh changes 5.8 features on
-    // average, so this reads and writes the row about twice instead of six times.
+    // Specialized on HasSrc/HasSub so incremental updates avoid null-checks on src
+    // and full rebuilds skip empty sub loops, giving each call site a small inlineable body.
+    template<bool HasSrc = true, bool HasSub = true>
+    static inline void applyThreatRows(int16_t* __restrict row, const int16_t* __restrict src,
+                                       const int8_t* const* __restrict sub, int ns,
+                                       const int8_t* const* __restrict add, int na) noexcept {
+        constexpr RowInit Init = HasSrc ? RowInit::Src : RowInit::Zero;
+        applyWeightRows<Init, HasSub>(row, src, sub, ns, add, na);
+    }
+
+    // Applies a whole piece-feature diff to one row in a single register-tiled
+    // pass, reading src (a distinct frame) when given or updating row in place.
     static inline void applyRows(int16_t* __restrict row,
                                  const int16_t* const* sub, int ns,
                                  const int16_t* const* add, int na,
                                  const int16_t* src = nullptr) noexcept {
-        if (src != nullptr && ns == 0 && na == 0) {
-            std::memcpy(row, src, HIDDEN * sizeof(int16_t));
+        if (ns == 0 && na == 0) {
+            if (src != nullptr) std::memcpy(row, src, HIDDEN * sizeof(int16_t));
             return;
         }
-        forEachPass(ns, na, [&]<int S, int A>(int si, int ai) {
-            if (src != nullptr) {
-                fuseRows<S, A, true>(row, src, sub + si, add + ai);
-                src = nullptr;
-            } else {
-                fuseRows<S, A>(row, nullptr, sub + si, add + ai);
-            }
-        });
+        if (src != nullptr) applyWeightRows<RowInit::Src, true>(row, src, sub, ns, add, na);
+        else                applyWeightRows<RowInit::InPlace, true>(row, nullptr, sub, ns, add, na);
     }
 };
 
