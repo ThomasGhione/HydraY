@@ -4,12 +4,15 @@ For Andrea. Thomas asked for threat inputs as the next NNUE lever, after weeks i
 the audits and the architecture changes (more output buckets, more king buckets, more
 layers) gave nothing. The code is complete and verified for correctness; **no net has
 been trained** and **nothing was SPRT'd**. The open question is whether the eval gain
-pays for the cost per node: x2.15 at first, **x1.76** (bench6) and x1.64 (datagen) since
-your six speed patches (section 4). Section 5 lists the ways to continue.
+pays for the cost per node: x2.15 at first, x1.76 after your six speed patches,
+**x1.70** (bench6) and **x1.60** (datagen) after the engine campaign of section 4. What is
+left is set by the feature set and the threat width, that is by training: section 5
+gives the exact speed of each training-side option.
 
 On `threat-inputs`, branched from `dev` at `fdf4756`: `64fcf83` (threat inputs),
 `beb787d`..`b909626` (your six patches, applied with `git am`), `4ca1354` (helpers they
-left unused, shorter comments; `.text` byte-identical). `dev` is untouched.
+left unused, shorter comments; `.text` byte-identical), `3dc0dff` (deferred-decode
+kernel), `9b94adb` (no cancellation in one-move updates). `dev` is untouched.
 
 ## 1. What a threat feature is
 
@@ -42,9 +45,9 @@ bullet's example drop them; see option E). **70,050 features.**
 | `nnue/trainer/src/bin/sanity_deep.rs` | oracle: reads 4 layouts (8/16 buckets, with/without threats), `threat_features(fen)`, threats in `evaluate` and `evaluate_bullet`, zero `l0t` in `to_bullet` for an old net |
 | `board/boardapi.cpp` | `recordThreats<Add>(piece, sq)` in `doMoveByKind`: the piece's attacks, the attacks on it, and the slider lines it cuts (`BEYOND` table), with the never-feature pairs masked out before the pops; `recordReplacedThreats` for the square of a capture; the child's key and TT prefetch come before all of it |
 | `board/board.cpp` | `computeThreats` (from scratch, by piece type); in `ensureNnueAccumulatorClean` the threats of a perspective are incremental whenever the ancestor has the same flip (even if the king bucket changed), with add/sub cancellation (`cancelAndApplyThreats`, AVX2) and `applyThreatPair1` for one move on both perspectives |
-| `nnue/accumulator.hpp` | `threat[2][1024]` and `ThreatDelta threatDelta[64]` (4 bytes each) per frame; `applyWeightRows`, one register-tiled AVX2 kernel for i8 threat rows and i16 piece rows |
+| `nnue/accumulator.hpp` | `threat[2][1024]` and `ThreatDelta threatDelta[64]` (4 bytes each) per frame; `applyWeightRows`: register-tiled AVX2 kernels, the deferred-decode one (`applyThreatList`) for i8 threat rows and the plain one for i16 piece rows |
 | `engine/sort/movepicker.hpp`, `engine/search/searcher.cpp`, `tt/tt.hpp` | AVX2 max in `nextMove`; `doMove(m, st, HashPrefetch)` in search, qsearch and ProbCut |
-| `nnue/network_deep.hpp`, `nnue_deep.cpp` | `l0t` on huge pages (zero for an old net), `layoutForFileSize`, forward takes the two threat accumulators and adds them with `adds_epi16` (scalar: int32 sum, same result) |
+| `nnue/network_deep.hpp`, `nnue_deep.cpp` | `l0t` on huge pages (zero for an old net), re-laid out at load for the AVX2 kernel (the file keeps the bullet layout), `layoutForFileSize`, forward takes the two threat accumulators and adds them with `adds_epi16` (scalar: int32 sum, same result) |
 | `huge_pages.hpp` | the huge-page allocator, moved out of `tt/tt.hpp` unchanged |
 | `nnue/tools/*` | deepcheck, holdoutloss, qatgap, reorder still build piece-only accumulators: they **refuse** threat nets instead of computing something wrong |
 
@@ -78,7 +81,9 @@ Invariants worth knowing:
   with the 4.4.0 net, with the synthetic net above (580,995) and with yours (734,233);
   seeded datagen SHA (40 games, 8,000 nodes) with all three nets; raweval == oracle on
   the 2,048 FENs with both synthetic nets; selftest; perft. All identical, so no SPRT.
-  Final tree: x86-64-v2 build (scalar paths: bench6 with both nets, raweval == oracle),
+  The same checks for `3dc0dff` and `9b94adb`, and for every prototype of section 5 the
+  4.4.0 bench6 (448,769). Final tree (`9b94adb` and before it `4ca1354`): x86-64-v2 build
+  (scalar paths: bench6 with both nets, raweval == oracle),
   Windows build under wine (bench6 with both nets), `make test`, and GCC ASan+UBSan on
   bench6, selftest, perft, seeded datagen and the 37 UCI corner cases: clean but for the
   first issue of section 7.
@@ -109,7 +114,47 @@ negligible (memset of 72 MB). RSS +72 MB.
 
 Every row is faster in every column (the 95% CI of each median ratio excludes 1).
 Against `dev` (no threat code, same nodes): bench6:13 x2.148 -> **x1.757**, datagen
-x1.933 -> **x1.635**. The profile and the counts below are from before the patches.
+x1.933 -> **x1.635**.
+
+**Engine campaign after the patches (2026-11-14).** The 4.4.0 net has zero threat
+weights, so any part of the threat code can be switched off without changing an eval:
+the tree stays identical and the time saved is that part's exact cost. Against `dev`
+= 1.00, on `4ca1354`:
+
+| switched off | x dev | its cost |
+|---|---|---|
+| nothing | 1.747 | |
+| the row kernel (dst = src instead) | 1.311 | 0.436 (58% of the overhead) |
+| + index lookup and cancellation | 1.163 | 0.148 (20%) |
+| + recording in `doMove` | 1.067 | 0.096 (13%) |
+| + threat reads in the forward | 1.038 | 0.029 (4%) |
+| rest (bigger frames) | | 0.038 (5%) |
+
+The kernel is **not** memory-bound: folding every feature onto 32 rows (32 KB, in L1)
+saves 3.5% of the total, onto 1,024 rows 1.6%, against 30.7% for removing it. Row
+accesses are concentrated (bench6 depth 17: 50% in the top 201 rows, 90% in 2,054,
+95% in 3,604), 9.3 rows per perspective and update after cancellation, 7.7% of the rows
+from rebuilds, 81% of the frames `doMove` pushes get computed, no overflow.
+
+Kept (each identical as in section 3, bench6:13 CPU time against the commit before):
+- `3dc0dff` **deferred decode, +1.93%** (24/24 pairs): `l0t` is re-laid out at load
+  (AVX2 builds) so that a 16-bit lane holds weight i + 128 and weight 16 + i; the kernel
+  sums raw lanes and their `vpsraw 8` and decodes once per tile. No row is widened:
+  3 vector ops per 32 weights and row instead of 2 `vpmovsxbw` + 2 adds.
+- `9b94adb` **no cancellation in one-move updates, +1.39%** (19/20).
+Together +3.3% on bench6, +3.1% on datagen: x1.70 and x1.60 against `dev`.
+
+Measured and dropped (against the deferred kernel unless said): `vpmaddubsw`/shift
+interleaves (+1.2% against the old kernel, below deferred); i16 rows (in-cache equal,
+2x slower outside); tiles of 64/32 lanes -1.9%/-4.5%; row-major groups of 2/4/8 rows
+-24%/-15%/-10%; fall-through switch per row count (microbench, worse); 4-row unroll and
+interleaved sub/add 0.0%; row prefetch in the kernel -2.4%, on 4 lines 0.0%, on all 16
+-4.1%, none at all 0.0% (0005's prefetch is neutral); L1-sized index tables -2.7%;
+branchless push -0.4%; branchless `recordThreats` masks -0.4%; reusing the
+"piece leaves `from`" deltas across siblings (only 24% of updates have such a sibling,
+at most 11.9% of rows: not built).
+
+The profile and the counts below are from before the patches.
 
 Profile (SIGPROF sampler, bench6 positions at depth 17), where the extra time goes:
 
@@ -184,7 +229,7 @@ short schedule on v10 (e.g. 40 SB from scratch, the antidead phase settings), wi
 without threats. For the arm without threats use `dev`'s trainer (same recipe), since this
 branch's trainer always trains threats. Then:
 1. SPRT at fixed nodes: does the threat net evaluate better, and by how much?
-2. SPRT at 4+0.04, Threads=1: does it pay the x1.76?
+2. SPRT at 4+0.04, Threads=1: does it pay the x1.70?
 If (1) is large and (2) is positive or close, go to C. If (1) is small, stop or try E.
 Costs ~40% of a full run.
 
@@ -195,29 +240,41 @@ must learn to permute the columns of `l0t` with the FT neurons (today it refuses
 nets), and `holdoutloss` needs threat accumulators to compare losses.
 
 **D. Cut the engine overhead (no retraining, identity-checkable): done, 2026-11-14.**
-Your six patches took bench6 from x2.15 to x1.76 against `dev` (section 4), past the
-x1.85 this section aimed at. Anything further should start from a new profile of
-`4ca1354`; check each step as in section 3 (bench6 per position with a non-zero
-synthetic net, oracle diff, seeded datagen SHA, selftest), then interleaved timing.
+Your six patches took bench6 from x2.15 to x1.76 against `dev`, the campaign of section 4
+to x1.70; what is left in the engine is listed there with what was tried.
 
-**E. Smaller feature set (retraining needed).** Dropping the king as attacker and victim
-and P->P removes ~27% of the rows (counted before D; the time it saves now is not
-measured). This is close to bullet's
-own example (`examples/advanced/inputs.rs` at the pinned rev: no king, pawns attack only
-N and R). Change `threats.rs` and `threats.hpp` together (the C++ static_assert pins
-the count), then re-run the checks of section 3.
+**E/F/H. Fewer features or a narrower threat layer (retraining needed): measured.**
+Each option below was built as the real engine change and timed with the 4.4.0 net,
+whose zero threat weights keep the tree identical (bench6 448,769 for all; the reduced
+sets pass the selftest with your synthetic net), so the times are those a net trained
+that way would have. bench6:13 CPU time against `dev`, 12 pairs, same session:
 
-**F. Narrower threat weights (architecture change, speculative).** Threats feeding only
-half of the 1024 accumulator entries would halve the kernel cost and the file. Untested
-anywhere I know of; in bullet it needs `l0t` padded with fixed zero rows or a split
-accumulator. Only if B shows a good gain at fixed nodes and a bad one at time control.
+| option | x dev |
+|---|---|
+| full set (today, `9b94adb`) | 1.707 |
+| no king as attacker or victim | 1.627 |
+| no P->P | 1.665 |
+| no king, no P->P (E; close to bullet's example) | 1.598 |
+| threats on half the accumulator, 512 of 1024 (F) | 1.528 |
+| half + no king + no P->P | 1.455 |
+| **H: attacks only, victims of the other colour (34,990 features)** | **1.363** |
+| H + no king + no P->P | 1.354 |
+| H + half | 1.317 |
+| H + half + no king + no P->P | 1.303 |
+| threat weights clipped to ±31 / ±15, 4 / 8 rows per `vpsraw` | 1.715 / 1.747 (worse) |
+
+Defences are about half of the threat cost; the king and P->P are small. H is the set
+that was offered at the start next to the full one. For any of them change `threats.rs`
+and `threats.hpp` together (the C++ static_assert pins the count) and re-run the checks
+of section 3; F needs `l0t` of 512 columns in the trainer and the engine. Strength is
+the open question: B with H as a third arm would answer it.
 
 **G. Warm start from 4.4.0 (quick signal, lower ceiling).** `HYDRAY_INIT_NET` on the
 shipped net works as is: `l0t` starts at zero and the start is the same function. A 40 SB
 fine-tune gives a threat net within a day, but it is likely below what a run from scratch
 reaches; it can serve as the threat arm of B if time is short.
 
-Suggested order: A, then B, then C or E.
+Suggested order: A, then B (with an H arm if time allows), then C on the set B favours.
 
 ## 6. How to check a change
 
@@ -260,7 +317,7 @@ Also: `./chess nnue-selftest synth.nnue 200`, `./chess perft suite`,
   UBSan shows it is also an out-of-bounds read: with `BUCKET_DIVISOR` 2 the empty board
   gets output bucket (0 - 2) / 2 = -1. The search never gets there (the missing-king
   guard returns first); only this selftest line does.
-- Until a threat net exists, this branch is ~x1.76 slower than `dev` with the same evals
-  (x1.64 in datagen): do not merge it for speed-neutral reasons.
+- Until a threat net exists, this branch is ~x1.70 slower than `dev` with the same evals
+  (x1.60 in datagen): do not merge it for speed-neutral reasons.
 - Threat nets are ~78 MB: the embedded binary grows by the same amount, and the release
   workflow and the lichess bot copy should be checked for size limits.
