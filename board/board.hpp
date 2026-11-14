@@ -233,7 +233,19 @@ private:
     inline void recordAcc(NNUE::AccDelta delta) noexcept;
     // Logs the threats that `piece` on sq takes part in as appearing (Add) or
     // vanishing, with the board as it stands and the piece on sq.
-    template<bool Add> inline void recordThreats(uint8_t piece, uint8_t sq) noexcept;
+    template<bool Add> void recordThreats(uint8_t piece, uint8_t sq) noexcept;
+    // Logs threat changes when oldPiece on sq is replaced in place by newPiece
+    // (board stands after the move; since sq remains occupied, no rays unblock through it).
+    void recordReplacedThreats(uint8_t oldPiece, uint8_t newPiece, uint8_t sq) noexcept;
+    template<bool Add, bool Checked>
+    inline void emitThreatDeltas(NNUE::Accumulator& f, uint8_t startN, uint8_t piece, uint8_t sq,
+                                 uint64_t victims, uint64_t attackers, uint64_t sliders,
+                                 uint64_t sliderOcc) const noexcept;
+    template<bool Checked>
+    inline void emitReplacedThreatDeltas(NNUE::Accumulator& f, uint8_t startN, uint8_t oldPiece,
+                                         uint8_t newPiece, uint8_t sq, uint64_t oldVictims,
+                                         uint64_t newVictims, uint64_t oldAttackers,
+                                         uint64_t newAttackers) const noexcept;
     // Perspective p's threat values of the current position, from nothing.
     void computeThreats(int16_t* row, int p, int flip) const noexcept;
 

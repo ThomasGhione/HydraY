@@ -59,38 +59,199 @@ inline void Board::recordAcc(NNUE::AccDelta delta) noexcept {
 }
 
 // Its attacks, the attacks on it, and the lines of the sliders that see sq,
-// which reach past sq exactly when the piece is not there.
-template<bool Add>
-__attribute__((always_inline))
-inline void Board::recordThreats(uint8_t piece, uint8_t sq) noexcept {
-    NNUE::Accumulator& f = frame(accTop);
-    const auto record = [&f](uint8_t attacker, uint8_t from, uint8_t victim, uint8_t to, bool add) {
-        if (!NNUE::threatPairIsFeature(attacker, victim)) return;
-        if (f.nthreat < NNUE::ACC_MAX_THREATS) f.threatDelta[f.nthreat++] = {attacker, from, victim, to, add};
-        else f.nthreat = NNUE::ACC_THREATS_OVERFLOW;
+// which reach past sq exactly when the piece is not there. Victim/attacker
+// bitboards are masked by NNUE::threatPairIsFeature rules before popping bits.
+namespace {
+
+struct ThreatMasks {
+    uint64_t victims;
+    uint64_t attackers;
+};
+
+// Shared per-square masks cached once so recordReplacedThreats does not repeat
+// rook/bishop/knight/pawn/king lookups for oldPiece and newPiece on the same square.
+struct SquareThreatInputs {
+    uint64_t occupancy;
+    const std::array<std::array<uint64_t, 2>, 7>& bb;
+    uint8_t sq;
+    uint64_t rookOcc;
+    uint64_t bishopOcc;
+    uint64_t queens;
+    uint64_t kings;
+    uint64_t sliders;
+    uint64_t knightAtks;
+    uint64_t slidersAndKnights;
+    uint64_t pawnAtks;
+    uint64_t kingAtks;
+
+    __attribute__((always_inline))
+    static SquareThreatInputs collect(uint8_t sq, uint64_t occupancy,
+                                      const std::array<std::array<uint64_t, 2>, 7>& bb) noexcept {
+        const uint64_t rookOcc    = pieces::Rook::attacks(sq, occupancy) & occupancy;
+        const uint64_t bishopOcc  = pieces::Bishop::attacks(sq, occupancy) & occupancy;
+        const uint64_t queens     = bb[Board::QUEEN][0] | bb[Board::QUEEN][1];
+        const uint64_t kings      = bb[Board::KING][0]  | bb[Board::KING][1];
+        const uint64_t sliders    = (rookOcc   & (bb[Board::ROOK][0]   | bb[Board::ROOK][1]   | queens))
+                                  | (bishopOcc & (bb[Board::BISHOP][0] | bb[Board::BISHOP][1] | queens));
+        const uint64_t knightAtks = pieces::KNIGHT_ATTACKS[sq] & (bb[Board::KNIGHT][0] | bb[Board::KNIGHT][1]);
+        const uint64_t pawnAtks   = (pieces::PAWN_ATTACKS[1][sq] & bb[Board::PAWN][0])
+                                  | (pieces::PAWN_ATTACKS[0][sq] & bb[Board::PAWN][1]);
+        const uint64_t kingAtks   = pieces::KING_ATTACKS[sq] & kings;
+        return {occupancy, bb, sq, rookOcc, bishopOcc, queens, kings, sliders,
+                knightAtks, sliders | knightAtks, pawnAtks, kingAtks};
+    }
+
+    __attribute__((always_inline))
+    ThreatMasks masksFor(uint8_t piece) const noexcept {
+        switch (piece & Board::MASK_PIECE_TYPE) {
+            case Board::PAWN: {
+                const uint64_t nonTargets = bb[Board::BISHOP][0] | bb[Board::BISHOP][1] | queens | kings;
+                return {pieces::PAWN_ATTACKS[Board::colorToIndex(piece)][sq] & (occupancy ^ nonTargets),
+                        slidersAndKnights | pawnAtks | kingAtks};
+            }
+            case Board::KNIGHT:
+                return {pieces::KNIGHT_ATTACKS[sq] & occupancy,
+                        slidersAndKnights | pawnAtks | kingAtks};
+            case Board::BISHOP:
+                return {bishopOcc & ~queens,
+                        slidersAndKnights | kingAtks};
+            case Board::ROOK:
+                return {rookOcc & ~queens,
+                        slidersAndKnights | pawnAtks | kingAtks};
+            case Board::QUEEN: {
+                const uint64_t victims = rookOcc | bishopOcc;
+                return {victims, (victims & queens) | knightAtks};
+            }
+            default: // KING
+                return {pieces::KING_ATTACKS[sq] & (occupancy ^ (queens | kings)),
+                        slidersAndKnights};
+        }
+    }
+};
+
+} // namespace
+
+template<bool Add, bool Checked>
+inline void Board::emitThreatDeltas(NNUE::Accumulator& f, uint8_t startN, uint8_t piece, uint8_t sq,
+                                    uint64_t victims, uint64_t attackers, uint64_t sliders,
+                                    uint64_t sliderOcc) const noexcept {
+    uint8_t n = startN;
+    const auto push = [&f, &n](uint8_t attacker, uint8_t from, uint8_t victim, uint8_t to, bool add) {
+        if constexpr (Checked) {
+            if (n >= NNUE::ACC_MAX_THREATS) { n = NNUE::ACC_THREATS_OVERFLOW; return; }
+        }
+        f.threatDelta[n++] = NNUE::ThreatDelta::make(attacker, from, victim, to, add);
     };
-    const uint64_t rookRays = pieces::Rook::attacks(sq, occupancy);
-    const uint64_t bishopRays = pieces::Bishop::attacks(sq, occupancy);
-    const uint64_t sliders = (rookRays & (bb[ROOK][0] | bb[ROOK][1] | bb[QUEEN][0] | bb[QUEEN][1]))
-                           | (bishopRays & (bb[BISHOP][0] | bb[BISHOP][1] | bb[QUEEN][0] | bb[QUEEN][1]));
-    uint64_t attackers = sliders
-                       | (pieces::PAWN_ATTACKS[1][sq] & bb[PAWN][0]) | (pieces::PAWN_ATTACKS[0][sq] & bb[PAWN][1])
-                       | (pieces::KNIGHT_ATTACKS[sq] & (bb[KNIGHT][0] | bb[KNIGHT][1]))
-                       | (pieces::KING_ATTACKS[sq] & (bb[KING][0] | bb[KING][1]));
-    for (uint64_t victims = attacksFrom(piece, sq, occupancy) & occupancy; victims; ) {
+    while (victims) {
         const auto to = static_cast<uint8_t>(pieces::popLSB(victims));
-        record(piece, sq, get(to), to, Add);
+        push(piece, sq, get(to), to, Add);
     }
     while (attackers) {
         const auto from = static_cast<uint8_t>(pieces::popLSB(attackers));
-        record(get(from), from, piece, sq, Add);
+        push(get(from), from, piece, sq, Add);
     }
-    for (uint64_t s = sliders; s; ) {
-        const auto from = static_cast<uint8_t>(pieces::popLSB(s));
-        if (const uint64_t past = (rookRays | bishopRays) & BEYOND[from][sq] & occupancy) {
+    // Orthogonal BEYOND rays only intersect rookOcc; diagonal ones only intersect bishopOcc,
+    // so both slider kinds share one sliderOcc mask and one discovered-ray loop.
+    while (sliders) {
+        const auto from = static_cast<uint8_t>(pieces::popLSB(sliders));
+        if (const uint64_t past = sliderOcc & BEYOND[from][sq]) {
             const auto to = static_cast<uint8_t>(std::countr_zero(past));
-            record(get(from), from, get(to), to, !Add);
+            const uint8_t att = get(from);
+            const uint8_t vic = get(to);
+            if (NNUE::threatPairIsFeature(att, vic)) push(att, from, vic, to, !Add);
         }
+    }
+    f.nthreat = n;
+}
+
+template<bool Checked>
+inline void Board::emitReplacedThreatDeltas(NNUE::Accumulator& f, uint8_t startN, uint8_t oldPiece,
+                                            uint8_t newPiece, uint8_t sq, uint64_t oldVictims,
+                                            uint64_t newVictims, uint64_t oldAttackers,
+                                            uint64_t newAttackers) const noexcept {
+    uint8_t n = startN;
+    const auto push = [&f, &n](uint8_t attacker, uint8_t from, uint8_t victim, uint8_t to, bool add) {
+        if constexpr (Checked) {
+            if (n >= NNUE::ACC_MAX_THREATS) { n = NNUE::ACC_THREATS_OVERFLOW; return; }
+        }
+        f.threatDelta[n++] = NNUE::ThreatDelta::make(attacker, from, victim, to, add);
+    };
+    const auto emitVictims = [&](uint64_t mask, uint8_t att, bool add) {
+        while (mask) {
+            const auto to = static_cast<uint8_t>(pieces::popLSB(mask));
+            push(att, sq, get(to), to, add);
+        }
+    };
+    const auto emitAttackers = [&](uint64_t mask, uint8_t vic, bool add) {
+        while (mask) {
+            const auto from = static_cast<uint8_t>(pieces::popLSB(mask));
+            push(get(from), from, vic, sq, add);
+        }
+    };
+    emitVictims(oldVictims, oldPiece, false);
+    emitVictims(newVictims, newPiece, true);
+    uint64_t shared = oldAttackers & newAttackers;
+    emitAttackers(oldAttackers ^ shared, oldPiece, false);
+    emitAttackers(newAttackers ^ shared, newPiece, true);
+    while (shared) {
+        const auto from = static_cast<uint8_t>(pieces::popLSB(shared));
+        const uint8_t att = get(from);
+        push(att, from, oldPiece, sq, false);
+        push(att, from, newPiece, sq, true);
+    }
+    f.nthreat = n;
+}
+
+template<bool Add>
+__attribute__((noinline))
+void Board::recordThreats(uint8_t piece, uint8_t sq) noexcept {
+    NNUE::Accumulator& f = frame(accTop);
+    const uint8_t startN = f.nthreat;
+
+    const SquareThreatInputs in = SquareThreatInputs::collect(sq, occupancy, bb);
+    const auto [victims, attackers] = in.masksFor(piece);
+    const uint64_t sliderOcc = in.rookOcc | in.bishopOcc;
+
+    // A single piece on one square hits <= 8 victims, <= 19 attackers, and <= 8 sliders (35 total).
+    if (startN <= NNUE::ACC_MAX_THREATS - 35) [[likely]] {
+        emitThreatDeltas<Add, false>(f, startN, piece, sq, victims, attackers, in.sliders, sliderOcc);
+        return;
+    }
+    const int worstCase = static_cast<int>(startN)
+        + std::popcount(victims)
+        + std::popcount(attackers)
+        + std::popcount(in.sliders);
+    if (worstCase <= NNUE::ACC_MAX_THREATS) {
+        emitThreatDeltas<Add, false>(f, startN, piece, sq, victims, attackers, in.sliders, sliderOcc);
+    } else if (startN != NNUE::ACC_THREATS_OVERFLOW) [[unlikely]] {
+        emitThreatDeltas<Add, true>(f, startN, piece, sq, victims, attackers, in.sliders, sliderOcc);
+    }
+}
+
+__attribute__((noinline))
+void Board::recordReplacedThreats(uint8_t oldPiece, uint8_t newPiece, uint8_t sq) noexcept {
+    NNUE::Accumulator& f = frame(accTop);
+    const uint8_t startN = f.nthreat;
+
+    const SquareThreatInputs in = SquareThreatInputs::collect(sq, occupancy, bb);
+    const auto [oldVictims, oldAttackers] = in.masksFor(oldPiece);
+    const auto [newVictims, newAttackers] = in.masksFor(newPiece);
+
+    // Replacing a piece on one square emits <= 8*2 + 19*2 = 54 threat deltas.
+    if (startN <= NNUE::ACC_MAX_THREATS - 54) [[likely]] {
+        emitReplacedThreatDeltas<false>(f, startN, oldPiece, newPiece, sq,
+                                        oldVictims, newVictims, oldAttackers, newAttackers);
+        return;
+    }
+    const int worstCase = static_cast<int>(startN)
+        + std::popcount(oldVictims) + std::popcount(newVictims)
+        + std::popcount(oldAttackers) + std::popcount(newAttackers);
+    if (worstCase <= NNUE::ACC_MAX_THREATS) {
+        emitReplacedThreatDeltas<false>(f, startN, oldPiece, newPiece, sq,
+                                        oldVictims, newVictims, oldAttackers, newAttackers);
+    } else if (startN != NNUE::ACC_THREATS_OVERFLOW) [[unlikely]] {
+        emitReplacedThreatDeltas<true>(f, startN, oldPiece, newPiece, sq,
+                                       oldVictims, newVictims, oldAttackers, newAttackers);
     }
 }
 
@@ -191,13 +352,11 @@ inline void Board::doMoveByKind(MoveState& st, uint8_t moving, uint8_t destBefor
         removePieceFromBB<true>(st.capturedPiece, capIndex);
         key ^= zobrist::TABLES.pieces[st.capturedPiece][capIndex];
     }
+    recordThreats<false>(moving, fromIndex);
     if constexpr (isCaptureKind(Kind)) {
-        recordThreats<false>(destBefore, toIndex);
         removePieceFromBB<true>(destBefore, toIndex);
-        occupancy &= ~(1ULL << toIndex);
         key ^= zobrist::TABLES.pieces[destBefore][toIndex];
     }
-    recordThreats<false>(moving, fromIndex);
     relocate<true>(moving, fromIndex, toIndex);
     if constexpr (Kind == MoveKind::Castling) {
         const Castling& c = castlingTo(toIndex);
@@ -210,19 +369,21 @@ inline void Board::doMoveByKind(MoveState& st, uint8_t moving, uint8_t destBefor
     }
     state.castle &= CASTLING_KEEP[fromIndex] & CASTLING_KEEP[toIndex];
     if constexpr (Kind == MoveKind::DoublePawnPush) state.enPassant = (fromIndex + toIndex) >> 1;
+    uint8_t placed = moving;
     if constexpr (isPromotionKind(Kind)) {
         // A missing or invalid promotion piece means a queen.
         const uint8_t promo = (promotionType >= KNIGHT && promotionType <= QUEEN) ? promotionType : uint8_t{QUEEN};
-        const uint8_t promoted = static_cast<uint8_t>(promo | (moving & MASK_COLOR));
+        placed = static_cast<uint8_t>(promo | (moving & MASK_COLOR));
         removePieceFromBB<true>(moving, toIndex);
-        addPieceToBB<true>(promoted, toIndex);
-        set(toIndex, static_cast<piece_id>(promoted));
-        recordThreats<true>(promoted, toIndex);
-        key ^= zobrist::TABLES.pieces[promoted][toIndex];
-    } else {
-        if constexpr (Kind != MoveKind::Castling) recordThreats<true>(moving, toIndex);
-        key ^= zobrist::TABLES.pieces[moving][toIndex];
+        addPieceToBB<true>(placed, toIndex);
+        set(toIndex, static_cast<piece_id>(placed));
     }
+    if constexpr (isCaptureKind(Kind)) {
+        recordReplacedThreats(destBefore, placed, toIndex);
+    } else if constexpr (Kind != MoveKind::Castling) {
+        recordThreats<true>(placed, toIndex);
+    }
+    key ^= zobrist::TABLES.pieces[placed][toIndex];
 }
 
 template<Board::MoveKind Kind>

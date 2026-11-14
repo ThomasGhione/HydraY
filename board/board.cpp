@@ -228,12 +228,50 @@ inline void syncRow(const Board& b, int16_t* row, uint64_t (&cached)[2][6], int 
 void Board::computeThreats(int16_t* row, int p, int flip) const noexcept {
     const int8_t* add[NNUE::MAX_ACTIVE_THREATS];
     int na = 0;
-    for (uint64_t attackers = occupancy; attackers; ) {
-        const auto from = static_cast<uint8_t>(pieces::popLSB(attackers));
-        for (uint64_t victims = attacksFrom(get(from), from, occupancy) & occupancy; victims; ) {
+    const NNUE::ThreatPerspective tp(p, flip);
+    const uint64_t bishops = bb[BISHOP][0] | bb[BISHOP][1];
+    const uint64_t queens  = bb[QUEEN][0]  | bb[QUEEN][1];
+    const uint64_t kings   = bb[KING][0]   | bb[KING][1];
+    const uint64_t nonQueenVictims = occupancy ^ queens;
+    const uint64_t pawnVictims     = occupancy ^ (bishops | queens | kings);
+    const uint64_t kingVictims     = occupancy ^ (queens | kings);
+
+    const auto emit = [&](int relA, uint8_t from, uint64_t victims) {
+        const int fromView = from ^ tp.toView;
+        uint32_t feature = 0;
+        while (victims) {
             const auto to = static_cast<uint8_t>(pieces::popLSB(victims));
-            if (const int feature = NNUE::threatFeature(p, flip, get(from), from, get(to), to); feature >= 0)
+            if (tp.tryFeature(relA, fromView, get(to), to, feature))
                 add[na++] = NNUE::Accumulator::threatRow(feature);
+        }
+    };
+
+    for (int side = 0; side < 2; ++side) {
+        const int baseA = (side ^ p) * 6;
+        for (uint64_t pcs = bb[PAWN][side]; pcs; ) {
+            const auto from = static_cast<uint8_t>(pieces::popLSB(pcs));
+            emit(baseA + (PAWN - 1), from, pieces::PAWN_ATTACKS[side][from] & pawnVictims);
+        }
+        for (uint64_t pcs = bb[KNIGHT][side]; pcs; ) {
+            const auto from = static_cast<uint8_t>(pieces::popLSB(pcs));
+            emit(baseA + (KNIGHT - 1), from, pieces::KNIGHT_ATTACKS[from] & occupancy);
+        }
+        for (uint64_t pcs = bb[BISHOP][side]; pcs; ) {
+            const auto from = static_cast<uint8_t>(pieces::popLSB(pcs));
+            emit(baseA + (BISHOP - 1), from, pieces::Bishop::attacks(from, occupancy) & nonQueenVictims);
+        }
+        for (uint64_t pcs = bb[ROOK][side]; pcs; ) {
+            const auto from = static_cast<uint8_t>(pieces::popLSB(pcs));
+            emit(baseA + (ROOK - 1), from, pieces::Rook::attacks(from, occupancy) & nonQueenVictims);
+        }
+        for (uint64_t pcs = bb[QUEEN][side]; pcs; ) {
+            const auto from = static_cast<uint8_t>(pieces::popLSB(pcs));
+            const uint64_t atks = pieces::Rook::attacks(from, occupancy) | pieces::Bishop::attacks(from, occupancy);
+            emit(baseA + (QUEEN - 1), from, atks & occupancy);
+        }
+        if (bb[KING][side]) {
+            const auto from = static_cast<uint8_t>(std::countr_zero(bb[KING][side]));
+            emit(baseA + (KING - 1), from, pieces::KING_ATTACKS[from] & kingVictims);
         }
     }
     NNUE::Accumulator::applyThreatRows<false, false>(row, nullptr, nullptr, 0, add, na);
@@ -322,8 +360,8 @@ void Board::ensureNnueAccumulatorClean() const noexcept {
             const NNUE::Accumulator& f = frame(i);
             for (int k = 0; k < f.nthreat; ++k) {
                 const NNUE::ThreatDelta& d = f.threatDelta[k];
-                const int feature = NNUE::threatFeature(p, rowFlip[p], d.attacker, d.from, d.victim, d.to);
-                if (feature >= 0) (d.add ? add[na++] : sub[ns++]) = NNUE::Accumulator::threatRow(feature);
+                const int feature = NNUE::threatFeature(p, rowFlip[p], d.attacker, d.from, d.victim, d.to());
+                if (feature >= 0) (d.add() ? add[na++] : sub[ns++]) = NNUE::Accumulator::threatRow(static_cast<uint32_t>(feature));
             }
         }
         for (int i = 0; i < ns; ) {

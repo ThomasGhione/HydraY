@@ -33,14 +33,22 @@ struct AccDelta {
     uint8_t to;     // Move only
 };
 
-// A threat that appears or vanishes with a move, in Board's pieces and squares.
-struct ThreatDelta {
+// A threat that appears or vanishes with a move, in Board's pieces and squares,
+// packed into 4 bytes (add flag in bit 7 of toAndAdd) for 32-bit writes.
+struct alignas(4) ThreatDelta {
     uint8_t attacker;
     uint8_t from;
     uint8_t victim;
-    uint8_t to;
-    bool    add;
+    uint8_t toAndAdd;
+
+    static constexpr ThreatDelta make(uint8_t attacker, uint8_t from, uint8_t victim,
+                                      uint8_t to, bool add) noexcept {
+        return {attacker, from, victim, static_cast<uint8_t>(to | (add ? 0x80 : 0))};
+    }
+    [[nodiscard]] constexpr uint8_t to()  const noexcept { return static_cast<uint8_t>(toAndAdd & 0x3f); }
+    [[nodiscard]] constexpr bool    add() const noexcept { return (toAndAdd & 0x80) != 0; }
 };
+static_assert(sizeof(ThreatDelta) == 4);
 
 // A move changes at most four features: a promotion capture.
 inline constexpr int ACC_MAX_DELTAS = 4;
@@ -57,15 +65,16 @@ inline constexpr int ACC_MAX_WALK = 8;
 
 struct alignas(64) Accumulator {
     int16_t v[2][HIDDEN];
-    int16_t threat[2][HIDDEN];
     int32_t base[2];   // 768 * king bucket, per perspective
     uint8_t flip[2];   // 0 or 7 (file mirror), per perspective
     bool    dirty[2];  // true = v[p] and threat[p] not computed for this position yet
     // The move from the previous frame, in the same cache line as the flags.
-    uint8_t  ndelta;
-    AccDelta delta[ACC_MAX_DELTAS];
+    uint8_t     ndelta;
+    AccDelta    delta[ACC_MAX_DELTAS];
     uint8_t     nthreat;
     ThreatDelta threatDelta[ACC_MAX_THREATS];
+    // Offset off v by >64 B to avoid 4K-aliasing conflicts between v and threat.
+    alignas(64) int16_t threat[2][HIDDEN];
 
     // Both perspectives in one traversal of the rows, writing d0/d1 from
     // s0/s1 (another frame) when From, in place otherwise (s0/s1 unused).
@@ -101,7 +110,7 @@ struct alignas(64) Accumulator {
         return activeNetwork->l0w[rowBase + (feat768 ^ rowFlip)];
     }
 
-    [[nodiscard]] static inline const int8_t* threatRow(int feature) noexcept {
+    [[nodiscard]] static inline const int8_t* threatRow(uint32_t feature) noexcept {
         return activeNetwork->l0t.get() + static_cast<size_t>(feature) * HIDDEN;
     }
 
