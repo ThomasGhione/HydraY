@@ -33,8 +33,8 @@ struct AccDelta {
     uint8_t to;     // Move only
 };
 
-// A threat that appears or vanishes with a move, in Board's pieces and squares,
-// packed into 4 bytes (add flag in bit 7 of toAndAdd) for 32-bit writes.
+// A threat that appears or vanishes with a move, in Board's pieces and squares;
+// the add flag is bit 7 of toAndAdd, so a delta is one 32-bit store.
 struct alignas(4) ThreatDelta {
     uint8_t attacker;
     uint8_t from;
@@ -73,7 +73,7 @@ struct alignas(64) Accumulator {
     AccDelta    delta[ACC_MAX_DELTAS];
     uint8_t     nthreat;
     ThreatDelta threatDelta[ACC_MAX_THREATS];
-    // Offset off v by >64 B to avoid 4K-aliasing conflicts between v and threat.
+    // Not 4 KiB after v: the loads of both would 4K-alias.
     alignas(64) int16_t threat[2][HIDDEN];
 
     // Both perspectives in one traversal of the rows, writing d0/d1 from
@@ -140,9 +140,9 @@ struct alignas(64) Accumulator {
 
     enum class RowInit { Zero, Src, InPlace };
 
-    // Single-pass register-tiled accumulator update shared by i8 threat weights
-    // (16->16 sign-extended) and i16 piece weights. Any number of rows costs one
-    // pass over the destination: each tile stays in registers while all rows apply.
+    // row = init - sub + add over rows of i8 threat or i16 piece weights. Any
+    // number of rows costs one pass over row: each tile of it stays in
+    // registers while every row is added in.
 #if defined(__AVX2__)
     template<bool Add, typename W>
     __attribute__((always_inline))
@@ -164,8 +164,7 @@ struct alignas(64) Accumulator {
             const W* p0 = rows[k]     + b;
             const W* p1 = rows[k + 1] + b;
             auto step2 = [&](__m256i& x, int off) noexcept {
-                // Pair p0+p1 before accumulating into x to halve the dependency chain length
-                // while keeping 8 ymm tile accumulators (16-bit modular arithmetic is exact).
+                // Two rows summed first: half the dependency chain on x.
                 x = accum(x, _mm256_add_epi16(loadVec(p0 + off), loadVec(p1 + off)));
             };
             step2(x0,   0); step2(x1,  16); step2(x2,  32); step2(x3,  48);
@@ -229,8 +228,7 @@ struct alignas(64) Accumulator {
 #endif
     }
 
-    // Specialized on HasSrc/HasSub so incremental updates avoid null-checks on src
-    // and full rebuilds skip empty sub loops, giving each call site a small inlineable body.
+    // From zero without HasSrc (a refresh), with no subs without HasSub.
     template<bool HasSrc = true, bool HasSub = true>
     static inline void applyThreatRows(int16_t* __restrict row, const int16_t* __restrict src,
                                        const int8_t* const* __restrict sub, int ns,
@@ -239,8 +237,8 @@ struct alignas(64) Accumulator {
         applyWeightRows<Init, HasSub>(row, src, sub, ns, add, na);
     }
 
-    // Applies a whole piece-feature diff to one row in a single register-tiled
-    // pass, reading src (a distinct frame) when given or updating row in place.
+    // Applies a whole piece-feature diff to one row in one pass, from src (a
+    // different row) when it is given, in place otherwise.
     static inline void applyRows(int16_t* __restrict row,
                                  const int16_t* const* sub, int ns,
                                  const int16_t* const* add, int na,

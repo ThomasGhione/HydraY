@@ -149,8 +149,8 @@ public:
     // --- Board access ---
     __attribute__((hot, always_inline)) constexpr uint8_t get(uint8_t index) const noexcept { return chessboard[index]; }
 
-    // Non-owning handle to the TT's 64 B-aligned bucket array so doMove can
-    // prefetch the child's bucket as soon as the hash key is ready.
+    // The TT's bucket array, for doMove to prefetch the child's bucket as soon
+    // as its key is known.
     struct HashPrefetch {
         static constexpr uint8_t BUCKET_SHIFT = 6;
         const std::byte* base = nullptr;
@@ -248,8 +248,8 @@ private:
     // Logs the threats that `piece` on sq takes part in as appearing (Add) or
     // vanishing, with the board as it stands and the piece on sq.
     template<bool Add> void recordThreats(uint8_t piece, uint8_t sq) noexcept;
-    // Logs threat changes when oldPiece on sq is replaced in place by newPiece
-    // (board stands after the move; since sq remains occupied, no rays unblock through it).
+    // The same for oldPiece on sq becoming newPiece, with the board after the
+    // move: sq stays occupied, so no line opens.
     void recordReplacedThreats(uint8_t oldPiece, uint8_t newPiece, uint8_t sq) noexcept;
     template<bool Add, bool Checked>
     inline void emitThreatDeltas(NNUE::Accumulator& f, uint8_t startN, uint8_t piece, uint8_t sq,

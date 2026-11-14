@@ -59,8 +59,8 @@ inline void Board::recordAcc(NNUE::AccDelta delta) noexcept {
 }
 
 // Its attacks, the attacks on it, and the lines of the sliders that see sq,
-// which reach past sq exactly when the piece is not there. Victim/attacker
-// bitboards are masked by NNUE::threatPairIsFeature rules before popping bits.
+// which reach past sq exactly when the piece is not there. The masks leave out
+// the pairs that are never a feature.
 namespace {
 
 struct ThreatMasks {
@@ -68,8 +68,7 @@ struct ThreatMasks {
     uint64_t attackers;
 };
 
-// Shared per-square masks cached once so recordReplacedThreats does not repeat
-// rook/bishop/knight/pawn/king lookups for oldPiece and newPiece on the same square.
+// What any piece on sq shares, computed once for both pieces of a replacement.
 struct SquareThreatInputs {
     uint64_t occupancy;
     const std::array<std::array<uint64_t, 2>, 7>& bb;
@@ -150,8 +149,8 @@ inline void Board::emitThreatDeltas(NNUE::Accumulator& f, uint8_t startN, uint8_
         const auto from = static_cast<uint8_t>(pieces::popLSB(attackers));
         push(get(from), from, piece, sq, Add);
     }
-    // Orthogonal BEYOND rays only intersect rookOcc; diagonal ones only intersect bishopOcc,
-    // so both slider kinds share one sliderOcc mask and one discovered-ray loop.
+    // A line past sq meets rookOcc only if orthogonal, bishopOcc only if
+    // diagonal: one mask serves both.
     while (sliders) {
         const auto from = static_cast<uint8_t>(pieces::popLSB(sliders));
         if (const uint64_t past = sliderOcc & BEYOND[from][sq]) {
@@ -212,7 +211,7 @@ void Board::recordThreats(uint8_t piece, uint8_t sq) noexcept {
     const auto [victims, attackers] = in.masksFor(piece);
     const uint64_t sliderOcc = in.rookOcc | in.bishopOcc;
 
-    // A single piece on one square hits <= 8 victims, <= 19 attackers, and <= 8 sliders (35 total).
+    // At most 8 victims, 19 attackers and 8 lines: 35 deltas.
     if (startN <= NNUE::ACC_MAX_THREATS - 35) [[likely]] {
         emitThreatDeltas<Add, false>(f, startN, piece, sq, victims, attackers, in.sliders, sliderOcc);
         return;
@@ -237,7 +236,7 @@ void Board::recordReplacedThreats(uint8_t oldPiece, uint8_t newPiece, uint8_t sq
     const auto [oldVictims, oldAttackers] = in.masksFor(oldPiece);
     const auto [newVictims, newAttackers] = in.masksFor(newPiece);
 
-    // Replacing a piece on one square emits <= 8*2 + 19*2 = 54 threat deltas.
+    // At most 2 * (8 + 19) = 54 deltas.
     if (startN <= NNUE::ACC_MAX_THREATS - 54) [[likely]] {
         emitReplacedThreatDeltas<false>(f, startN, oldPiece, newPiece, sq,
                                         oldVictims, newVictims, oldAttackers, newAttackers);
@@ -341,9 +340,8 @@ inline void Board::passTurn(bool resetHalfMoves) noexcept {
 template<Board::MoveKind Kind, bool WithPrefetch>
 inline void Board::doMoveByKind(MoveState& st, uint8_t moving, uint8_t destBefore, uint8_t fromIndex,
                                 uint8_t toIndex, uint8_t promotionType, uint64_t& key, HashPrefetch tt) noexcept {
-    // Compute the child's Zobrist key and issue its TT bucket prefetch before
-    // recordThreats runs, hiding TT latency behind threat discovery and board
-    // updates while keeping every recordThreats call on the exact same board.
+    // The child's key first, so that its TT bucket loads while the threats
+    // are recorded.
     uint8_t capIndex = 0;
     uint8_t rook = 0;
     uint8_t placed = moving;

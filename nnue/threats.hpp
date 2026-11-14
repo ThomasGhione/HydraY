@@ -86,14 +86,13 @@ constexpr uint64_t targets(int a, int v, int from) noexcept {
     return m;
 }
 
-// Valid (attacker, victim) feature-pair count across 12x12 relative piece codes:
-// 29 valid type pairs out of 36 * 4 color combinations = 116, plus 1 empty
-// sentinel block so non-feature pairs resolve branchlessly to mask == 0.
+// The 116 feature pairs (29 type pairs in 4 colour combinations) get one entry
+// per attacker square; every other pair points to an extra empty block, so a
+// lookup needs no branch.
 inline constexpr int VALID_PAIR_COUNT = 116;
 inline constexpr uint16_t INVALID_PAIR_BASE = VALID_PAIR_COUNT * 64;
 
-// Mask of legal victim squares (empty where !pairIsFeature or mutual && to <= from)
-// together with the base feature index for (attacker, attacker square, victim).
+// The victim squares of a pair and attacker square, and the first feature.
 struct Entry {
     uint64_t mask;
     uint32_t first;
@@ -127,7 +126,7 @@ inline constexpr Table TABLE = [] {
 }();
 static_assert(TABLE.total == THREAT_FEATURES, "threats.rs counts 70,050");
 
-// Bitmask over Board piece types 1..6 (indexed by piece & 0x7) replacing `% 6`.
+// Bit v of entry a: Board types a and v (1-6) can form a feature.
 inline constexpr std::array<uint8_t, 8> PAIR_FEATURE_MASK = [] {
     std::array<uint8_t, 8> m{};
     for (int ta = 0; ta < 6; ++ta)
@@ -153,11 +152,6 @@ constexpr bool tryIndex(int a, int from, int v, int to, uint32_t& out) noexcept 
     return tryIndexBase(TABLE.pairBase[a][v] + from, to, out);
 }
 
-constexpr int index(int a, int from, int v, int to) noexcept {
-    uint32_t out = 0;
-    return tryIndex(a, from, v, to, out) ? static_cast<int>(out) : -1;
-}
-
 } // namespace threats
 
 // Whether attacker and victim types (Board's 1-6) can form a feature at all.
@@ -165,7 +159,7 @@ constexpr int index(int a, int from, int v, int to) noexcept {
     return (threats::PAIR_FEATURE_MASK[attacker & 0x7] >> (victim & 0x7)) & 1;
 }
 
-// Maps [perspective][Board piece 1..6 / 9..14] -> threat relative piece index 0..11.
+// [perspective][Board piece] -> relative piece 0-11.
 inline constexpr std::array<std::array<uint8_t, 16>, 2> REL_PIECE = [] {
     std::array<std::array<uint8_t, 16>, 2> t{};
     for (int p = 0; p < 2; ++p)
@@ -175,8 +169,8 @@ inline constexpr std::array<std::array<uint8_t, 16>, 2> REL_PIECE = [] {
     return t;
 }();
 
-// Packs [base0 | (base1 << 16)] indexed by Board (attacker & 0xf, victim & 0xf)
-// so threatFeaturePair resolves both perspectives in one table load with no multiplies.
+// Both perspectives' pair bases by Board attacker and victim, perspective 1 in
+// the high half.
 inline constexpr std::array<std::array<uint32_t, 16>, 16> BOTH_PAIR_BASE = [] {
     std::array<std::array<uint32_t, 16>, 16> b{};
     for (int a = 0; a < 16; ++a)
@@ -192,12 +186,8 @@ inline constexpr std::array<std::array<uint32_t, 16>, 16> BOTH_PAIR_BASE = [] {
     return b;
 }();
 
-[[nodiscard]] constexpr int threatRelativePiece(int p, uint8_t piece) noexcept {
-    return REL_PIECE[p][piece & 0xf];
-}
-
-// Perspective transform helper so callers with a fixed attacker or updating both
-// perspectives can hoist toView and relative piece codes out of inner loops.
+// Perspective p (0 = white) whose king puts the file mirror `flip`, on Board
+// pieces and squares (a8 = 0).
 struct ThreatPerspective {
     int p;
     int toView;
@@ -213,24 +203,9 @@ struct ThreatPerspective {
     [[nodiscard]] constexpr bool tryFeature(uint8_t attacker, uint8_t from, uint8_t victim, uint8_t to, uint32_t& out) const noexcept {
         return threats::tryIndex(relPiece(attacker), from ^ toView, relPiece(victim), to ^ toView, out);
     }
-    [[nodiscard]] constexpr int feature(int relA, int fromView, uint8_t victim, uint8_t to) const noexcept {
-        uint32_t out = 0;
-        return tryFeature(relA, fromView, victim, to, out) ? static_cast<int>(out) : -1;
-    }
-    [[nodiscard]] constexpr int feature(uint8_t attacker, uint8_t from, uint8_t victim, uint8_t to) const noexcept {
-        uint32_t out = 0;
-        return tryFeature(attacker, from, victim, to, out) ? static_cast<int>(out) : -1;
-    }
 };
 
-// The feature of Board pieces and squares (a8 = 0) for perspective p (0 =
-// white) whose king puts the file mirror `flip`; -1 when it is not a feature.
-[[nodiscard]] inline int threatFeature(int p, int flip, uint8_t attacker, uint8_t from,
-                                       uint8_t victim, uint8_t to) noexcept {
-    return ThreatPerspective(p, flip).feature(attacker, from, victim, to);
-}
-
-// Computes both perspectives' threat features for one delta with one pair lookup.
+// Both perspectives' features of one threat, -1 where it is none.
 inline void threatFeaturePair(int toView0, int flip1, uint8_t attacker, uint8_t from,
                               uint8_t victim, uint8_t to, int& out0, int& out1) noexcept {
     const uint32_t bases = BOTH_PAIR_BASE[attacker & 0xf][victim & 0xf];

@@ -223,17 +223,14 @@ inline void syncRow(const Board& b, int16_t* row, uint64_t (&cached)[2][6], int 
     NNUE::Accumulator::applyRows(row, sub, ns, add, na);
 }
 
-// Cancels any row appearing in both `sub` and `add` (using >=7 bytes of padding
-// past add[na - 1]) and applies the remaining threat rows to write `dst` from `src`.
-// Keep out-of-line so incremental() and applyThreatRange() share one compact AVX2
-// cancel+apply loop in L1I cache instead of duplicating it across perspectives.
+// dst = src - sub + add, a row in both lists cancelled first; add needs 8 spare
+// slots past na. Out of line: every caller shares one copy.
 __attribute__((noinline, hot))
 void cancelAndApplyThreats(int16_t* __restrict dst, const int16_t* __restrict src,
                            const int8_t** sub, int ns, const int8_t** add, int na) noexcept {
     if (ns > 0 && na > 0) {
 #if defined(__AVX2__)
-        // Callers allocate >= 8 slack slots past na; a fixed 64-byte zero store
-        // avoids a variable-length loop that Clang turns into call memset@plt.
+        // A fixed-size store: clang turns a variable-length one into a memset call.
         std::memset(add + na, 0, 8 * sizeof(const int8_t*));
         const auto matchMask8 = [](const __m256i key, const __m256i a0, const __m256i a1) noexcept {
             const int m0 = _mm256_movemask_pd(_mm256_castsi256_pd(_mm256_cmpeq_epi64(key, a0)));
@@ -292,7 +289,7 @@ void cancelAndApplyThreats(int16_t* __restrict dst, const int16_t* __restrict sr
     NNUE::Accumulator::applyThreatRows(dst, src, sub, ns, add, na);
 }
 
-// Single-move dual-perspective threat update kept out-of-line in L1I cache.
+// Both perspectives' threats of a frame from the one before it.
 __attribute__((noinline, hot))
 void applyThreatPair1(NNUE::Accumulator& dst, const NNUE::Accumulator& src, int flip0, int flip1) noexcept {
     const int8_t* sub[2][NNUE::ACC_MAX_THREATS];
@@ -320,8 +317,7 @@ void applyThreatPair1(NNUE::Accumulator& dst, const NNUE::Accumulator& src, int 
         cancelAndApplyThreats(dst.threat[p], src.threat[p], sub[p], ns[p], add[p], na[p]);
 }
 
-// Multi-pass fallback kept out-of-line so incremental()'s hot L1I body holds
-// only the common 1-move single-pass piece kernels.
+// A piece diff of more than one pass, out of line to keep incremental() small.
 __attribute__((noinline))
 void fusePairFallback(NNUE::Accumulator& dst, const NNUE::Accumulator& src,
                       const int rowBase[2], const int rowFlip[2],
@@ -461,8 +457,7 @@ void Board::ensureNnueAccumulatorClean() const noexcept {
             from = i;
             break;
         }
-        // Check while walking back so Clang sees trip count <= ACC_MAX_WALK and
-        // does not emit a wide SIMD vectorization prologue.
+        // Here, not in a loop of its own: clang vectorised that one.
         threatsLogged &= f.nthreat != NNUE::ACC_THREATS_OVERFLOW;
     }
     const int origin = from;
@@ -493,7 +488,7 @@ void Board::ensureNnueAccumulatorClean() const noexcept {
                     const int8_t* row = NNUE::Accumulator::threatRow(feature);
                     (d.add() ? add[na++] : sub[ns++]) = row;
 #if defined(__AVX2__)
-                    // Overlap L3/DRAM fetch of each 1 KiB threat row with remaining collection and cancel.
+                    // The row loads while the others are collected and cancelled.
                     _mm_prefetch(reinterpret_cast<const char*>(row), _MM_HINT_T0);
 #endif
                 }

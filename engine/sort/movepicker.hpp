@@ -83,8 +83,7 @@ struct MovePicker {
             uint32_t best;
 #if defined(__AVX2__)
             if (moves.size - currentIndex >= 8) {
-                // Overlapping tail load keeps vector max down to 8 moves with no
-                // scalar tail and no sentinel padding past moves.size.
+                // The first load is the last 8 keys: no scalar tail, no padding.
                 __m256i vmax = _mm256_loadu_si256(reinterpret_cast<const __m256i*>(keys + moves.size - 8));
                 for (int i = currentIndex; i + 8 < moves.size; i += 8) {
                     vmax = _mm256_max_epu32(vmax, _mm256_loadu_si256(reinterpret_cast<const __m256i*>(keys + i)));
