@@ -436,8 +436,9 @@ SearchMoveResult searchMoves(Board& b, MovePicker& movePicker, const SearchConte
 
         Board::MoveState state;
         b.doMove(m, state);
-        // The child's TT bucket loads while the child checks its node entry.
+        // The child's TT bucket and eval cache slot load while the child checks its node entry.
         runtime.transpositionTable->prefetch(b.getHash());
+        evalCache.prefetch(b.getHash());
 
         const bool forcing = t.isCapture || t.isPromotion || moveIndex < 3;
         const bool givesCheck = ctx.depth >= 2 && ctx.depth <= 4 && forcing && b.inCheck(oppColor);
@@ -848,6 +849,7 @@ int32_t quiescenceSearch(Board& b, SearchRuntime& runtime, int32_t alpha, int32_
         Board::MoveState state;
         b.doMove(m, state);
         tt.prefetch(b.getHash());
+        evalCache.prefetch(b.getHash());
         const int32_t score = -quiescenceSearch(b, runtime, -beta, -alpha, ply + 1);
         b.undoMove(m, state);
         best = std::max(best, score);

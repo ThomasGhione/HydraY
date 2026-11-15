@@ -27,6 +27,8 @@ public:
 
     void clear() noexcept { std::fill_n(table_.get(), SLOTS, 0); }
 
+    void prefetch(uint64_t key) const noexcept { __builtin_prefetch(&table_[key & (SLOTS - 1)], 0, 3); }
+
     [[nodiscard]] bool probe(uint64_t key, int32_t& outEval) const noexcept {
         const uint64_t slot = word(key).load(std::memory_order_relaxed);
         if ((slot >> 16) != (key >> 16)) return false;
