@@ -100,7 +100,7 @@ inline Spin SEE_PRUNE_MAX_DEPTH{3, "SEE_PRUNE_MAX_DEPTH", 0, 12};
 // SEE quiet pruning: skip quiets with SEE < -QUIET_SEE_MARGIN * depth^2,
 // depth 1..QUIET_SEE_MAX_DEPTH (0 = off).
 inline Spin QUIET_SEE_MARGIN{12, "QUIET_SEE_MARGIN", 0, 200};
-inline Spin QUIET_SEE_MAX_DEPTH{0, "QUIET_SEE_MAX_DEPTH", 0, 12};
+inline Spin QUIET_SEE_MAX_DEPTH{6, "QUIET_SEE_MAX_DEPTH", 0, 12};
 // Singular extension.
 inline constexpr int SE_MIN_DEPTH     = 6;
 inline constexpr int SE_DEPTH_MARGIN  = 3;
