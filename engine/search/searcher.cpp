@@ -1014,19 +1014,25 @@ IterativeSearchResult runIterativeDeepening(Board& rootBoard, SearchRuntime& run
             int32_t center = prevScore;
             int32_t below = delta;
             int32_t above = delta;
+            // Each fail high re-searches a ply shallower, up to ROOT_FAIL_HIGH_MAX:
+            // the move that failed high is confirmed faster; a fail low resets it.
+            int failHighs = 0;
             for (int researches = 0;;) {
                 iterationAlpha = std::clamp(center - below, NEG_INF, POS_INF);
                 iterationBeta  = std::clamp(center + above, NEG_INF, POS_INF);
+                runtime.depth = std::max(1, currentDepth - failHighs);
                 candidate = getBestMove(rootBoard, moves, runtime, iterationAlpha, iterationBeta);
                 if (runtime.isInterrupted()) break;
                 const int32_t score = runtime.eval;
                 const bool failLow = (score <= iterationAlpha);
                 if (!failLow && score < iterationBeta) break;
+                failHighs = (failLow || std::abs(score) >= TB_WIN_BOUND) ? 0 : std::min<int>(failHighs + 1, ROOT_FAIL_HIGH_MAX);
                 center = failLow ? std::min(center, score) : std::max(center, score);
                 delta = std::min(WINDOW_HARD_CAP, delta * 2 + 10);
                 if (++researches >= MAX_ASP_RESEARCHES || delta >= WINDOW_HARD_CAP) {
                     iterationAlpha = NEG_INF;
                     iterationBeta = POS_INF;
+                    runtime.depth = currentDepth;
                     candidate = getBestMove(rootBoard, moves, runtime);
                     break;
                 }
@@ -1034,6 +1040,7 @@ IterativeSearchResult runIterativeDeepening(Board& rootBoard, SearchRuntime& run
                 above = failLow ? std::max(25, delta / 2) : delta;
             }
         }
+        runtime.depth = currentDepth;
         if (runtime.isInterrupted()) break;
 
         if (runtime.timeManager != nullptr) {
