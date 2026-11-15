@@ -195,6 +195,8 @@ inline Spin QS_EVAL_PCT_ENDGAME{346, "QS_EVAL_PCT_ENDGAME", 100, 600};  // npm <
 // --- Aspiration window ---
 inline constexpr int32_t WINDOW_HARD_CAP    = 1500;
 inline constexpr int     MAX_ASP_RESEARCHES = 6;
+// Plies a root fail high takes off the re-search (0 = off).
+inline Spin ROOT_FAIL_HIGH_MAX{3, "ROOT_FAIL_HIGH_MAX", 0, 6};
 
 // --- Draw scoring ---
 inline constexpr int32_t REPETITION_CONTEMPT = 80; // ~0.8 pawn
