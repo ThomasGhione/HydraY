@@ -2,7 +2,7 @@
 
 // The quantised network:
 //
-//   (768x4kb_hm + threats -> 1024)x2 -> pairwise -> 1024 -> 16 -> 1
+//   (768x4kb_hm + threats -> 768)x2 -> pairwise -> 768 -> 16 -> 1
 //
 // The feature space and l0 are in network.hpp, all that board.hpp needs. One
 // hidden layer: trainer_deep.rs says why not bullet's 16->32->1 example. The
@@ -12,15 +12,15 @@
 // FILE LAYOUT (little-endian, padded to 64 B with "bullet" repeated), OB =
 // output buckets:
 //
-//   l0w [4*768][1024]  i16  QA=255   (factoriser already folded in at save)
-//   l0b [1024]         i16  QA
-//   l1w [OB][16][1024] i8   QB=64    (transposed: each bucket contiguous)
+//   l0w [4*768][768]   i16  QA=255   (factoriser already folded in at save)
+//   l0b [768]          i16  QA
+//   l1w [OB][16][768]  i8   QB=64    (transposed: each bucket contiguous)
 //   l1b [OB][16]       f32  real scale
 //   l2w [OB][1][16]    f32
 //   l2b [OB]           f32
-//   l0t [63554][1024]  i8   QA=255   (threat inputs, threats.hpp; absent in older nets)
-//   OB = 16: payload 6,557,760 B, with threats 78,288,960 B (no padding)
-//   OB = 8:  payload 6,425,632 B, with threats 78,156,832 B
+//   l0t [63554][768]   i8   QA=255   (threat inputs, threats.hpp; absent in older nets)
+//   OB = 16: payload 4,918,848 B, with threats 53,728,320 B (no padding)
+//   OB = 8:  payload 4,819,488 B, with threats 53,628,960 B
 //
 // All four are loaded. An 8-bucket file gives each of its heads the two
 // 16-bucket slots it covers, and a file without threats gets zero threat
@@ -30,7 +30,7 @@
 //
 //   acc[i] = pieces[i] + threats[i]              one i16 accumulator, modular
 //   c[i] = clamp(acc[i], 0, QA)                  QA scale, fits in u8
-//   p[j] = c[j] * c[j+512] / QA                  TRUNCATING INTEGER division
+//   p[j] = c[j] * c[j+384] / QA                  TRUNCATING INTEGER division
 //   z[o] = SUM(p[i] * l1w[o][i]) / (QA*QB) + l1b[o]   FLOAT division
 //   a[o] = clamp(z[o], 0, 1)^2                   SCReLU in float
 //   y    = SUM a[o]*l2w[o] + l2b                 linear
@@ -69,6 +69,7 @@ inline constexpr int32_t SCALE = 400;
 // concatenated), not 2*HIDDEN -- which is why the layer is cheap.
 inline constexpr int PAIRWISE_OUT = HIDDEN / 2;
 static_assert(2 * PAIRWISE_OUT == HIDDEN, "pairwise needs an even HIDDEN");
+static_assert(PAIRWISE_OUT % 32 == 0, "the vectorised pairwise pass works in blocks of 32");
 
 struct alignas(64) NetworkDeep {
     int16_t l0w[INPUT_BUCKETS * INPUTS][HIDDEN];
@@ -155,9 +156,9 @@ struct FileLayout {
             if (size == fileBytes(buckets, threats)) return {buckets, threats};
     return {};
 }
-static_assert(payloadBytes(OUTPUT_BUCKETS, false) == 6'557'760, "layout changed: update sanity_deep.rs");
-static_assert(payloadBytes(LEGACY_OUTPUT_BUCKETS, false) == 6'425'632, "legacy layout changed");
-static_assert(payloadBytes(LEGACY_OUTPUT_BUCKETS, true) == 71'504'928, "threat layout changed: update sanity_deep.rs");
+static_assert(payloadBytes(OUTPUT_BUCKETS, false) == 4'918'848, "layout changed: update sanity_deep.rs");
+static_assert(payloadBytes(LEGACY_OUTPUT_BUCKETS, false) == 4'819'488, "legacy layout changed");
+static_assert(payloadBytes(LEGACY_OUTPUT_BUCKETS, true) == 53'628'960, "threat layout changed: update sanity_deep.rs");
 
 // Scalar forward, from the two perspectives' accumulators to the evaluation
 // in centipawns. The correctness reference for the vectorised version.

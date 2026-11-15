@@ -2,7 +2,7 @@
 // trainer_deep.rs: it is the ORACLE. The C++ must agree with this file, not the
 // other way round.
 //
-// Net: (768x4kb_hm + threats -> 1024)x2 -> pairwise -> 1024 -> 16 -> 1, with OB
+// Net: (768x4kb_hm + threats -> 768)x2 -> pairwise -> 768 -> 16 -> 1, with OB
 // material-count output buckets on l1 and l2. QA=255 QB=64 SCALE=400. OB is 16
 // or 8, and the threat inputs (../threats.rs) present or not, recognised by
 // the file size; the piece inputs are those of sanity.rs.
@@ -10,21 +10,21 @@
 // LAYOUT (little-endian, save_format order, padded to 64 B with "bullet"):
 //
 //   offset              field                  type   scale
-//   0                   l0w [4*768][1024]      i16    QA
-//   6,291,456           l0b [1024]             i16    QA
-//   6,293,504           l1w [OB][16][1024]     i8     QB
-//   + OB*16384          l1b [OB][16]           f32    real
+//   0                   l0w [4*768][768]       i16    QA
+//   4,718,592           l0b [768]              i16    QA
+//   4,720,128           l1w [OB][16][768]      i8     QB
+//   + OB*12288          l1b [OB][16]           f32    real
 //   + OB*64             l2w [OB][1][16]        f32    real
 //   + OB*64             l2b [OB]               f32    real
-//   + OB*4              l0t [63554][1024]      i8     QA     threat nets only
-//   OB = 16: payload 6,557,760; OB = 8: payload 6,425,632; l0t adds 65,079,296
+//   + OB*4              l0t [63554][768]       i8     QA     threat nets only
+//   OB = 16: payload 4,918,848; OB = 8: payload 4,819,488; l0t adds 48,809,472
 //
 // ARITHMETIC, the delicate part:
 //
 //   acc[i] = piece + threat features, one i16 accumulator, wrapping
 //   c[i]  = clamp(acc[i], 0, QA)                    QA scale, fits in u8
-//   p[j]  = c[j] * c[j + 512] / QA                  pairwise, back in u8
-//   hl1   = [p_stm (512), p_ntm (512)]              1024 values, QA scale
+//   p[j]  = c[j] * c[j + 384] / QA                  pairwise, back in u8
+//   hl1   = [p_stm (384), p_ntm (384)]              768 values, QA scale
 //   z[o]  = (SUM hl1[i]*l1w[o][i]) / (QA*QB) + l1b[o]     real
 //   a[o]  = clamp(z[o], 0, 1)^2                     SCReLU in float
 //   y     = SUM a[o]*l2w[o] + l2b                   linear
@@ -35,7 +35,7 @@
 #[path = "../threats.rs"]
 pub mod threats;
 
-const HIDDEN: usize = 1024;
+pub const HIDDEN: usize = 768;
 const L1_SIZE: usize = 16;
 const INPUT_BUCKETS: usize = 4;
 // The output-bucket counts a file may have, as in network_deep.hpp.
@@ -245,7 +245,7 @@ pub fn accumulate(net: &Network, fen: &str) -> (Vec<i32>, Vec<i32>, usize) {
     (sum(&us, &us_threats), sum(&them, &them_threats), out_bucket)
 }
 
-/// CReLU + pairwise product: 1024 accumulators -> 512 values in [0, QA].
+/// CReLU + pairwise product: 768 accumulators -> 384 values in [0, QA].
 fn pairwise(acc: &[i32], out: &mut [i32]) {
     let half = HIDDEN / 2;
     for j in 0..half {

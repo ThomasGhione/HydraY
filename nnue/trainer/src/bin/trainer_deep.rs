@@ -1,8 +1,8 @@
-// HydraY NNUE: the deep net, (768x4kb_hm + threats -> 1024)x2 -> pairwise -> 1024 -> 16 -> 1,
+// HydraY NNUE: the deep net, (768x4kb_hm + threats -> 768)x2 -> pairwise -> 768 -> 16 -> 1,
 // with material-count output buckets on BOTH layers after the feature transformer.
 //
 // THREAT INPUTS (../threats.rs): 63,554 more features, "piece a on s attacks
-// piece v on t", summed into the same 1024 accumulator. Their weights l0t are a
+// piece v on t", summed into the same 768 accumulator. Their weights l0t are a
 // matrix of their own: no factoriser, a clip of ±127/QA and a save in i8, so
 // that the engine's accumulator still sees QA-scaled values.
 //
@@ -13,8 +13,8 @@
 //
 // Two choices come with the architecture and are not free:
 //   1. CReLU on the feature transformer, with the pairwise product of its two
-//      halves supplying the quadratic term and halving the width (1024 -> 512 per
-//      perspective), so l1's input is 1024 and not 2048;
+//      halves supplying the quadratic term and halving the width (768 -> 384 per
+//      perspective), so l1's input is 768 and not 1536;
 //   2. init_with_effective_input_size(32): fan-in 32 (the active features per
 //      position), the right init for sparse inputs.
 //
@@ -25,16 +25,16 @@
 //
 // QUANTISED FILE LAYOUT (little-endian, save_format order), OB = output buckets:
 //
-//   l0w  [4*768][1024]  i16  QA=255   (factoriser folded in)
-//   l0b  [1024]         i16  QA=255
-//   l1w  [OB][16][1024] i8   QB=64    (transposed: each bucket contiguous)
+//   l0w  [4*768][768]   i16  QA=255   (factoriser folded in)
+//   l0b  [768]          i16  QA=255
+//   l1w  [OB][16][768]  i8   QB=64    (transposed: each bucket contiguous)
 //   l1b  [OB][16]       f32
 //   l2w  [OB][1][16]    f32           (transposed)
 //   l2b  [OB]           f32
-//   l0t  [63554][1024]  i8   QA=255
+//   l0t  [63554][768]   i8   QA=255
 //
-//   OB = 16: 71,637,056 B (a multiple of 64: bullet adds no padding)
-//   OB = 8:  71,504,928 B, padded to 71,504,960
+//   OB = 16: 53,728,320 B (a multiple of 64: bullet adds no padding)
+//   OB = 8:  53,628,960 B, padded to 53,628,992
 //
 // Only l0 and l1w are quantised; the 16 -> 1 tail stays float. sanity_deep.rs is
 // the reference reader, and the C++ must agree with it byte for byte.
@@ -108,7 +108,8 @@ use bullet_lib::{
 mod sanity_deep;
 use sanity_deep::threats;
 
-const HIDDEN_SIZE: usize = 1024;
+// The width lives in sanity_deep.rs, the oracle; the engine's HIDDEN (network.hpp) must match.
+const HIDDEN_SIZE: usize = sanity_deep::HIDDEN;
 // Width of the hidden layer; the forward's cost scales linearly with it.
 const L1_SIZE: usize = 16;
 const OUTPUT_BUCKETS: usize = match option_env!("HYDRAY_OUTPUT_BUCKETS") {

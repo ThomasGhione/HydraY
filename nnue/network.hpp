@@ -1,7 +1,7 @@
 #pragma once
 
 // Feature space and l0 prefix shared by every net format:
-//   768x4kb_hm -> 1024 per perspective.
+//   768x4kb_hm -> 768 per perspective.
 //
 // What comes AFTER l0 lives in network_deep.hpp; this header stops at the
 // accumulator, which is all board.hpp needs for the hot-path hooks.
@@ -26,7 +26,7 @@
 namespace NNUE {
 
 inline constexpr int INPUTS = 768;
-inline constexpr int HIDDEN = 1024;
+inline constexpr int HIDDEN = 768;
 inline constexpr int INPUT_BUCKETS = 4;
 
 // The same literal as BUCKET_LAYOUT in trainer_deep.rs, sanity.rs and

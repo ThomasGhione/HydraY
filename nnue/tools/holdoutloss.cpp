@@ -45,7 +45,9 @@ using namespace NNUE::Deep::tools;
 
 namespace {
 
-// Single-layer quantised.bin: (768x4kb_hm -> 1024)x2 -> 8, SCReLU. Same l0 as
+// Single-layer quantised.bin: (768x4kb_hm -> HIDDEN)x2 -> 8, SCReLU. HIDDEN is the live
+// width: the single-layer nets that were trained are 1024 wide, so on the 768-wide
+// branch this reads only a 768 file, which does not exist; it is kept for the format. Same l0 as
 // the deep format, so the accumulator is shared; only the output layer differs.
 // Layout and arithmetic transcribed from sanity.rs, the oracle for this format.
 //
@@ -67,7 +69,8 @@ struct alignas(64) ShallowNet {
 constexpr size_t SHALLOW_PAYLOAD_BYTES =
     sizeof(int16_t) * (SHALLOW_INPUT_BUCKETS * INPUTS * HIDDEN + HIDDEN
                        + SHALLOW_OUTPUT_BUCKETS * 2 * HIDDEN + SHALLOW_OUTPUT_BUCKETS);
-static_assert(SHALLOW_PAYLOAD_BYTES == 6'326'288);
+static_assert(HIDDEN != 1024 || SHALLOW_PAYLOAD_BYTES == 6'326'288);
+static_assert(HIDDEN != 768 || SHALLOW_PAYLOAD_BYTES == 4'744'720);
 
 int32_t shallowHalf(const int16_t* acc, const int16_t* w) noexcept {
     int32_t s = 0;
@@ -315,7 +318,7 @@ int main(int argc, char** argv) {
             }
             ev.l0 = &net;
             ev.deep = &net;
-            std::printf("format:  deep (1024 -> 16 -> 1, %d output buckets)\n", net.fileBuckets);
+            std::printf("format:  deep (%d -> 16 -> 1, %d output buckets)\n", HIDDEN, net.fileBuckets);
         } else if (netBytes >= SHALLOW_PAYLOAD_BYTES && netBytes < SHALLOW_PAYLOAD_BYTES + 64) {
             // The king-bucket map is compiled in, so a build whose map has a
             // different number of buckets cannot read these nets at all: it

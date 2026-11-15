@@ -23,7 +23,7 @@ namespace {
     return static_cast<int32_t>(std::lround(y * net.outputScale));
 }
 
-// CReLU + pairwise product: 1024 accumulators -> 512 values in [0, QA]. The
+// CReLU + pairwise product: 768 accumulators -> 384 values in [0, QA]. The
 // division by QA is integer and truncating, as in sanity_deep.rs.
 inline void pairwise(const int16_t* acc, int32_t* out) noexcept {
     for (int j = 0; j < PAIRWISE_OUT; ++j) {

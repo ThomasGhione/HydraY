@@ -78,7 +78,7 @@ bool loadNetwork(const std::string& path) {
         std::cout << "info string EvalFile error: cannot load '" << path << "'\n";
         return false;
     }
-    std::cout << "info string EvalFile: network (1024 -> " << Deep::L1_SIZE << " -> 1, "
+    std::cout << "info string EvalFile: network (" << Deep::HIDDEN << " -> " << Deep::L1_SIZE << " -> 1, "
               << activeNetwork->fileBuckets << " output buckets"
               << (activeNetwork->fileThreats ? ", threat inputs)" : ")")
               << (Deep::hasVnniPath() ? ", VNNI" : ", no VNNI") << ", eval scale x" << scale << "\n";
