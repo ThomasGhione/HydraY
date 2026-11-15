@@ -1,7 +1,7 @@
 // HydraY NNUE: the deep net, (768x4kb_hm + threats -> 1024)x2 -> pairwise -> 1024 -> 16 -> 1,
 // with material-count output buckets on BOTH layers after the feature transformer.
 //
-// THREAT INPUTS (../threats.rs): 70,050 more features, "piece a on s attacks
+// THREAT INPUTS (../threats.rs): 63,554 more features, "piece a on s attacks
 // piece v on t", summed into the same 1024 accumulator. Their weights l0t are a
 // matrix of their own: no factoriser, a clip of ±127/QA and a save in i8, so
 // that the engine's accumulator still sees QA-scaled values.
@@ -31,10 +31,10 @@
 //   l1b  [OB][16]       f32
 //   l2w  [OB][1][16]    f32           (transposed)
 //   l2b  [OB]           f32
-//   l0t  [70050][1024]  i8   QA=255
+//   l0t  [63554][1024]  i8   QA=255
 //
-//   OB = 16: 78,288,960 B (a multiple of 64: bullet adds no padding)
-//   OB = 8:  78,156,832 B, padded to 78,156,864
+//   OB = 16: 71,637,056 B (a multiple of 64: bullet adds no padding)
+//   OB = 8:  71,504,928 B, padded to 71,504,960
 //
 // Only l0 and l1w are quantised; the 16 -> 1 tail stays float. sanity_deep.rs is
 // the reference reader, and the C++ must agree with it byte for byte.

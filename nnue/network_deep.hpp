@@ -18,7 +18,7 @@
 //   l1b [OB][16]       f32  real scale
 //   l2w [OB][1][16]    f32
 //   l2b [OB]           f32
-//   l0t [70050][1024]  i8   QA=255   (threat inputs, threats.hpp; absent in older nets)
+//   l0t [63554][1024]  i8   QA=255   (threat inputs, threats.hpp; absent in older nets)
 //   OB = 16: payload 6,557,760 B, with threats 78,288,960 B (no padding)
 //   OB = 8:  payload 6,425,632 B, with threats 78,156,832 B
 //
@@ -157,7 +157,7 @@ struct FileLayout {
 }
 static_assert(payloadBytes(OUTPUT_BUCKETS, false) == 6'557'760, "layout changed: update sanity_deep.rs");
 static_assert(payloadBytes(LEGACY_OUTPUT_BUCKETS, false) == 6'425'632, "legacy layout changed");
-static_assert(payloadBytes(LEGACY_OUTPUT_BUCKETS, true) == 78'156'832, "threat layout changed: update sanity_deep.rs");
+static_assert(payloadBytes(LEGACY_OUTPUT_BUCKETS, true) == 71'504'928, "threat layout changed: update sanity_deep.rs");
 
 // Scalar forward, from the two perspectives' accumulators to the evaluation
 // in centipawns. The correctness reference for the vectorised version.

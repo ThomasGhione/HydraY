@@ -16,8 +16,8 @@
 //   + OB*16384          l1b [OB][16]           f32    real
 //   + OB*64             l2w [OB][1][16]        f32    real
 //   + OB*64             l2b [OB]               f32    real
-//   + OB*4              l0t [70050][1024]      i8     QA     threat nets only
-//   OB = 16: payload 6,557,760; OB = 8: payload 6,425,632; l0t adds 71,731,200
+//   + OB*4              l0t [63554][1024]      i8     QA     threat nets only
+//   OB = 16: payload 6,557,760; OB = 8: payload 6,425,632; l0t adds 65,079,296
 //
 // ARITHMETIC, the delicate part:
 //

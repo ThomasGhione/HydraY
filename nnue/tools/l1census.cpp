@@ -1,5 +1,5 @@
-// Census of the l1 neurons of a quantised net over a bulletformat range: how
-// many never fire, per output bucket of the file.
+// Census of the l1 neurons of a quantised net (with or without threat inputs)
+// over a bulletformat range: how many never fire, per output bucket of the file.
 //
 //   g++ -std=c++23 -O2 -march=native nnue/tools/l1census.cpp nnue/nnue_deep.cpp -o /tmp/l1census
 //   /tmp/l1census <net> <data.bin> [offset] [count]
@@ -12,8 +12,9 @@
 //
 // Use positions no net trained on: the first 20,000,400 records of v8_std.t0.bin.
 
-#include "fen_accumulator.hpp"
+#include "threat_accumulator.hpp"
 
+#include <algorithm>
 #include <cstdio>
 #include <memory>
 #include <string>
@@ -27,11 +28,18 @@ int main(int argc, char** argv) {
         std::fprintf(stderr, "usage: %s <net> <data.bin> [offset] [count]\n", argv[0]);
         return 2;
     }
+    if (!verifyAttackTables()) {
+        std::fprintf(stderr, "internal error: LERF attack table self-check failed\n");
+        return 1;
+    }
     auto net = std::make_unique<NetworkDeep>();
-    if (!loadFromFile(argv[1], *net)) {
+    std::vector<int8_t> rawL0t;
+    if (!loadNetAndRawThreats(argv[1], *net, rawL0t)) {
         std::fprintf(stderr, "cannot load %s\n", argv[1]);
         return 1;
     }
+    const int8_t* rawL0tPtr = net->fileThreats ? rawL0t.data() : nullptr;
+
     const uint64_t offset = argc > 3 ? std::stoull(argv[3]) : 1'000'000;
     const uint64_t count = argc > 4 ? std::stoull(argv[4]) : 600'000;
     const std::vector<Record> recs = readRecords(argv[2], offset, count);
@@ -44,10 +52,12 @@ int main(int argc, char** argv) {
     // the same head, so slot / share is the file's bucket.
     const int share = OUTPUT_BUCKETS / net->fileBuckets;
     std::vector<uint64_t> seen(net->fileBuckets), fired(net->fileBuckets * L1_SIZE);
-    std::vector<int16_t> us(HIDDEN), them(HIDDEN);
-    int32_t hl1[HIDDEN];
+    alignas(64) int16_t us[HIDDEN], them[HIDDEN];
+    alignas(64) int32_t hl1[HIDDEN];
     for (const Record& r : recs) {
-        const int slot = accumulateRecord(*net, r, us.data(), them.data());
+        const NormPos pos = recordToNormPos(r);
+        accumulatePos(*net, rawL0tPtr, pos, us, them);
+        const int slot = pos.outBucket;
         for (int j = 0; j < PAIRWISE_OUT; ++j) {
             hl1[j] = std::clamp<int32_t>(us[j], 0, QA) * std::clamp<int32_t>(us[j + PAIRWISE_OUT], 0, QA) / QA;
             hl1[j + PAIRWISE_OUT] =
