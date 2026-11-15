@@ -214,14 +214,16 @@ namespace uci {
             engine.board = chess::Board(std::string(chess::Board::EMPTY_FEN));
             emit("info string invalid position (malformed FEN or not one king per side): " + fen + "\n");
         }
-        // Coordinate notation; an illegal move is skipped.
+        // Coordinate notation. The list stops at the first move that does not
+        // parse or is not legal: the moves after it belong to another position.
         while (is >> token) {
-            if (token.size() < 4) continue;
-            const chess::Square from = chess::parseSquare(token.substr(0, 2));
-            const chess::Square to = chess::parseSquare(token.substr(2, 2));
-            if (!chess::isValidSquare(from) || !chess::isValidSquare(to)) continue;
+            const chess::Square from = token.size() >= 4 ? chess::parseSquare(token.substr(0, 2)) : chess::NO_SQUARE;
+            const chess::Square to = token.size() >= 4 ? chess::parseSquare(token.substr(2, 2)) : chess::NO_SQUARE;
             const uint8_t promo = (token.size() > 4) ? chess::Move::promotionTypeFromChar(token[4]) : 0;
-            engine.board.move({from, to, promo});
+            if (!chess::isValidSquare(from) || !chess::isValidSquare(to) || !engine.board.move({from, to, promo})) {
+                emit("info string illegal move " + token + ": it and the moves after it are ignored\n");
+                break;
+            }
         }
     }
 
