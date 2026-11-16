@@ -9,8 +9,9 @@
 # the build machine.
 
 FROM debian:trixie-slim AS build
+# curl: make downloads the net from Hugging Face when the context lacks it.
 RUN apt-get update \
-    && apt-get install -y --no-install-recommends clang g++ make \
+    && apt-get install -y --no-install-recommends clang g++ make curl ca-certificates \
     && rm -rf /var/lib/apt/lists/*
 WORKDIR /src
 COPY . .
