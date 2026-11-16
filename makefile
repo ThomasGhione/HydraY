@@ -254,6 +254,11 @@ $(COMPILER_STAMP):
 # -MMD cannot track: declare the data dependency explicitly.
 $(OUTPUT_DIR)/nnue/embedded.o: $(ROOT_DIR)/nnue/net/hydray.nnue $(ROOT_DIR)/nnue/scale_ref.txt
 
+# The net is not in git: the tracked pointer names its sha256, script/net.sh
+# downloads it from the Hugging Face bucket when it is missing or stale.
+$(ROOT_DIR)/nnue/net/hydray.nnue: $(ROOT_DIR)/nnue/net/hydray.nnue.sha256
+	$(ROOT_DIR)/script/net.sh fetch
+
 # tbprobe.c compiled as C (not C++) to avoid name mangling issues
 $(SYZYGY_C_OBJ): $(SYZYGY_C_SRC) $(COMPILER_STAMP)
 	@printf "\nCompiling $<..."

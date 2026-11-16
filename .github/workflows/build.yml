@@ -1,0 +1,17 @@
+name: build
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Fetch the net from Hugging Face
+        run: script/net.sh fetch
+      - name: Build
+        run: make prod CXX=g++ ARCH="-march=x86-64-v3"
+      - name: Embedded net self-test
+        run: ./chess nnue-selftest nnue/net/hydray.nnue
