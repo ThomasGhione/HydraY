@@ -70,19 +70,19 @@ static_assert(MATE_VALUE + MAX_PLY <= std::numeric_limits<int16_t>::max(),
 // rebuildSearchDerivedTables() after a spin write.
 // Null-move reduction: NMP_BASE_R + depth / 3, deeper the further eval beats beta.
 inline Spin NMP_BASE_R{4, "NMP_BASE_R", 1, 8};
-inline Spin NMP_EVAL_DIV{260, "NMP_EVAL_DIV", 50, 400};
+inline Spin NMP_EVAL_DIV{235, "NMP_EVAL_DIV", 50, 400};
 inline Spin NMP_EVAL_MAX{4, "NMP_EVAL_MAX", 0, 10};
 // Reverse futility pruning margin per remaining ply.
-inline Spin RFP_MARGIN_PER_DEPTH{63, "RFP_MARGIN_PER_DEPTH", 30, 250};
+inline Spin RFP_MARGIN_PER_DEPTH{55, "RFP_MARGIN_PER_DEPTH", 30, 250};
 // Futility margin FUTILITY_MID_STEP * depth, depth 1..FUTILITY_MAX_DEPTH.
 inline constexpr int FUTILITY_DEPTH_CAP = 10;
 inline Spin FUTILITY_MAX_DEPTH{6, "FUTILITY_MAX_DEPTH", 0, FUTILITY_DEPTH_CAP};
-inline Spin FUTILITY_MID_STEP{171, "FUTILITY_MID_STEP", 80, 600};
+inline Spin FUTILITY_MID_STEP{150, "FUTILITY_MID_STEP", 80, 600};
 // LMP threshold, depth 1..LMP_MAX_DEPTH: the base curve scaled by
 // LMP_SCALE_PCT[improving]. Higher = more permissive.
 inline constexpr int LMP_DEPTH_CAP = 10;
 inline Spin LMP_MAX_DEPTH{4, "LMP_MAX_DEPTH", 0, LMP_DEPTH_CAP};
-inline Spin LMP_SCALE_PCT[2] = {{50, "LMP_SCALE_STD_PCT", 10, 250}, {53, "LMP_SCALE_IMP_PCT", 10, 250}};
+inline Spin LMP_SCALE_PCT[2] = {{45, "LMP_SCALE_STD_PCT", 10, 250}, {48, "LMP_SCALE_IMP_PCT", 10, 250}};
 inline int lmpThreshold(bool improving, int depth) noexcept {
     const int base = improving ? depth * depth + 7 * depth + 8 : (depth + 2) * (depth + 3);
     return base * LMP_SCALE_PCT[improving] / 100;
@@ -114,7 +114,7 @@ void rebuildSearchDerivedTables() noexcept;
 
 // --- Late move reductions ---
 // LMR_C == LMR_C_PERCENT / 100.0 (int spin for the tuner).
-inline Spin LMR_C_PERCENT{314, "LMR_C_PERCENT", 150, 600};
+inline Spin LMR_C_PERCENT{355, "LMR_C_PERCENT", 150, 600};
 // Extra plies of reduction at an expected cut node.
 inline Spin LMR_CUT_BONUS{1, "LMR_CUT_BONUS", 0, 4};
 // First reduced move index: LMR_MIN_INDEX_ALL at an expected all node
@@ -157,18 +157,18 @@ inline constexpr int32_t CORR_HIST_LIMIT      = 1024;
 inline constexpr int32_t CORR_HIST_SCALE      = 131072;
 // Update bonus: residual * depth * rate / 1280 (160 = 1/8, 128 = 1/10 after a
 // raised alpha), clamped to +-CORR_BONUS_CAP (UCI spins).
-inline Spin CORR_BONUS_RATE{160, "CORR_BONUS_RATE", 0, 640};
-inline Spin CORR_BONUS_RATE_RAISED{128, "CORR_BONUS_RATE_RAISED", 0, 640};
+inline Spin CORR_BONUS_RATE{176, "CORR_BONUS_RATE", 0, 640};
+inline Spin CORR_BONUS_RATE_RAISED{141, "CORR_BONUS_RATE_RAISED", 0, 640};
 inline Spin CORR_BONUS_CAP{CORR_HIST_LIMIT / 4, "CORR_BONUS_CAP", 0, 512};
 // Weights of each table in the applied correction (UCI spins).
-inline Spin CORR_WEIGHT_PAWN{10347, "CORR_WEIGHT_PAWN", 0, 32768};
-inline Spin CORR_WEIGHT_MINOR{8821, "CORR_WEIGHT_MINOR", 0, 32768};
-inline Spin CORR_WEIGHT_NON_PAWN{11665, "CORR_WEIGHT_NON_PAWN", 0, 32768};
+inline Spin CORR_WEIGHT_PAWN{8000, "CORR_WEIGHT_PAWN", 0, 32768};
+inline Spin CORR_WEIGHT_MINOR{11200, "CORR_WEIGHT_MINOR", 0, 32768};
+inline Spin CORR_WEIGHT_NON_PAWN{14500, "CORR_WEIGHT_NON_PAWN", 0, 32768};
 // Update bonus of the minor and non-pawn tables, in 128ths of the pawn one (UCI spins).
-inline Spin CORR_UPDATE_MINOR{156, "CORR_UPDATE_MINOR", 0, 512};
-inline Spin CORR_UPDATE_NON_PAWN{178, "CORR_UPDATE_NON_PAWN", 0, 512};
+inline Spin CORR_UPDATE_MINOR{185, "CORR_UPDATE_MINOR", 0, 512};
+inline Spin CORR_UPDATE_NON_PAWN{210, "CORR_UPDATE_NON_PAWN", 0, 512};
 // Global strength of the applied correction, in percent (UCI spin).
-inline Spin CORR_HIST_WEIGHT_PCT{100, "CORR_HIST_WEIGHT_PCT", 0, 400};
+inline Spin CORR_HIST_WEIGHT_PCT{110, "CORR_HIST_WEIGHT_PCT", 0, 400};
 
 // --- Quiescence search ---
 inline constexpr uint8_t MAX_QSEARCH_DEPTH = 48;

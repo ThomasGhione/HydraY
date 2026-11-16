@@ -102,6 +102,8 @@ struct SquareThreatInputs {
 
     __attribute__((always_inline))
     ThreatMasks masksFor(uint8_t piece) const noexcept {
+        // Opponent king bitboard: (WHITE & MASK_COLOR) >> 3 == 1 (BLACK), and vice versa.
+        const auto oppKing = [&]() noexcept { return bb[Board::KING][(piece & Board::MASK_COLOR) >> 3]; };
         switch (piece & Board::MASK_PIECE_TYPE) {
             case Board::PAWN: {
                 const uint64_t nonTargets = bb[Board::BISHOP][0] | bb[Board::BISHOP][1] | queens | kings;
@@ -109,21 +111,26 @@ struct SquareThreatInputs {
                         slidersAndKnights | pawnAtks | kingAtks};
             }
             case Board::KNIGHT:
-                return {pieces::KNIGHT_ATTACKS[sq] & occupancy,
+                return {pieces::KNIGHT_ATTACKS[sq] & (occupancy ^ oppKing()),
                         slidersAndKnights | pawnAtks | kingAtks};
             case Board::BISHOP:
-                return {bishopOcc & ~queens,
+                return {bishopOcc & ~(queens | oppKing()),
                         slidersAndKnights | kingAtks};
             case Board::ROOK:
-                return {rookOcc & ~queens,
+                return {rookOcc & ~(queens | oppKing()),
                         slidersAndKnights | pawnAtks | kingAtks};
             case Board::QUEEN: {
-                const uint64_t victims = rookOcc | bishopOcc;
-                return {victims, (victims & queens) | knightAtks};
+                const uint64_t occRays = rookOcc | bishopOcc;
+                return {occRays & ~oppKing(), (occRays & queens) | knightAtks};
             }
-            default: // KING
+            default: { // KING
+                // Checks (* -> opp K) are excluded, so only friendly sliders/knights defending own K remain.
+                const int c = Board::colorToIndex(piece);
+                const uint64_t ownMinorMajor = bb[Board::KNIGHT][c] | bb[Board::BISHOP][c]
+                                             | bb[Board::ROOK][c]   | bb[Board::QUEEN][c];
                 return {pieces::KING_ATTACKS[sq] & (occupancy ^ (queens | kings)),
-                        slidersAndKnights};
+                        slidersAndKnights & ownMinorMajor};
+            }
         }
     }
 };

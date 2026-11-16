@@ -13,10 +13,10 @@
 //     v's: P->B, P->Q, P->K, B->Q, R->Q, K->Q (the reverse feature is kept);
 //   - two pieces of one type that attack each other (pawns: only of opposite
 //     colours) are one feature, the one whose attacker square is lower.
-// What is left: 70,050 features, indexed by attacker, victim, attacker square,
+// What is left: 63,554 features, indexed by attacker, victim, attacker square,
 // then victim square in increasing order among the squares a could attack.
 
-pub const FEATURES: usize = 70_050;
+pub const FEATURES: usize = 63_554;
 // Every piece attacks at most 8 others (one per ray or step), and at most 32
 // pieces stand on the board.
 pub const MAX_ACTIVE: usize = 256;
@@ -82,10 +82,11 @@ pub const fn attacks(piece: usize, sq: usize, occ: u64) -> u64 {
 }
 
 pub const fn pair_is_feature(a: usize, v: usize) -> bool {
-    !matches!(
-        (a % 6, v % 6),
-        (KING, KING) | (PAWN, BISHOP) | (PAWN, QUEEN) | (PAWN, KING) | (BISHOP, QUEEN) | (ROOK, QUEEN) | (KING, QUEEN)
-    )
+    !(v % 6 == KING && a / 6 != v / 6)
+        && !matches!(
+            (a % 6, v % 6),
+            (KING, KING) | (PAWN, BISHOP) | (PAWN, QUEEN) | (PAWN, KING) | (BISHOP, QUEEN) | (ROOK, QUEEN) | (KING, QUEEN)
+        )
 }
 
 const fn mutual(a: usize, v: usize) -> bool {

@@ -14,7 +14,7 @@
 
 namespace NNUE {
 
-inline constexpr int THREAT_FEATURES = 70'050;
+inline constexpr int THREAT_FEATURES = 63'554;
 // Every piece attacks at most 8 others, and at most 32 pieces stand on the board.
 inline constexpr int MAX_ACTIVE_THREATS = 256;
 
@@ -67,10 +67,11 @@ inline constexpr auto EMPTY_BOARD_ATTACKS = [] {
     return table;
 }();
 
-// King on king, and the pairs where the victim always attacks back.
+// King on king, checks (* -> opp K), and the pairs where the victim always attacks back.
 constexpr bool pairIsFeature(int a, int v) noexcept {
     const int ta = a % 6, tv = v % 6;
-    return !(ta == KING && tv == KING) && !(ta == PAWN && (tv == BISHOP || tv == QUEEN || tv == KING))
+    return !(ta == KING && tv == KING) && !(tv == KING && a / 6 != v / 6)
+        && !(ta == PAWN && (tv == BISHOP || tv == QUEEN || tv == KING))
         && !(tv == QUEEN && (ta == BISHOP || ta == ROOK || ta == KING));
 }
 
@@ -86,10 +87,10 @@ constexpr uint64_t targets(int a, int v, int from) noexcept {
     return m;
 }
 
-// The 116 feature pairs (29 type pairs in 4 colour combinations) get one entry
-// per attacker square; every other pair points to an extra empty block, so a
-// lookup needs no branch.
-inline constexpr int VALID_PAIR_COUNT = 116;
+// The 108 feature pairs (29 type pairs in 4 colour combinations, minus the 8
+// check pairs * -> opp K) get one entry per attacker square; every other pair
+// points to an extra empty block, so a lookup needs no branch.
+inline constexpr int VALID_PAIR_COUNT = 108;
 inline constexpr uint16_t INVALID_PAIR_BASE = VALID_PAIR_COUNT * 64;
 
 // The victim squares of a pair and attacker square, and the first feature.
@@ -124,14 +125,22 @@ inline constexpr Table TABLE = [] {
         }
     return t;
 }();
-static_assert(TABLE.total == THREAT_FEATURES, "threats.rs counts 70,050");
+static_assert(TABLE.total == THREAT_FEATURES, "threats.rs counts 63,554");
 
-// Bit v of entry a: Board types a and v (1-6) can form a feature.
-inline constexpr std::array<uint8_t, 8> PAIR_FEATURE_MASK = [] {
-    std::array<uint8_t, 8> m{};
-    for (int ta = 0; ta < 6; ++ta)
-        for (int tv = 0; tv < 6; ++tv)
-            if (pairIsFeature(ta, tv)) m[ta + 1] |= static_cast<uint8_t>(1U << (tv + 1));
+// Bit (victim & 0xf) of entry (attacker & 0xf): Board pieces a and v can form a feature.
+inline constexpr std::array<uint16_t, 16> PAIR_FEATURE_MASK = [] {
+    std::array<uint16_t, 16> m{};
+    for (int a = 1; a <= 14; ++a) {
+        const int ta = (a & 7) - 1;
+        if (ta < 0 || ta >= 6) continue;
+        const int ra = ((a & 8) ? 0 : 6) + ta;
+        for (int v = 1; v <= 14; ++v) {
+            const int tv = (v & 7) - 1;
+            if (tv < 0 || tv >= 6) continue;
+            const int rv = ((v & 8) ? 0 : 6) + tv;
+            if (pairIsFeature(ra, rv)) m[a] |= static_cast<uint16_t>(1U << v);
+        }
+    }
     return m;
 }();
 
@@ -154,9 +163,9 @@ constexpr bool tryIndex(int a, int from, int v, int to, uint32_t& out) noexcept 
 
 } // namespace threats
 
-// Whether attacker and victim types (Board's 1-6) can form a feature at all.
+// Whether attacker and victim pieces (Board encoding: bit 3 = colour, bits 0-2 = 1-6) can form a feature.
 [[nodiscard]] constexpr bool threatPairIsFeature(uint8_t attacker, uint8_t victim) noexcept {
-    return (threats::PAIR_FEATURE_MASK[attacker & 0x7] >> (victim & 0x7)) & 1;
+    return (threats::PAIR_FEATURE_MASK[attacker & 0xF] >> (victim & 0xF)) & 1;
 }
 
 // [perspective][Board piece] -> relative piece 0-11.

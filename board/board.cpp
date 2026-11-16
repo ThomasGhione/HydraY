@@ -343,12 +343,11 @@ void Board::computeThreats(int16_t* row, const int16_t* src, int p, int flip) co
     const int8_t* add[NNUE::MAX_ACTIVE_THREATS];
     int na = 0;
     const NNUE::ThreatPerspective tp(p, flip);
-    const uint64_t bishops = bb[BISHOP][0] | bb[BISHOP][1];
-    const uint64_t queens  = bb[QUEEN][0]  | bb[QUEEN][1];
-    const uint64_t kings   = bb[KING][0]   | bb[KING][1];
-    const uint64_t nonQueenVictims = occupancy ^ queens;
-    const uint64_t pawnVictims     = occupancy ^ (bishops | queens | kings);
-    const uint64_t kingVictims     = occupancy ^ (queens | kings);
+    const uint64_t bishops     = bb[BISHOP][0] | bb[BISHOP][1];
+    const uint64_t queens      = bb[QUEEN][0]  | bb[QUEEN][1];
+    const uint64_t kings       = bb[KING][0]   | bb[KING][1];
+    const uint64_t pawnVictims = occupancy ^ (bishops | queens | kings);
+    const uint64_t kingVictims = occupancy ^ (queens | kings);
 
     const auto emit = [&](int relA, uint8_t from, uint64_t victims) {
         const int fromView = from ^ tp.toView;
@@ -362,13 +361,15 @@ void Board::computeThreats(int16_t* row, const int16_t* src, int p, int flip) co
 
     for (int side = 0; side < 2; ++side) {
         const int baseA = (side ^ p) * 6;
+        const uint64_t validOcc        = occupancy ^ bb[KING][side ^ 1];
+        const uint64_t nonQueenVictims = validOcc ^ queens;
         for (uint64_t pcs = bb[PAWN][side]; pcs; ) {
             const auto from = static_cast<uint8_t>(pieces::popLSB(pcs));
             emit(baseA + (PAWN - 1), from, pieces::PAWN_ATTACKS[side][from] & pawnVictims);
         }
         for (uint64_t pcs = bb[KNIGHT][side]; pcs; ) {
             const auto from = static_cast<uint8_t>(pieces::popLSB(pcs));
-            emit(baseA + (KNIGHT - 1), from, pieces::KNIGHT_ATTACKS[from] & occupancy);
+            emit(baseA + (KNIGHT - 1), from, pieces::KNIGHT_ATTACKS[from] & validOcc);
         }
         for (uint64_t pcs = bb[BISHOP][side]; pcs; ) {
             const auto from = static_cast<uint8_t>(pieces::popLSB(pcs));
@@ -381,7 +382,7 @@ void Board::computeThreats(int16_t* row, const int16_t* src, int p, int flip) co
         for (uint64_t pcs = bb[QUEEN][side]; pcs; ) {
             const auto from = static_cast<uint8_t>(pieces::popLSB(pcs));
             const uint64_t atks = pieces::Rook::attacks(from, occupancy) | pieces::Bishop::attacks(from, occupancy);
-            emit(baseA + (QUEEN - 1), from, atks & occupancy);
+            emit(baseA + (QUEEN - 1), from, atks & validOcc);
         }
         if (bb[KING][side]) {
             const auto from = static_cast<uint8_t>(std::countr_zero(bb[KING][side]));
