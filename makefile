@@ -61,7 +61,7 @@ endif
 # Objects (LTO bitcode) from one compiler cannot be linked by the other, and
 # objects built for one ARCH must not reach a binary for another: a switch
 # leaves no stamp for the new combination, which then rebuilds them all.
-BUILD_ID := $(shell printf '%s' '$(ARCH) $(RELEASE_FLAGS)' | cksum | cut -d' ' -f1)
+BUILD_ID := $(shell printf '%s' '$(ARCH) $(RELEASE_FLAGS)$(if $(EVALFILE), $(EVALFILE))' | cksum | cut -d' ' -f1)
 COMPILER_STAMP = $(OUTPUT_DIR)/.cxx-$(notdir $(CXX))-$(BUILD_ID)
 
 # Windows cross-compiler (requires mingw-w64). The -posix variant, where the
@@ -103,7 +103,10 @@ LIZARD = lizard
 GPROF2DOT = $(SCRIPT_DIR)/gprof2dot.py
 
 # Output binaries
-NAME_APP = $(ROOT_DIR)/chess
+# OpenBench builds with `make EXE=<name> [CXX=...] [EVALFILE=<net>]`: EXE names
+# the production binary, EVALFILE embeds that net instead of the repo's.
+NAME_APP = $(if $(EXE),$(abspath $(EXE)),$(ROOT_DIR)/chess)
+NET_FILE = $(if $(EVALFILE),$(abspath $(EVALFILE)),$(ROOT_DIR)/nnue/net/hydray.nnue)
 TEST_APP = $(TESTS_DIR)/test
 PERF_APP = $(TESTS_DIR)/perf
 NAME_APP_WIN = $(ROOT_DIR)/chess.exe
@@ -169,7 +172,8 @@ DEPFILES = $(ALL_OBJS:.o=.d) $(TEST_OBJS:.o=.d) $(TEST_MAIN_OBJ:.o=.d) $(PERF_OB
 # Main targets
 .PHONY: all prod prod_windows release parallel_prod prod_sequential debug test perf all-tests analyze analyze-setup analyze-cppcheck analyze-clang-tidy analyze-iwyu analyze-scan-build analyze-gcc-analyzer analyze-cppclean analyze-lizard analyze-summary complexity test-valgrind cls cls-compile-files get-image help debug-vars
 
-# Default target for plain `make`
+# Default target for plain `make`; prod when EXE is given
+.DEFAULT_GOAL := $(if $(EXE),prod,all)
 all: PRODFLAGS += -DDEBUG -fomit-frame-pointer
 all: prod
 
@@ -252,7 +256,10 @@ $(COMPILER_STAMP):
 
 # embedded.cpp pulls the network blob in via the assembler's .incbin, which
 # -MMD cannot track: declare the data dependency explicitly.
-$(OUTPUT_DIR)/nnue/embedded.o: $(ROOT_DIR)/nnue/net/hydray.nnue $(ROOT_DIR)/nnue/scale_ref.txt
+$(OUTPUT_DIR)/nnue/embedded.o: $(NET_FILE) $(ROOT_DIR)/nnue/scale_ref.txt
+ifneq ($(EVALFILE),)
+$(OUTPUT_DIR)/nnue/embedded.o: PRODFLAGS += -DHYDRAY_NET_FILE='"$(NET_FILE)"'
+endif
 
 # tbprobe.c compiled as C (not C++) to avoid name mangling issues
 $(SYZYGY_C_OBJ): $(SYZYGY_C_SRC) $(COMPILER_STAMP)

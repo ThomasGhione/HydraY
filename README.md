@@ -69,6 +69,14 @@ NNUE-specific modes (see the NNUE section below):
 ./chess nnue-selftest <net.nnue>                                # verify accumulator correctness
 ```
 
+Search fingerprint: the bench6 positions to a fixed depth on one thread. The
+total node count is deterministic on every machine; the last line,
+`<nodes> nodes <nps> nps`, is what OpenBench reads.
+
+```sh
+./chess bench [depth]                # default depth 14; bench 12 = engine_driver.sh bench6
+```
+
 Move-generation diagnostics (see Testing below):
 
 ```sh
@@ -93,6 +101,9 @@ binary may not start on another CPU: `make prod ARCH=-march=x86-64-v3` builds a
 portable one. Object files go to `output/` so incremental builds stay fast.
 `make release` hides the tuning options (`-DHYDRAY_RELEASE`); every other build
 keeps them for the scripts in `tuning/`.
+`make EXE=<name> [CXX=...] [EVALFILE=<net>]` is the OpenBench build: a
+production binary named `<name>`, with `<net>` embedded instead of
+`nnue/net/hydray.nnue` when given.
 
 ## Testing
 

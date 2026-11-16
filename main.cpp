@@ -2,6 +2,7 @@
 #include <string_view>
 
 #include "./ascii_utils.hpp"
+#include "./engine/bench.hpp"
 #include "./engine/engine.hpp"
 #include "./engine/perft.hpp"
 #include "./uci/uci.hpp"
@@ -27,10 +28,11 @@ int main(int argc, char *argv[]) {
     }
 
     if (mode == "perft") return engine::runPerftCommand(argc, argv);
+    if (mode == "bench") return engine::runBenchCommand(argc, argv);
 
     while (mode.starts_with('-')) mode.remove_prefix(1);
     if (!ascii::iequals(mode, "uci")) {
-        std::cerr << "usage: chess [uci | perft | datagen | datagen-dump | nnue-selftest] ...\n";
+        std::cerr << "usage: chess [uci | bench | perft | datagen | datagen-dump | nnue-selftest] ...\n";
         return 1;
     }
 
