@@ -243,8 +243,12 @@ handcrafted evaluator (SPRT, LOS 100%); later nets are validated against the
 previous release instead.
 
 - The net ships **embedded in the binary** (`nnue/net/hydray.nnue` via
-  `.incbin`) and is activated at startup. To ship a new net, replace that file
-  and rebuild.
+  `.incbin`) and is activated at startup. The file is not in git: `make`
+  downloads it from the Hugging Face bucket
+  [ThomasGhione/hydray-net](https://huggingface.co/buckets/ThomasGhione/hydray-net)
+  as named by `nnue/net/hydray.nnue.sha256`. To ship a new net run
+  `script/net.sh push <file.nnue>` (needs `HF_TOKEN` and the `hf` CLI), commit
+  the updated `.sha256`, and rebuild.
 - The UCI option `EvalFile` loads an external `.nnue` file instead - useful
   for A/B-testing candidate nets without rebuilding.
 - The accumulator is updated incrementally in the board's piece add/remove

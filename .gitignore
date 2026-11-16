@@ -65,3 +65,7 @@ __pycache__/
 # Docker datagen: local settings (may hold HF_TOKEN) and the default data folder
 /docker/.env
 /data/
+
+# Nets live in the HF bucket ThomasGhione/hydray-net (script/net.sh)
+/nnue/net/*.nnue
+!/.github/
