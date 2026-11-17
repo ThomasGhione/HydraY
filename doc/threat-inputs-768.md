@@ -31,13 +31,13 @@ Pairwise halves are 384 (`PAIRWISE_OUT`), l1's input is 768.
 - `nnue/tools/cut_width.py`: cuts a 1024-wide net without threats to 768, keeping the
   pairs (j, j + 512), j < 384.
 
-## The embedded net is a placeholder
+## The embedded net
 
-`nnue/net/hydray.nnue` is **the 4.4.0 net cut to 768 with `cut_width.py`**, not a trained
-768 net (a 1024-wide file cannot be loaded by this build). It makes the binary start,
-and tests, selftests and timing work. Its strength is well below 4.4.0's: compare nothing
-against it, and replace it with a trained net once one exists. 4.4.0 itself stays in the
-`dev` binary (and in git history).
+`nnue/net/hydray.nnue.sha256` names `hydray-threats768-v10-ft-antidead-steps-qat-80sb-reordered.nnue`
+(sha256 `bc3c5971...`), the first trained 768 threat net, fetched from the Hugging Face
+bucket by `make`. Until 2026-11-17 the embedded net was a placeholder: **the 4.4.0 net cut
+to 768 with `cut_width.py`** (sha256 `fdf0eaba...`, also in the bucket), not a trained net
+(a 1024-wide file cannot be loaded by this build); compare nothing against it.
 
 ## Verified (2026-11-15)
 
