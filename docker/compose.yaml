@@ -39,6 +39,7 @@ services:
     command:
       # - --out=/data/NAME        # default /data/m<machine-id hash>-v<version>-n<nodes>
       - --nodes=16000
+      - --shard=20000000          # positions per sealed (and uploaded) shard
       - --seal-on-exit
       - --min-free-gb=4           # pause below 4 GB free, room left for the upload
       # Upload of the sealed shards (HF_TOKEN in .env); without a token or
