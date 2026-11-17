@@ -31,7 +31,7 @@ RUN mkdir bin \
 # included) and, when the build passes it, the git commit; datagen.sh adds
 # the ISA of the binary it runs.
 ARG GIT_COMMIT=
-RUN echo "hydray-$(sed -n 's/.*id name HydraY \([0-9.]*\).*/\1/p' uci/uci.cpp)" \
+RUN echo "hydray-$(sed -n 's/.*id name HydraY \([0-9A-Za-z.-]*\).*/\1/p' uci/uci.cpp)" \
          "src-$(find board engine nnue tt uci main.cpp makefile -type f | LC_ALL=C sort \
                 | xargs sha256sum | sha256sum | cut -c1-12)" \
          "${GIT_COMMIT:+git-$GIT_COMMIT}" > BUILD_ID

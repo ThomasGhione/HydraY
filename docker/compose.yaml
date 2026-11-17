@@ -38,7 +38,7 @@ services:
     # default to every CPU; --games does not fit a service that restarts.
     command:
       # - --out=/data/NAME        # default /data/m<machine-id hash>-v<version>-n<nodes>
-      - --nodes=8000
+      - --nodes=16000
       - --seal-on-exit
       - --min-free-gb=4           # pause below 4 GB free, room left for the upload
       # Upload of the sealed shards (HF_TOKEN in .env); without a token or
