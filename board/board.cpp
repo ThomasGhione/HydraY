@@ -305,11 +305,13 @@ void applyMixed(int16_t* __restrict dst, const int16_t* __restrict src,
     }
 }
 
-// Both perspectives of a frame from the one before it, the move's piece rows
-// given. One move rarely adds and removes the same threat, so nothing is
-// cancelled.
+// Both perspectives of dst from src, one move apart: the move logged in
+// `moved` leads from src to dst, or from dst to src with invert. Its piece
+// rows are given. One move rarely adds and removes the same threat, so
+// nothing is cancelled.
 __attribute__((noinline, hot))
-void applyFramePair1(NNUE::Accumulator& dst, const NNUE::Accumulator& src, int flip0, int flip1,
+void applyFramePair1(NNUE::Accumulator& dst, const NNUE::Accumulator& src, const NNUE::Accumulator& moved,
+                     bool invert, int flip0, int flip1,
                      const int16_t* const (&psub)[2][NNUE::ACC_MAX_DELTAS], int pns,
                      const int16_t* const (&padd)[2][NNUE::ACC_MAX_DELTAS], int pna) noexcept {
     const int8_t* sub[2][NNUE::ACC_MAX_THREATS];
@@ -317,11 +319,11 @@ void applyFramePair1(NNUE::Accumulator& dst, const NNUE::Accumulator& src, int f
     int ns[2] = {0, 0};
     int na[2] = {0, 0};
     const int toView0 = 56 ^ flip0;
-    for (int k = 0; k < dst.nthreat; ++k) {
-        const NNUE::ThreatDelta& d = dst.threatDelta[k];
+    for (int k = 0; k < moved.nthreat; ++k) {
+        const NNUE::ThreatDelta& d = moved.threatDelta[k];
         int f0 = 0, f1 = 0;
         NNUE::threatFeaturePair(toView0, flip1, d.attacker, d.from, d.victim, d.to(), f0, f1);
-        const bool isAdd = d.add();
+        const bool isAdd = d.add() != invert;
         const auto pushRow = [&](int p, int feat) noexcept {
             if (feat < 0) return;
             const int8_t* row = NNUE::Accumulator::threatRow(static_cast<uint32_t>(feat));
@@ -485,14 +487,10 @@ void Board::ensureNnueAccumulatorClean() const noexcept {
         cancelThreats(sub, ns, add, na);
     };
 
-    // Frame `target` from frame `start` for the usable perspectives, through
-    // the changes logged in the frames between.
-    const auto incremental = [&](int start, int target) __attribute__((hot)) {
-        constexpr int CAP = NNUE::ACC_MAX_WALK * NNUE::ACC_MAX_DELTAS;
-        uint16_t sub[CAP];   // piece << 8 | square
-        uint16_t add[CAP];
-        int ns = 0;
-        int na = 0;
+    constexpr int CAP = NNUE::ACC_MAX_WALK * NNUE::ACC_MAX_DELTAS;
+    // The piece features the moves after frame `start` up to frame `target`
+    // add and remove (piece << 8 | square), those on both sides dropped.
+    const auto collectPieces = [&](int start, int target, uint16_t* sub, int& ns, uint16_t* add, int& na) {
         for (int i = start + 1; i <= target; ++i) {
             const NNUE::Accumulator& f = frame(i);
             for (int k = 0; k < f.ndelta; ++k) {
@@ -513,20 +511,36 @@ void Board::ensureNnueAccumulatorClean() const noexcept {
             sub[i] = sub[--ns];   // swap-remove: order is irrelevant
             add[j] = add[--na];
         }
+    };
+    const auto row = [&](int p, uint16_t c) {
+        return NNUE::Accumulator::rowFor(rowBase[p], rowFlip[p], p, static_cast<uint8_t>(c >> 8),
+                                         static_cast<uint8_t>(c));
+    };
+    // Frame dst from frame src one move away, both perspectives on this basis;
+    // `moved` holds the move (dst's own, or src's with invert).
+    const auto pair1 = [&](NNUE::Accumulator& dst, const NNUE::Accumulator& src, const NNUE::Accumulator& moved,
+                           bool invert, const uint16_t* sub, int ns, const uint16_t* add, int na) {
+        const int16_t* subRow[2][NNUE::ACC_MAX_DELTAS];
+        const int16_t* addRow[2][NNUE::ACC_MAX_DELTAS];
+        for (int p = 0; p < 2; ++p) {
+            for (int k = 0; k < ns; ++k) subRow[p][k] = row(p, sub[k]);
+            for (int k = 0; k < na; ++k) addRow[p][k] = row(p, add[k]);
+        }
+        applyFramePair1(dst, src, moved, invert, rowFlip[0], rowFlip[1], subRow, ns, addRow, na);
+    };
+
+    // Frame `target` from frame `start` for the usable perspectives, through
+    // the changes logged in the frames between.
+    const auto incremental = [&](int start, int target) __attribute__((hot)) {
+        uint16_t sub[CAP];
+        uint16_t add[CAP];
+        int ns = 0;
+        int na = 0;
+        collectPieces(start, target, sub, ns, add, na);
         const NNUE::Accumulator& src = frame(start);
         NNUE::Accumulator& dst = frame(target);
-        const auto row = [&](int p, uint16_t c) {
-            return NNUE::Accumulator::rowFor(rowBase[p], rowFlip[p], p, static_cast<uint8_t>(c >> 8),
-                                             static_cast<uint8_t>(c));
-        };
         if (usable[0] && usable[1] && target == start + 1) {
-            const int16_t* subRow[2][NNUE::ACC_MAX_DELTAS];
-            const int16_t* addRow[2][NNUE::ACC_MAX_DELTAS];
-            for (int p = 0; p < 2; ++p) {
-                for (int k = 0; k < ns; ++k) subRow[p][k] = row(p, sub[k]);
-                for (int k = 0; k < na; ++k) addRow[p][k] = row(p, add[k]);
-            }
-            applyFramePair1(dst, src, rowFlip[0], rowFlip[1], subRow, ns, addRow, na);
+            pair1(dst, src, dst, false, sub, ns, add, na);
             return;
         }
         for (int p = 0; p < 2; ++p) {
@@ -585,6 +599,33 @@ void Board::ensureNnueAccumulatorClean() const noexcept {
         NNUE::FinnyEntry& e = finny.entry[p][NNUE::KING_BUCKET_MAP[kingView[p]]][rowFlip[p] ? 1 : 0];
         syncRow(*this, e.v, e.bb, p, rowBase[p], rowFlip[p]);
         computeThreats(top.v[p], e.v, p, rowFlip[p]);
+    }
+
+    // The ancestors of a frame refreshed here stay uncomputed, and every later
+    // sibling or cousin would refresh too: compute them back from this frame
+    // while the moves kept both bases.
+    for (int i = accTop; i - 1 >= accFloor && i > accTop - NNUE::ACC_MAX_WALK; --i) {
+        NNUE::Accumulator& child = frame(i);
+        NNUE::Accumulator& parent = frame(i - 1);
+        if (!parent.dirty[0] || child.nthreat == NNUE::ACC_THREATS_OVERFLOW) return;
+        for (int k = 0; k < child.ndelta; ++k) {
+            const NNUE::AccDelta& d = child.delta[k];
+            if ((d.piece & MASK_PIECE_TYPE) != KING) continue;
+            const int p = colorToIndex(d.piece);
+            const int view = (p == 1) ? d.from : (d.from ^ 56);
+            if (NNUE::kingFeatureBase(view) != rowBase[p] || NNUE::kingFlip(view) != rowFlip[p]) return;
+        }
+        uint16_t sub[CAP];
+        uint16_t add[CAP];
+        int ns = 0;
+        int na = 0;
+        collectPieces(i - 1, i, add, na, sub, ns);
+        pair1(parent, child, child, true, sub, ns, add, na);
+        for (int p = 0; p < 2; ++p) {
+            parent.base[p] = rowBase[p];
+            parent.flip[p] = static_cast<uint8_t>(rowFlip[p]);
+            parent.dirty[p] = false;
+        }
     }
 }
 
