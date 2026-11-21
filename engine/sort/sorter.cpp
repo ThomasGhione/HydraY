@@ -11,14 +11,30 @@ namespace {
 
 using chess::Board;
 
+// Pack (from, to) into a single 16-bit key so killer / counter / hash move
+// checks compile to a single 16-bit compare instead of two byte loads+branches.
+__attribute__((always_inline))
+constexpr uint16_t packFromTo(uint8_t from, uint8_t to) noexcept {
+    return static_cast<uint16_t>(static_cast<uint16_t>(from) | (static_cast<uint16_t>(to) << 8));
+}
+
+__attribute__((always_inline))
+inline int32_t clampHist(int16_t raw) noexcept {
+    int32_t v = raw;
+    v = (v < HISTORY_SCORE_MIN) ? HISTORY_SCORE_MIN : v;
+    v = (v > HISTORY_SCORE_MAX) ? HISTORY_SCORE_MAX : v;
+    return v;
+}
+
 // The scorer's node-invariant inputs, resolved once per node.
 struct MoveOrderingContext {
-    const SearchRuntime& runtime;
+    const int16_t (*history)[64];
+    const int16_t (*captureHistory)[7][CAPTURE_HISTORY_SLOTS];
     const int16_t* contHistEntry;
-    int usSide;
-    chess::Move killer0;
-    chess::Move killer1;
-    uint16_t counterMove;   // 0 = none
+    uint16_t killer0Ft;
+    uint16_t killer1Ft;
+    uint16_t counterFt;      // 0xFFFF = none (never matches any legal move)
+    uint8_t  counterPromo;
 };
 
 // Move::promotionType is already the piece type; 0 (no promotion) adds nothing.
@@ -26,28 +42,26 @@ constexpr int32_t promotionGain(uint8_t promotionType) noexcept {
     return (promotionType == Board::EMPTY) ? 0 : PIECE_VALUES[promotionType] - PIECE_VALUES[Board::PAWN];
 }
 
-int32_t scoreMove(const MoveOrderingContext& ctx, const chess::Move& m, const MoveTraits& t,
-                  bool isHashMove) noexcept {
-    if (isHashMove) return HASH_MOVE_SCORE;
-
+template<bool HasContHist>
+__attribute__((always_inline))
+inline int32_t scoreMove(const MoveOrderingContext& ctx, const chess::Move& m, uint16_t ft,
+                         const MoveTraits& t) noexcept {
     if (t.isCapture) {
         // Provisionally a good capture: finalizeSee demotes a losing one later.
-        const int16_t* history = ctx.runtime.captureHistory[ctx.usSide][m.to][t.victimType];
+        const int16_t* history = ctx.captureHistory[m.to][t.victimType];
         return CAPTURE_BASE_SCORE + PIECE_VALUES[t.victimType] * 10
              + (t.isPromotion ? promotionGain(m.promotionType) : 0)
              + std::min<int32_t>(500, (history[0] + (history[1] >> 1)) / 20);
     }
 
-    if (m.sameFromTo(ctx.killer0)) return KILLER_1_SCORE;
-    if (m.sameFromTo(ctx.killer1)) return KILLER_2_SCORE;
-    if (ctx.counterMove != 0 && ctx.counterMove == TT::Entry::encodeMove(m)) return COUNTER_MOVE_SCORE;
+    if (ft == ctx.killer0Ft) return KILLER_1_SCORE;
+    if (ft == ctx.killer1Ft) return KILLER_2_SCORE;
+    if (ft == ctx.counterFt && m.promotionType == ctx.counterPromo) return COUNTER_MOVE_SCORE;
     if (t.isPromotion) return PROMOTION_BASE_SCORE + PIECE_VALUES[m.promotionType];
 
-    int32_t score = std::clamp<int32_t>(ctx.runtime.history[ctx.usSide][m.from][m.to],
-                                        HISTORY_SCORE_MIN, HISTORY_SCORE_MAX);
-    if (ctx.contHistEntry != nullptr) {
-        score += std::clamp<int32_t>(ctx.contHistEntry[contHistIndex(t.fromType, m.to)],
-                                     HISTORY_SCORE_MIN, HISTORY_SCORE_MAX) / 2;
+    int32_t score = clampHist(ctx.history[m.from][m.to]);
+    if constexpr (HasContHist) {
+        score += clampHist(ctx.contHistEntry[contHistIndex(t.fromType, m.to)]) / 2;
     }
     return score;
 }
@@ -132,38 +146,80 @@ MovePicker sortLegalMoves(MoveList moves, int ply, const Board& b, const SearchR
     return picker;
 }
 
+template<bool HasContHist>
+static void scoreLegalMovesImpl(MovePicker& picker, const Board& b, const MoveOrderingContext& ctx,
+                                uint16_t hashFt, uint8_t hashPromo, int promotionRank,
+                                chess::Square enPassant, bool* outHashMoveIsLegal) noexcept {
+    bool hashMoveFound = false;
+    const int n = picker.moves.size;
+
+    for (int i = 0; i < n; ++i) {
+        const chess::Move& m = picker.moves[i];
+        const uint16_t ft = packFromTo(m.from, m.to);
+        if (ft == hashFt && m.promotionType == hashPromo) [[unlikely]] {
+            hashMoveFound = true;
+            picker.setScore(i, HASH_MOVE_SCORE);
+            picker.seePending[i] = SeePending::Final;
+            continue;
+        }
+        const MoveTraits t = moveTraits(b, m, enPassant, promotionRank);
+        // SEE is deferred to the picker, so a move no cutoff reaches never pays
+        // for it. Quiet pawn and king moves skip the hanging-quiet demotion: for
+        // them it does not repay its SEE.
+        const SeePending pending = t.isCapture ? SeePending::Capture
+            : (!t.isPromotion && t.fromType != Board::KING && t.fromType != Board::PAWN) ? SeePending::Quiet
+            : SeePending::Final;
+        picker.setScore(i, scoreMove<HasContHist>(ctx, m, ft, t));
+        picker.seePending[i] = pending;
+    }
+
+    if (outHashMoveIsLegal != nullptr) *outHashMoveIsLegal = hashMoveFound;
+}
+
 void scoreLegalMoves(MovePicker& picker, int ply, const Board& b, const SearchRuntime& runtime,
                      uint16_t encodedHashMove, const chess::Move* previousMove,
                      bool* outHashMoveIsLegal, const int16_t* contHistEntry) noexcept {
     picker.board = &b;
 
+    const int usSide = Board::colorToIndex(b.getActiveColor());
     const int promotionRank = Board::promotionRank(b.getActiveColor() == Board::WHITE);
     const chess::Square enPassant = b.getEnPassant();
-    const MoveOrderingContext ctx{
-        runtime, contHistEntry, Board::colorToIndex(b.getActiveColor()),
-        runtime.killerMoves[ply][0], runtime.killerMoves[ply][1],
-        (previousMove != nullptr) ? runtime.counterMoves[previousMove->from][previousMove->to] : uint16_t{0}
-    };
-    const chess::Move hashMove = TT::Entry::decodeMove(encodedHashMove);
-    bool hashMoveFound = false;
 
-    for (int i = 0; i < picker.moves.size; ++i) {
-        const chess::Move& m = picker.moves[i];
-        const MoveTraits t = moveTraits(b, m, enPassant, promotionRank);
-        const bool isHashMove = (encodedHashMove != 0) && m == hashMove;
-        hashMoveFound |= isHashMove;
-        // SEE is deferred to the picker, so a move no cutoff reaches never pays
-        // for it. Quiet pawn and king moves skip the hanging-quiet demotion: for
-        // them it does not repay its SEE.
-        const SeePending pending = isHashMove ? SeePending::Final
-            : t.isCapture ? SeePending::Capture
-            : (!t.isPromotion && t.fromType != Board::KING && t.fromType != Board::PAWN) ? SeePending::Quiet
-            : SeePending::Final;
-        picker.setScore(i, scoreMove(ctx, m, t, isHashMove));
-        picker.seePending[i] = pending;
+    const uint16_t rawCounter = (previousMove != nullptr)
+        ? runtime.counterMoves[previousMove->from][previousMove->to] : uint16_t{0};
+    uint16_t counterFt = 0xFFFFu;
+    uint8_t counterPromo = 0;
+    if (rawCounter != 0) {
+        const chess::Move cm = TT::Entry::decodeMove(rawCounter);
+        counterFt = packFromTo(cm.from, cm.to);
+        counterPromo = cm.promotionType;
     }
 
-    if (outHashMoveIsLegal != nullptr) *outHashMoveIsLegal = hashMoveFound;
+    const chess::Move& k0 = runtime.killerMoves[ply][0];
+    const chess::Move& k1 = runtime.killerMoves[ply][1];
+    const MoveOrderingContext ctx{
+        runtime.history[usSide],
+        runtime.captureHistory[usSide],
+        contHistEntry,
+        packFromTo(k0.from, k0.to),
+        packFromTo(k1.from, k1.to),
+        counterFt,
+        counterPromo
+    };
+
+    uint16_t hashFt = 0xFFFFu;
+    uint8_t hashPromo = 0;
+    if (encodedHashMove != 0) {
+        const chess::Move hm = TT::Entry::decodeMove(encodedHashMove);
+        hashFt = packFromTo(hm.from, hm.to);
+        hashPromo = hm.promotionType;
+    }
+
+    if (contHistEntry != nullptr) {
+        scoreLegalMovesImpl<true>(picker, b, ctx, hashFt, hashPromo, promotionRank, enPassant, outHashMoveIsLegal);
+    } else {
+        scoreLegalMovesImpl<false>(picker, b, ctx, hashFt, hashPromo, promotionRank, enPassant, outHashMoveIsLegal);
+    }
 }
 
 MovePicker sortTacticalMoves(const MoveList& tacticalMoves, const Board& b,
