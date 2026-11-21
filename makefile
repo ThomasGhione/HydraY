@@ -40,8 +40,10 @@ TEST_FLAGS = -std=c++23 -Wall -Wextra -Wpedantic -O3 -DDEBUG -fopenmp -march=nat
 ARCH ?= -march=native -mtune=native
 # RELEASE_FLAGS: set by `make release`.
 RELEASE_FLAGS ?=
+# PGO_FLAGS: set internally by `make pgo` (empty for `make prod`).
+PGO_FLAGS ?=
 # Balanced production flags (safety + speed)
-PRODFLAGS = -std=c++23 -Wall -Wextra -Wpedantic -fopenmp $(ARCH) $(RELEASE_FLAGS) \
+PRODFLAGS = -std=c++23 -Wall -Wextra -Wpedantic -fopenmp $(ARCH) $(RELEASE_FLAGS) $(PGO_FLAGS) \
 		-flto=auto -fno-math-errno -fno-trapping-math -funroll-loops \
 		-ffunction-sections -fdata-sections -O3 -fno-pie -no-pie
 # clang: node-identical to g++ and faster (bench6 +3.8% on a P-core, +1.8% on
@@ -61,8 +63,14 @@ endif
 # Objects (LTO bitcode) from one compiler cannot be linked by the other, and
 # objects built for one ARCH must not reach a binary for another: a switch
 # leaves no stamp for the new combination, which then rebuilds them all.
-BUILD_ID := $(shell printf '%s' '$(ARCH) $(RELEASE_FLAGS)' | cksum | cut -d' ' -f1)
+BUILD_ID := $(shell printf '%s' '$(ARCH) $(RELEASE_FLAGS) $(PGO_FLAGS)' | cksum | cut -d' ' -f1)
 COMPILER_STAMP = $(OUTPUT_DIR)/.cxx-$(notdir $(CXX))-$(BUILD_ID)
+
+# Clang PGO paths and matching llvm-profdata binary (resolved from $(CXX)'s toolchain dir).
+PGO_DIR := $(OUTPUT_DIR)/pgo
+PGO_GEN_BIN := $(PGO_DIR)/chess-pgo-gen
+PGO_PROFDATA := $(PGO_DIR)/chess.profdata
+LLVM_PROFDATA ?= $(or $(wildcard $(dir $(realpath $(shell command -v $(CXX) 2>/dev/null)))llvm-profdata),$(shell command -v llvm-profdata 2>/dev/null))
 
 # Windows cross-compiler (requires mingw-w64). The -posix variant, where the
 # distribution has one: winpthreads gives std::thread and the watchdog's timed
@@ -167,7 +175,7 @@ PERF_OBJS = $(patsubst $(ROOT_DIR)/%.cpp,$(OUTPUT_DIR)/%.o,$(ALL_PERF_MODULE_SRC
 DEPFILES = $(ALL_OBJS:.o=.d) $(TEST_OBJS:.o=.d) $(TEST_MAIN_OBJ:.o=.d) $(PERF_OBJS:.o=.d) $(PERF_MAIN_OBJ:.o=.d)
 
 # Main targets
-.PHONY: all prod prod_windows release parallel_prod prod_sequential debug test perf all-tests analyze analyze-setup analyze-cppcheck analyze-clang-tidy analyze-iwyu analyze-scan-build analyze-gcc-analyzer analyze-cppclean analyze-lizard analyze-summary complexity test-valgrind cls cls-compile-files get-image help debug-vars
+.PHONY: all prod pgo prod_windows release parallel_prod prod_sequential debug test perf all-tests analyze analyze-setup analyze-cppcheck analyze-clang-tidy analyze-iwyu analyze-scan-build analyze-gcc-analyzer analyze-cppclean analyze-lizard analyze-summary complexity test-valgrind cls cls-compile-files get-image help debug-vars
 
 # Default target for plain `make`
 all: PRODFLAGS += -DDEBUG -fomit-frame-pointer
@@ -182,6 +190,31 @@ prod: $(NAME_APP)
 
 # Explicit alias for parallel build
 parallel_prod: prod
+
+# Profile-guided optimization with Clang (leaves `make prod` unchanged).
+# Builds an instrumented binary, runs a deterministic workload (bench6 + seeded
+# datagen), merges profiles with llvm-profdata and rebuilds $(NAME_APP).
+pgo:
+ifeq (,$(findstring clang,$(CXX)))
+	@printf "Error: make pgo requires Clang (e.g. CXX=clang++ make pgo)\n" >&2; exit 1
+endif
+	@if [ -z "$(LLVM_PROFDATA)" ] || [ ! -x "$(LLVM_PROFDATA)" ]; then \
+		printf "Error: llvm-profdata not found for $(CXX) (override with LLVM_PROFDATA=...)\n" >&2; \
+		exit 1; \
+	fi
+	@printf "\n=== [1/4] Building PGO-instrumented binary ===\n"
+	@rm -rf $(PGO_DIR) && mkdir -p $(PGO_DIR)
+	$(MAKE) prod OUTPUT_DIR=$(PGO_DIR)/obj-gen NAME_APP=$(PGO_GEN_BIN) \
+		PGO_FLAGS="-fprofile-instr-generate=$(PGO_DIR)/pgo-%p.profraw"
+	@printf "\n=== [2/4] Running deterministic PGO training workload ===\n"
+	HYDRAY_BIN=$(PGO_GEN_BIN) $(ROOT_DIR)/script/engine_driver.sh bench6 13
+	$(PGO_GEN_BIN) datagen --out $(PGO_DIR)/dg --threads 1 --games 4 --seed 42 --shard 0
+	@rm -f $(PGO_DIR)/dg.bin $(PGO_DIR)/dg.meta $(PGO_DIR)/dg.lock
+	@printf "\n=== [3/4] Merging profiles with $(LLVM_PROFDATA) ===\n"
+	$(LLVM_PROFDATA) merge -output=$(PGO_PROFDATA) $(PGO_DIR)/pgo-*.profraw
+	@printf "\n=== [4/4] Building PGO-optimized $(NAME_APP) ===\n"
+	$(MAKE) prod PGO_FLAGS="-fprofile-instr-use=$(PGO_PROFDATA)"
+	@printf "\nPGO build completed: $(NAME_APP)\n\n"
 
 # Windows production build (cross-compile from Linux)
 # tbprobe.c compiled separately as C (not C++) to avoid name mangling issues
@@ -434,6 +467,7 @@ help:
 	@printf "\n=== Chess Build System ===\n"
 	@printf "\nBUILD TARGETS:\n"
 	@printf "  make prod           - Optimized production build\n"
+	@printf "  make pgo            - Clang PGO production build (instrument, train, merge, rebuild)\n"
 	@printf "  make prod_windows   - Windows cross-build (requires mingw-w64)\n"
 	@printf "  make release        - Release binaries in release/ (Linux and Windows, four ISAs)\n"
 	@printf "  make debug          - Build with debug symbols\n"
