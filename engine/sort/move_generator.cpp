@@ -42,17 +42,23 @@ inline void appendPromotions(MoveList& moves, int from, int to) noexcept {
 }
 
 // Pawn moves to `targets`. En passant takes two pieces off their squares, so it
-// gets a full legality check instead of relying on the pin ray.
-template<bool IsWhite>
+// gets a full legality check instead of relying on the pin ray. CanPromote is
+// false for the ~98% of pawns not on the 7th rank, keeping promo setup out of
+// their hot loop.
+template<bool IsWhite, bool CanPromote>
+__attribute__((always_inline))
 inline void appendPawnTargets(const Board& b, MoveList& moves, int from, uint64_t targets,
                               chess::Square enPassant) noexcept {
     constexpr uint8_t pawnPiece = Board::PAWN | (IsWhite ? Board::WHITE : Board::BLACK);
     while (targets) {
         const int to = pieces::popLSB(targets);
-        if (chess::isValidSquare(enPassant) && to == enPassant && chess::file(to) != chess::file(from)
-            && !b.isLegalPseudoMove(from, to, pawnPiece)) continue;
-        if (chess::rank(to) == Board::promotionRank(IsWhite)) appendPromotions(moves, from, to);
-        else moves.emplace_back(from, to);
+        if constexpr (!CanPromote) {
+            if (chess::isValidSquare(enPassant) && to == enPassant && chess::file(to) != chess::file(from)
+                && !b.isLegalPseudoMove(from, to, pawnPiece)) continue;
+            moves.emplace_back(from, to);
+        } else {
+            appendPromotions(moves, from, to);
+        }
     }
 }
 
@@ -63,26 +69,32 @@ template<bool IsWhite, bool Tactical>
 inline void appendPawnMoves(const Board& b, MoveList& moves, const SideView<IsWhite>& v,
                             uint64_t evasionMask, uint64_t pinnedMask, const uint64_t* pinRays) noexcept {
     constexpr int push = IsWhite ? -8 : 8;
+    constexpr int prePromoRank = IsWhite ? 1 : 6;
     uint64_t pawns = v.pawns;
     while (pawns) {
         const int from = pieces::popLSB(pawns);
         const uint64_t attacks = pieces::PAWN_ATTACKS[v.side][from];
         uint64_t mask = attacks & v.oppOcc;
+        const bool isPrePromo = chess::rank(from) == prePromoRank;
         if constexpr (Tactical) {
-            if (chess::rank(from) == (IsWhite ? 1 : 6) && !(v.occ & (1ULL << (from + push))))
+            if (isPrePromo && !(v.occ & (1ULL << (from + push))))
                 mask |= 1ULL << (from + push);
         } else {
             mask = (mask | pieces::getPawnForwardPushes(from, IsWhite, v.occ)) & evasionMask;
         }
         if (pinnedMask & (1ULL << from)) mask &= pinRays[from];
-        appendPawnTargets<IsWhite>(b, moves, from, mask | (attacks & v.enPassantBit), v.enPassant);
+        const uint64_t targets = mask | (attacks & v.enPassantBit);
+        if (!targets) continue;
+        if (isPrePromo) [[unlikely]] appendPawnTargets<IsWhite, true>(b, moves, from, targets, v.enPassant);
+        else                         appendPawnTargets<IsWhite, false>(b, moves, from, targets, v.enPassant);
     }
 }
 
 // Moves of one piece type to `targets`, a pinned piece kept on its pin ray.
+// Writes through a local pointer cursor so moves.size is updated once per call.
 template<bool HasPins, uint8_t PieceType>
 __attribute__((always_inline))
-inline void appendPieceMoves(MoveList& moves, uint64_t movers, uint64_t occ, uint64_t targets,
+inline void appendPieceMoves(chess::Move*& out, uint64_t movers, uint64_t occ, uint64_t targets,
                              [[maybe_unused]] uint64_t pinnedMask,
                              [[maybe_unused]] const uint64_t* pinRays) noexcept {
     while (movers) {
@@ -91,21 +103,26 @@ inline void appendPieceMoves(MoveList& moves, uint64_t movers, uint64_t occ, uin
         if constexpr (HasPins) {
             if (pinnedMask & (1ULL << from)) mask &= pinRays[from];
         }
-        while (mask) moves.emplace_back(from, pieces::popLSB(mask));
+        while (mask) {
+            *out++ = chess::Move{static_cast<chess::Square>(from),
+                                 static_cast<chess::Square>(pieces::popLSB(mask)), 0};
+        }
     }
 }
 
 template<bool IsWhite>
 inline void appendAllPieceMoves(MoveList& moves, const SideView<IsWhite>& v, uint64_t targets,
                                 uint64_t pinnedMask, const uint64_t* pinRays) noexcept {
+    chess::Move* out = moves.begin() + moves.size;
     const auto all = [&]<bool HasPins>() {
-        appendPieceMoves<HasPins, Board::KNIGHT>(moves, v.knights, v.occ, targets, pinnedMask, pinRays);
-        appendPieceMoves<HasPins, Board::BISHOP>(moves, v.bishops, v.occ, targets, pinnedMask, pinRays);
-        appendPieceMoves<HasPins, Board::ROOK>(moves, v.rooks, v.occ, targets, pinnedMask, pinRays);
-        appendPieceMoves<HasPins, Board::QUEEN>(moves, v.queens, v.occ, targets, pinnedMask, pinRays);
+        appendPieceMoves<HasPins, Board::KNIGHT>(out, v.knights, v.occ, targets, pinnedMask, pinRays);
+        appendPieceMoves<HasPins, Board::BISHOP>(out, v.bishops, v.occ, targets, pinnedMask, pinRays);
+        appendPieceMoves<HasPins, Board::ROOK>(out, v.rooks, v.occ, targets, pinnedMask, pinRays);
+        appendPieceMoves<HasPins, Board::QUEEN>(out, v.queens, v.occ, targets, pinnedMask, pinRays);
     };
     if (pinnedMask) all.template operator()<true>();
     else            all.template operator()<false>();
+    moves.size = static_cast<int>(out - moves.begin());
 }
 
 // Every square the opponent attacks with `occ` as blockers. Built with our king
@@ -132,32 +149,30 @@ inline uint64_t enemyAttacks(const Board& b, uint64_t occ) noexcept {
 
 // Fills pinRays for our pinned pieces and returns their mask.
 template<bool IsWhite>
-uint64_t computePinRays(const Board& b, int kingSq, uint64_t pinRays[64]) noexcept {
-    constexpr int us = IsWhite ? 0 : 1;
-    constexpr int them = us ^ 1;
-    const uint64_t ownOcc = b.sideOcc(us) ^ b.bb[Board::KING][us];
+uint64_t computePinRays(const Board& b, int kingSq, uint64_t ownNonKing, uint64_t occ, uint64_t pinRays[64]) noexcept {
+    constexpr int them = IsWhite ? 1 : 0;
     const uint64_t rookLikeEnemy = b.bb[Board::ROOK][them] | b.bb[Board::QUEEN][them];
     const uint64_t bishopLikeEnemy = b.bb[Board::BISHOP][them] | b.bb[Board::QUEEN][them];
     // No enemy slider on a line through the king, even on an empty board: no pins.
-    if (!(pieces::Rook::attacks(kingSq, 0ULL) & rookLikeEnemy) &&
-        !(pieces::Bishop::attacks(kingSq, 0ULL) & bishopLikeEnemy)) {
+    if (!(pieces::Rook::EMPTY_ATTACKS[kingSq] & rookLikeEnemy) &&
+        !(pieces::Bishop::EMPTY_ATTACKS[kingSq] & bishopLikeEnemy)) {
         return 0ULL;
     }
 
-    const uint64_t occWithoutOwn = b.getPiecesBitMap() ^ ownOcc;
+    const uint64_t occWithoutOwn = occ ^ ownNonKing;
     uint64_t pinnedMask = 0ULL;
     const auto addPins = [&](uint64_t pinners) noexcept {
         while (pinners) {
             const int pinnerSq = pieces::popLSB(pinners);
-            const uint64_t blockers = BETWEEN[kingSq][pinnerSq] & ownOcc;
+            const uint64_t blockers = BETWEEN[kingSq][pinnerSq] & ownNonKing;
             if (blockers && !(blockers & (blockers - 1))) {
                 pinnedMask |= blockers;
                 pinRays[std::countr_zero(blockers)] = BETWEEN[kingSq][pinnerSq] | (1ULL << pinnerSq);
             }
         }
     };
-    addPins(pieces::Rook::attacks(kingSq, occWithoutOwn) & rookLikeEnemy);
-    addPins(pieces::Bishop::attacks(kingSq, occWithoutOwn) & bishopLikeEnemy);
+    addPins(pieces::Rook::attacks(static_cast<uint8_t>(kingSq), occWithoutOwn) & rookLikeEnemy);
+    addPins(pieces::Bishop::attacks(static_cast<uint8_t>(kingSq), occWithoutOwn) & bishopLikeEnemy);
     return pinnedMask;
 }
 
@@ -187,15 +202,19 @@ void generateMovesFor(const Board& b, uint64_t checkers, MoveList& moves) noexce
         }
 
         if (!inCheck) { // castling: illegal when in check.
-            for (const int right : {2 * v.side, 2 * v.side + 1})
-                if (b.canCastle(right)) moves.emplace_back(Board::CASTLINGS[right].king, Board::CASTLINGS[right].kingTo);
+            if (const uint8_t cr = b.castlingRights() & static_cast<uint8_t>(3u << (2 * v.side))) {
+                for (const int right : {2 * v.side, 2 * v.side + 1})
+                    if ((cr & (1u << right)) && b.canCastle(right))
+                        moves.emplace_back(Board::CASTLINGS[right].king, Board::CASTLINGS[right].kingTo);
+            }
         }
         if (inDoubleCheck) return; // only the king can move
     }
 
     // Read only where pinnedMask has a bit, so left uninitialised.
     uint64_t pinRays[64];
-    const uint64_t pinnedMask = (v.ownOcc ^ v.kings) ? computePinRays<IsWhite>(b, kingFrom, pinRays) : 0ULL;
+    const uint64_t ownNonKing = v.ownOcc ^ v.kings;
+    const uint64_t pinnedMask = ownNonKing ? computePinRays<IsWhite>(b, kingFrom, ownNonKing, v.occ, pinRays) : 0ULL;
     appendPawnMoves<IsWhite, Tactical>(b, moves, v, evasionMask, pinnedMask, pinRays);
     appendAllPieceMoves<IsWhite>(moves, v, (Tactical ? v.oppOcc : ~v.ownOcc) & evasionMask, pinnedMask, pinRays);
 

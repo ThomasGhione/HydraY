@@ -95,13 +95,15 @@ constexpr uint64_t occupancySubset(int i, uint64_t mask) noexcept {
 template<bool IsRook>
 struct Slider {
     static constexpr auto& DIRS = IsRook ? ROOK_DIRS : BISHOP_DIRS;
+    static constexpr std::array<uint64_t, 64> EMPTY_ATTACKS =
+        squareTable([](int sq) { return slidingAttacks(sq, 0ULL, DIRS); });
     static constexpr std::array<MagicParams, 64> PARAMS = [] {
         std::array<MagicParams, 64> params{};
         uint32_t offset = 0;
         for (int sq = 0; sq < 64; ++sq) {
             const uint64_t edges = (0xFF000000000000FFULL & ~(0xFFULL << (8 * chess::rank(sq))))
                                  | (0x8181818181818181ULL & ~(0x0101010101010101ULL << chess::file(sq)));
-            params[sq] = {slidingAttacks(sq, 0ULL, DIRS) & ~edges, offset};
+            params[sq] = {EMPTY_ATTACKS[sq] & ~edges, offset};
             offset += 1u << std::popcount(params[sq].mask);
         }
         return params;
