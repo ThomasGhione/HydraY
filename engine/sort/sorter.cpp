@@ -128,6 +128,13 @@ MovePicker sortLegalMoves(MoveList moves, int ply, const Board& b, const SearchR
                           bool* outHashMoveIsLegal, const int16_t* contHistEntry) noexcept {
     MovePicker picker;
     picker.moves = std::move(moves);
+    scoreLegalMoves(picker, ply, b, runtime, encodedHashMove, previousMove, outHashMoveIsLegal, contHistEntry);
+    return picker;
+}
+
+void scoreLegalMoves(MovePicker& picker, int ply, const Board& b, const SearchRuntime& runtime,
+                     uint16_t encodedHashMove, const chess::Move* previousMove,
+                     bool* outHashMoveIsLegal, const int16_t* contHistEntry) noexcept {
     picker.board = &b;
 
     const int promotionRank = Board::promotionRank(b.getActiveColor() == Board::WHITE);
@@ -157,7 +164,6 @@ MovePicker sortLegalMoves(MoveList moves, int ply, const Board& b, const SearchR
     }
 
     if (outHashMoveIsLegal != nullptr) *outHashMoveIsLegal = hashMoveFound;
-    return picker;
 }
 
 MovePicker sortTacticalMoves(const MoveList& tacticalMoves, const Board& b,
@@ -197,7 +203,7 @@ MovePicker sortTacticalMoves(const MoveList& tacticalMoves, const Board& b,
     return picker;
 }
 
-MoveList sortEvasionsForcingFirst(MoveList evasions, const Board& b) noexcept {
+void sortEvasionsForcingFirst(MoveList& evasions, const Board& b) noexcept {
     const chess::Square enPassant = b.getEnPassant();
     const int promotionRank = Board::promotionRank(b.getActiveColor() == Board::WHITE);
     int write = 0;
@@ -209,7 +215,6 @@ MoveList sortEvasionsForcingFirst(MoveList evasions, const Board& b) noexcept {
         // Rotating it down to `write` keeps both groups in generation order.
         if (forcing) std::rotate(&evasions[write++], &evasions[i], &evasions[i] + 1);
     }
-    return evasions;
 }
 
 } // namespace engine::Sorter

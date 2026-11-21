@@ -10,6 +10,8 @@ namespace engine::MoveGenerator {
 
 // `checkers` is Board::checkersTo for the side to move (0 = not in check).
 MoveList generateLegalMoves(const chess::Board& b, uint64_t checkers) noexcept;
+// The same into `moves`, which must be empty: no copy of the list.
+void generateLegalMoves(const chess::Board& b, uint64_t checkers, MoveList& moves) noexcept;
 inline MoveList generateLegalMoves(const chess::Board& b) noexcept {
     return generateLegalMoves(b, b.checkersTo(b.getActiveColor()));
 }
