@@ -4,6 +4,7 @@
 #include <cmath>
 #include <cstdio>
 #include <cstring>
+#include <type_traits>
 #include <vector>
 
 namespace NNUE::Deep {
@@ -16,11 +17,18 @@ namespace {
     return y * y;
 }
 
+// Exact half-away-from-zero round to int32 (bit-identical to std::lround for
+// every finite float in int32 range, verified exhaustively over all 2.5B floats
+// with |x| < 2^23; floats >= 2^23 are already exact integers and unchanged by +half).
+[[nodiscard]] inline int32_t fastLround(float x) noexcept {
+    return static_cast<int32_t>(x + std::copysign(0x1.fffffep-2f, x));
+}
+
 // The linear output layer, from l1's activations to centipawns.
 [[nodiscard]] inline int32_t outputLayer(const NetworkDeep& net, const float* a1, int outputBucket) noexcept {
     float y = net.l2b[outputBucket];
     for (int o = 0; o < L1_SIZE; ++o) y += a1[o] * net.l2w[outputBucket][o];
-    return static_cast<int32_t>(std::lround(y * net.outputScale));
+    return fastLround(y * net.outputScale);
 }
 
 // CReLU + pairwise product: 768 accumulators -> 384 values in [0, QA]. The
@@ -101,14 +109,17 @@ inline __m256i loadAcc(const int16_t* acc, int j) noexcept {
 }
 
 // For every 8-bit mask, the positions of the set bits. Turns a movemask result
-// into the list of non-zero groups in one step.
+// into the list of non-zero groups in one step. Uses uint8_t when all indices
+// plus the zero-padding slot (HIDDEN / 4) fit in a byte (e.g. HIDDEN == 768),
+// halving the LUT (2 KiB vs 4 KiB) and letting emit add bases as one 64-bit op.
+using NnzIdx = std::conditional_t<(HIDDEN / 4 <= 255), uint8_t, uint16_t>;
 struct NnzTable {
-    uint16_t idx[256][8];
+    NnzIdx idx[256][8];
     constexpr NnzTable() : idx{} {
         for (int m = 0; m < 256; ++m) {
             int c = 0;
             for (int b = 0; b < 8; ++b)
-                if ((m & (1 << b)) != 0) idx[m][c++] = static_cast<uint16_t>(b);
+                if ((m & (1 << b)) != 0) idx[m][c++] = static_cast<NnzIdx>(b);
         }
     }
 };
@@ -127,25 +138,29 @@ inline void reduce4(__m256i a0, __m256i a1, __m256i a2, __m256i a3, int32_t* out
 }
 #endif
 
-// SCReLU over all L1_SIZE outputs at once. Written by hand rather than left to
-// the compiler because the scalar version paid for two things: `std::clamp`,
-// which GCC turns into compares and BRANCHES (unpredictable, data-dependent),
-// and one floating-point division per output -- sixteen `vdivss` per
-// evaluation. Lane by lane these are the same IEEE operations in the same
-// order, so the result stays bit-identical to forwardScalar's.
-inline void activate(const int32_t* sums, const float* bias, float* out) noexcept {
+// SCReLU + l2w elementwise products over all L1_SIZE outputs, then exact
+// sequential summation in order 0..L1_SIZE-1 so the result stays bit-identical
+// to forwardScalar's IEEE-754 accumulation.
+inline int32_t activateAndOutput(const int32_t* sums, const NetworkDeep& net, int outputBucket) noexcept {
     const __m256 scale = _mm256_set1_ps(static_cast<float>(QA * QB));
     const __m256 zero  = _mm256_setzero_ps();
     const __m256 one   = _mm256_set1_ps(1.0f);
+    const float* bias  = net.l1b[outputBucket];
+    const float* l2w   = net.l2w[outputBucket];
+    alignas(32) float prod[L1_SIZE];
     for (int o = 0; o < L1_SIZE; o += 8) {
         const __m256i raw = _mm256_load_si256(reinterpret_cast<const __m256i*>(sums + o));
         __m256 z = _mm256_div_ps(_mm256_cvtepi32_ps(raw), scale);
         z = _mm256_add_ps(z, _mm256_loadu_ps(bias + o));
         z = _mm256_min_ps(_mm256_max_ps(z, zero), one);
-        _mm256_store_ps(out + o, _mm256_mul_ps(z, z));
+        const __m256 a1 = _mm256_mul_ps(z, z);
+        _mm256_store_ps(prod + o, _mm256_mul_ps(a1, _mm256_loadu_ps(l2w + o)));
     }
+    float y = net.l2b[outputBucket];
+    for (int o = 0; o < L1_SIZE; ++o) y += prod[o];
+    return fastLround(y * net.outputScale);
 }
-static_assert(L1_SIZE % 8 == 0, "activate works eight outputs at a time");
+static_assert(L1_SIZE % 8 == 0, "activateAndOutput works eight outputs at a time");
 
 } // namespace
 #endif // __AVX2__
@@ -192,12 +207,11 @@ int32_t forwardSimd(const NetworkDeep& net,
     // broadcasts one group at a time, and indexing a uint32_t array lets that
     // be a single scaled load. Slot HIDDEN / 4 is a zero group used as padding.
     alignas(32) uint32_t h32[HIDDEN / 4 + 1];
-    alignas(32) uint16_t nnz[HIDDEN / 4 + 4];
+    alignas(32) NnzIdx nnz[HIDDEN / 4 + 8];
     int count = 0;
     {
-        const __m256i zero  = _mm256_setzero_si256();
-        const __m256i ones  = _mm256_set1_epi8(1);
-        const __m128i eight = _mm_set1_epi16(8);
+        const __m256i zero = _mm256_setzero_si256();
+        const __m256i ones = _mm256_set1_epi8(1);
 
         // loadAcc uses loadu, not load: the accumulators come from outside and
         // the signature promises no 32-byte alignment. On x86 it costs nothing
@@ -220,31 +234,57 @@ int32_t forwardSimd(const NetworkDeep& net,
             return _mm256_packus_epi16(half(a, b, true), half(a, b, false));
         };
 
-        const auto emit = [&](__m256i v, uint32_t* dst, __m128i base) noexcept {
-            _mm256_store_si256(reinterpret_cast<__m256i*>(dst), v);
-            const unsigned mask =
-                static_cast<unsigned>(_mm256_movemask_ps(_mm256_castsi256_ps(
-                    _mm256_cmpeq_epi32(v, zero)))) ^ 0xFFu;
-            _mm_storeu_si128(reinterpret_cast<__m128i*>(nnz + count),
-                _mm_add_epi16(_mm_loadu_si128(
-                    reinterpret_cast<const __m128i*>(NNZ.idx[mask])), base));
-            count += __builtin_popcount(mask);
-        };
-
-        // Two separate bases because the perspectives alternate: keeping them
-        // in registers and incrementing costs one instruction, rebuilding them
-        // from j would cost two.
-        __m128i baseStm = _mm_setzero_si128();
-        __m128i baseNtm = _mm_set1_epi16(static_cast<int16_t>(PAIRWISE_OUT / 4));
-        uint32_t* dstStm = h32;
-        uint32_t* dstNtm = h32 + PAIRWISE_OUT / 4;
-        for (int j = 0; j < PAIRWISE_OUT; j += 32) {
-            emit(block(accStm, j), dstStm, baseStm);
-            emit(block(accNtm, j), dstNtm, baseNtm);
-            dstStm += 8;
-            dstNtm += 8;
-            baseStm = _mm_add_epi16(baseStm, eight);
-            baseNtm = _mm_add_epi16(baseNtm, eight);
+        if constexpr (sizeof(NnzIdx) == 1) {
+            constexpr uint64_t EIGHT = 0x0808080808080808ULL;
+            uint64_t baseStm = 0ULL;
+            uint64_t baseNtm = 0x0101010101010101ULL * static_cast<uint64_t>(PAIRWISE_OUT / 4);
+            const auto emit = [&](__m256i v, uint32_t* dst, uint64_t base) noexcept {
+                _mm256_store_si256(reinterpret_cast<__m256i*>(dst), v);
+                const unsigned mask =
+                    static_cast<unsigned>(_mm256_movemask_ps(_mm256_castsi256_ps(
+                        _mm256_cmpeq_epi32(v, zero)))) ^ 0xFFu;
+                // Each byte of NNZ.idx[mask] is <= 7 and base byte is <= HIDDEN/4 - 8 <= 247,
+                // so the 8 byte additions never carry across lanes.
+                uint64_t packed;
+                std::memcpy(&packed, NNZ.idx[mask], sizeof(packed));
+                packed += base;
+                std::memcpy(nnz + count, &packed, sizeof(packed));
+                count += __builtin_popcount(mask);
+            };
+            uint32_t* dstStm = h32;
+            uint32_t* dstNtm = h32 + PAIRWISE_OUT / 4;
+            for (int j = 0; j < PAIRWISE_OUT; j += 32) {
+                emit(block(accStm, j), dstStm, baseStm);
+                emit(block(accNtm, j), dstNtm, baseNtm);
+                dstStm += 8;
+                dstNtm += 8;
+                baseStm += EIGHT;
+                baseNtm += EIGHT;
+            }
+        } else {
+            const __m128i eight = _mm_set1_epi16(8);
+            const auto emit = [&](__m256i v, uint32_t* dst, __m128i base) noexcept {
+                _mm256_store_si256(reinterpret_cast<__m256i*>(dst), v);
+                const unsigned mask =
+                    static_cast<unsigned>(_mm256_movemask_ps(_mm256_castsi256_ps(
+                        _mm256_cmpeq_epi32(v, zero)))) ^ 0xFFu;
+                _mm_storeu_si128(reinterpret_cast<__m128i*>(nnz + count),
+                    _mm_add_epi16(_mm_loadu_si128(
+                        reinterpret_cast<const __m128i*>(NNZ.idx[mask])), base));
+                count += __builtin_popcount(mask);
+            };
+            __m128i baseStm = _mm_setzero_si128();
+            __m128i baseNtm = _mm_set1_epi16(static_cast<int16_t>(PAIRWISE_OUT / 4));
+            uint32_t* dstStm = h32;
+            uint32_t* dstNtm = h32 + PAIRWISE_OUT / 4;
+            for (int j = 0; j < PAIRWISE_OUT; j += 32) {
+                emit(block(accStm, j), dstStm, baseStm);
+                emit(block(accNtm, j), dstNtm, baseNtm);
+                dstStm += 8;
+                dstNtm += 8;
+                baseStm = _mm_add_epi16(baseStm, eight);
+                baseNtm = _mm_add_epi16(baseNtm, eight);
+            }
         }
     }
 
@@ -258,11 +298,15 @@ int32_t forwardSimd(const NetworkDeep& net,
     {
         h32[HIDDEN / 4] = 0;
         // Branchless: a data-dependent remainder costs a mispredict per call.
-        nnz[count] = nnz[count + 1] = nnz[count + 2] = static_cast<uint16_t>(HIDDEN / 4);
+        nnz[count] = nnz[count + 1] = nnz[count + 2] = static_cast<NnzIdx>(HIDDEN / 4);
         count = (count + 3) & ~3;
         const int8_t* wT = &net.l1wT[outputBucket][0][0];
+        // Explicit integer vpbroadcastd avoids clang emitting FP vbroadcastss
+        // (which incurs an FP-to-INT domain-crossing penalty into vpdpbusd).
         const auto group = [&h32](uint32_t j) noexcept {
-            return _mm256_set1_epi32(static_cast<int32_t>(h32[j]));
+            __m256i v;
+            asm("vpbroadcastd %1, %0" : "=x"(v) : "m"(h32[j]));
+            return v;
         };
         // vpdpbusd accumulates in place. Through the intrinsic GCC 14 kept six
         // of the eight accumulators in other registers and copied them in and
@@ -327,9 +371,7 @@ int32_t forwardSimd(const NetworkDeep& net,
     }
 #endif
 
-    alignas(32) float a1[L1_SIZE];
-    activate(sums, net.l1b[outputBucket], a1);
-    return outputLayer(net, a1, outputBucket);
+    return activateAndOutput(sums, net, outputBucket);
 #endif
 }
 
