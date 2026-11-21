@@ -18,9 +18,10 @@ constexpr std::array<uint8_t, 64> CASTLING_KEEP = [] {
     return keep;
 }();
 
-// BEYOND[a][b]: the squares past b on the line from a through b, 0 when the two
-// are not aligned.
-constexpr std::array<std::array<uint64_t, 64>, 64> BEYOND = [] {
+// BEYOND_BY_SQ[b][a]: the squares past b on the line from a through b, 0 when
+// the two are not aligned. Indexed by b first so emitThreatDeltas walks a
+// single 512-byte slice for fixed sq instead of striding 512 bytes per slider.
+constexpr std::array<std::array<uint64_t, 64>, 64> BEYOND_BY_SQ = [] {
     std::array<std::array<uint64_t, 64>, 64> lut{};
     for (int a = 0; a < 64; ++a)
         for (int b = 0; b < 64; ++b) {
@@ -28,7 +29,7 @@ constexpr std::array<std::array<uint64_t, 64>, 64> BEYOND = [] {
             if (a == b || (df != 0 && dr != 0 && df != dr && df != -dr)) continue;
             const int sf = (df > 0) - (df < 0), sr = (dr > 0) - (dr < 0);
             for (int f = chess::file(b) + sf, r = chess::rank(b) + sr; f >= 0 && f < 8 && r >= 0 && r < 8; f += sf, r += sr)
-                lut[a][b] |= 1ULL << (r * 8 + f);
+                lut[b][a] |= 1ULL << (r * 8 + f);
         }
     return lut;
 }();
@@ -44,17 +45,17 @@ inline void Board::set(uint8_t index, piece_id value) noexcept {
 // the changes the hooks log into it. A long game wraps the ring; only frames
 // still inside it stay valid starts.
 __attribute__((always_inline))
-inline void Board::pushAccFrame() noexcept {
+inline NNUE::Accumulator& Board::pushAccFrame() noexcept {
     NNUE::Accumulator& f = frame(++accTop);
     f.ndelta = 0;
     f.nthreat = 0;
     f.dirty[0] = f.dirty[1] = true;
     if (accTop - accFloor >= NNUE::ACC_FRAMES) accFloor = accTop - NNUE::ACC_FRAMES + 1;
+    return f;
 }
 
 __attribute__((always_inline))
-inline void Board::recordAcc(NNUE::AccDelta delta) noexcept {
-    NNUE::Accumulator& f = frame(accTop);
+inline void Board::recordAcc(NNUE::Accumulator& f, NNUE::AccDelta delta) noexcept {
     f.delta[f.ndelta++] = delta;
 }
 
@@ -80,8 +81,6 @@ struct SquareThreatInputs {
     uint64_t sliders;
     uint64_t knightAtks;
     uint64_t slidersAndKnights;
-    uint64_t pawnAtks;
-    uint64_t kingAtks;
 
     __attribute__((always_inline))
     static SquareThreatInputs collect(uint8_t sq, uint64_t occupancy,
@@ -93,11 +92,19 @@ struct SquareThreatInputs {
         const uint64_t sliders    = (rookOcc   & (bb[Board::ROOK][0]   | bb[Board::ROOK][1]   | queens))
                                   | (bishopOcc & (bb[Board::BISHOP][0] | bb[Board::BISHOP][1] | queens));
         const uint64_t knightAtks = pieces::KNIGHT_ATTACKS[sq] & (bb[Board::KNIGHT][0] | bb[Board::KNIGHT][1]);
-        const uint64_t pawnAtks   = (pieces::PAWN_ATTACKS[1][sq] & bb[Board::PAWN][0])
-                                  | (pieces::PAWN_ATTACKS[0][sq] & bb[Board::PAWN][1]);
-        const uint64_t kingAtks   = pieces::KING_ATTACKS[sq] & kings;
         return {occupancy, bb, sq, rookOcc, bishopOcc, queens, kings, sliders,
-                knightAtks, sliders | knightAtks, pawnAtks, kingAtks};
+                knightAtks, sliders | knightAtks};
+    }
+
+    __attribute__((always_inline))
+    uint64_t pawnAtks() const noexcept {
+        return (pieces::PAWN_ATTACKS[1][sq] & bb[Board::PAWN][0])
+             | (pieces::PAWN_ATTACKS[0][sq] & bb[Board::PAWN][1]);
+    }
+
+    __attribute__((always_inline))
+    uint64_t kingAtks() const noexcept {
+        return pieces::KING_ATTACKS[sq] & kings;
     }
 
     __attribute__((always_inline))
@@ -108,17 +115,17 @@ struct SquareThreatInputs {
             case Board::PAWN: {
                 const uint64_t nonTargets = bb[Board::BISHOP][0] | bb[Board::BISHOP][1] | queens | kings;
                 return {pieces::PAWN_ATTACKS[Board::colorToIndex(piece)][sq] & (occupancy ^ nonTargets),
-                        slidersAndKnights | pawnAtks | kingAtks};
+                        slidersAndKnights | pawnAtks() | kingAtks()};
             }
             case Board::KNIGHT:
                 return {pieces::KNIGHT_ATTACKS[sq] & (occupancy ^ oppKing()),
-                        slidersAndKnights | pawnAtks | kingAtks};
+                        slidersAndKnights | pawnAtks() | kingAtks()};
             case Board::BISHOP:
                 return {bishopOcc & ~(queens | oppKing()),
-                        slidersAndKnights | kingAtks};
+                        slidersAndKnights | kingAtks()};
             case Board::ROOK:
                 return {rookOcc & ~(queens | oppKing()),
-                        slidersAndKnights | pawnAtks | kingAtks};
+                        slidersAndKnights | pawnAtks() | kingAtks()};
             case Board::QUEEN: {
                 const uint64_t occRays = rookOcc | bishopOcc;
                 return {occRays & ~oppKing(), (occRays & queens) | knightAtks};
@@ -158,9 +165,10 @@ inline void Board::emitThreatDeltas(NNUE::Accumulator& f, uint8_t startN, uint8_
     }
     // A line past sq meets rookOcc only if orthogonal, bishopOcc only if
     // diagonal: one mask serves both.
+    const uint64_t* const beyondSq = BEYOND_BY_SQ[sq].data();
     while (sliders) {
         const auto from = static_cast<uint8_t>(pieces::popLSB(sliders));
-        if (const uint64_t past = sliderOcc & BEYOND[from][sq]) {
+        if (const uint64_t past = sliderOcc & beyondSq[from]) {
             const auto to = static_cast<uint8_t>(std::countr_zero(past));
             const uint8_t att = get(from);
             const uint8_t vic = get(to);
@@ -171,6 +179,7 @@ inline void Board::emitThreatDeltas(NNUE::Accumulator& f, uint8_t startN, uint8_
 }
 
 template<bool Checked>
+__attribute__((always_inline))
 inline void Board::emitReplacedThreatDeltas(NNUE::Accumulator& f, uint8_t startN, uint8_t oldPiece,
                                             uint8_t newPiece, uint8_t sq, uint64_t oldVictims,
                                             uint64_t newVictims, uint64_t oldAttackers,
@@ -210,8 +219,7 @@ inline void Board::emitReplacedThreatDeltas(NNUE::Accumulator& f, uint8_t startN
 
 template<bool Add>
 __attribute__((noinline))
-void Board::recordThreats(uint8_t piece, uint8_t sq) noexcept {
-    NNUE::Accumulator& f = frame(accTop);
+void Board::recordThreats(NNUE::Accumulator& f, uint8_t piece, uint8_t sq) noexcept {
     const uint8_t startN = f.nthreat;
 
     const SquareThreatInputs in = SquareThreatInputs::collect(sq, occupancy, bb);
@@ -235,8 +243,7 @@ void Board::recordThreats(uint8_t piece, uint8_t sq) noexcept {
 }
 
 __attribute__((noinline))
-void Board::recordReplacedThreats(uint8_t oldPiece, uint8_t newPiece, uint8_t sq) noexcept {
-    NNUE::Accumulator& f = frame(accTop);
+void Board::recordReplacedThreats(NNUE::Accumulator& f, uint8_t oldPiece, uint8_t newPiece, uint8_t sq) noexcept {
     const uint8_t startN = f.nthreat;
 
     const SquareThreatInputs in = SquareThreatInputs::collect(sq, occupancy, bb);
@@ -263,28 +270,28 @@ void Board::recordReplacedThreats(uint8_t oldPiece, uint8_t newPiece, uint8_t sq
 
 template<bool Record>
 __attribute__((always_inline))
-inline void Board::addPieceToBB(uint8_t piece, uint8_t index) noexcept {
+inline void Board::addPieceToBB(uint8_t piece, uint8_t index, NNUE::Accumulator* f) noexcept {
     bb[piece & MASK_PIECE_TYPE][colorToIndex(piece)] |= 1ULL << index;
-    if constexpr (Record) recordAcc({NNUE::AccDelta::Add, piece, index, 0});
+    if constexpr (Record) recordAcc(*f, {NNUE::AccDelta::Add, piece, index, 0});
 }
 
 template<bool Record>
 __attribute__((always_inline))
-inline void Board::removePieceFromBB(uint8_t piece, uint8_t index) noexcept {
+inline void Board::removePieceFromBB(uint8_t piece, uint8_t index, NNUE::Accumulator* f) noexcept {
     bb[piece & MASK_PIECE_TYPE][colorToIndex(piece)] &= ~(1ULL << index);
-    if constexpr (Record) recordAcc({NNUE::AccDelta::Remove, piece, index, 0});
+    if constexpr (Record) recordAcc(*f, {NNUE::AccDelta::Remove, piece, index, 0});
 }
 
 // Moves a piece between squares: mailbox, occupancy, its bitboard (which never
 // holds the destination, so one XOR does both ends) and, in doMove, the frame.
 template<bool Record>
 __attribute__((always_inline))
-inline void Board::relocate(uint8_t piece, uint8_t fromIndex, uint8_t toIndex) noexcept {
+inline void Board::relocate(uint8_t piece, uint8_t fromIndex, uint8_t toIndex, NNUE::Accumulator* f) noexcept {
     set(toIndex, static_cast<piece_id>(piece));
     set(fromIndex, EMPTY);
     occupancy = (occupancy | (1ULL << toIndex)) & ~(1ULL << fromIndex);
     bb[piece & MASK_PIECE_TYPE][colorToIndex(piece)] ^= (1ULL << fromIndex) | (1ULL << toIndex);
-    if constexpr (Record) recordAcc({NNUE::AccDelta::Move, piece, fromIndex, toIndex});
+    if constexpr (Record) recordAcc(*f, {NNUE::AccDelta::Move, piece, fromIndex, toIndex});
 }
 
 inline Board::MoveKind Board::classifyMoveKind(uint8_t movingType, uint8_t movingColor, uint8_t fromIndex,
@@ -345,8 +352,8 @@ inline void Board::passTurn(bool resetHalfMoves) noexcept {
 }
 
 template<Board::MoveKind Kind, bool WithPrefetch>
-inline void Board::doMoveByKind(MoveState& st, uint8_t moving, uint8_t destBefore, uint8_t fromIndex,
-                                uint8_t toIndex, uint8_t promotionType, uint64_t& key, HashPrefetch tt) noexcept {
+inline void Board::doMoveByKind(NNUE::Accumulator& f, MoveState& st, uint8_t moving, uint8_t destBefore, uint8_t fromIndex,
+                                uint8_t toIndex, uint8_t promotionType, uint64_t& key, const HashPrefetch& tt) noexcept {
     // The child's key first, so that its TT bucket loads while the threats
     // are recorded.
     uint8_t capIndex = 0;
@@ -381,32 +388,32 @@ inline void Board::doMoveByKind(MoveState& st, uint8_t moving, uint8_t destBefor
     // Every recordThreats sees the board between two of these steps, the piece
     // it records standing on its square.
     if constexpr (Kind == MoveKind::EnPassant) {
-        recordThreats<false>(st.capturedPiece, capIndex);
+        recordThreats<false>(f, st.capturedPiece, capIndex);
         set(capIndex, EMPTY);
         occupancy &= ~(1ULL << capIndex);
-        removePieceFromBB<true>(st.capturedPiece, capIndex);
+        removePieceFromBB<true>(st.capturedPiece, capIndex, &f);
     }
-    recordThreats<false>(moving, fromIndex);
+    recordThreats<false>(f, moving, fromIndex);
     if constexpr (isCaptureKind(Kind)) {
-        removePieceFromBB<true>(destBefore, toIndex);
+        removePieceFromBB<true>(destBefore, toIndex, &f);
     }
-    relocate<true>(moving, fromIndex, toIndex);
+    relocate<true>(moving, fromIndex, toIndex, &f);
     if constexpr (Kind == MoveKind::Castling) {
         const Castling& c = castlingTo(toIndex);
-        recordThreats<true>(moving, toIndex);
-        recordThreats<false>(rook, c.rook);
-        relocate<true>(rook, c.rook, c.rookTo);
-        recordThreats<true>(rook, c.rookTo);
+        recordThreats<true>(f, moving, toIndex);
+        recordThreats<false>(f, rook, c.rook);
+        relocate<true>(rook, c.rook, c.rookTo, &f);
+        recordThreats<true>(f, rook, c.rookTo);
     }
     if constexpr (isPromotionKind(Kind)) {
-        removePieceFromBB<true>(moving, toIndex);
-        addPieceToBB<true>(placed, toIndex);
+        removePieceFromBB<true>(moving, toIndex, &f);
+        addPieceToBB<true>(placed, toIndex, &f);
         set(toIndex, static_cast<piece_id>(placed));
     }
     if constexpr (isCaptureKind(Kind)) {
-        recordReplacedThreats(destBefore, placed, toIndex);
+        recordReplacedThreats(f, destBefore, placed, toIndex);
     } else if constexpr (Kind != MoveKind::Castling) {
-        recordThreats<true>(placed, toIndex);
+        recordThreats<true>(f, placed, toIndex);
     }
 }
 
@@ -434,24 +441,27 @@ inline void Board::undoMoveByKind(const MoveState& st, uint8_t pieceOnTo, uint8_
 
 // --- Incremental do/undo, no legality checks ---
 template<bool WithPrefetch>
-inline void Board::doMoveImpl(const Move& m, MoveState& st, HashPrefetch tt) noexcept {
-    pushAccFrame();
-    const uint8_t moving     = get(m.from);
-    const uint8_t destBefore = get(m.to);
+inline void Board::doMoveImpl(const Move& m, MoveState& st, const HashPrefetch& tt) noexcept {
+    NNUE::Accumulator& f = pushAccFrame();
+    const uint8_t fromIndex = m.from;
+    const uint8_t toIndex = m.to;
+    const uint8_t promo = m.promotionType;
+    const uint8_t moving     = get(fromIndex);
+    const uint8_t destBefore = get(toIndex);
     prepareMoveState(st, destBefore);
-    st.moveKind = classifyMoveKind(moving & MASK_PIECE_TYPE, moving & MASK_COLOR, m.from, m.to,
+    st.moveKind = classifyMoveKind(moving & MASK_PIECE_TYPE, moving & MASK_COLOR, fromIndex, toIndex,
                                    destBefore, st.prev.enPassant);
 
-    uint64_t key = state.hash ^ zobrist::TABLES.pieces[moving][m.from] ^ zobrist::TABLES.sideToMove;
+    uint64_t key = state.hash ^ zobrist::TABLES.pieces[moving][fromIndex] ^ zobrist::TABLES.sideToMove;
     if (st.prev.epHashFile < 8) key ^= zobrist::TABLES.enPassant[st.prev.epHashFile];
-    const uint8_t newCastle = state.castle & CASTLING_KEEP[m.from] & CASTLING_KEEP[m.to];
+    const uint8_t newCastle = state.castle & CASTLING_KEEP[fromIndex] & CASTLING_KEEP[toIndex];
     if (newCastle != st.prev.castle) key ^= zobrist::TABLES.castling[st.prev.castle] ^ zobrist::TABLES.castling[newCastle];
     state.castle     = newCastle;
     state.enPassant  = NO_SQUARE;
     state.epHashFile = 0xFF;
 
     visitKind(st.moveKind, [&]<MoveKind K>() {
-        doMoveByKind<K, WithPrefetch>(st, moving, destBefore, m.from, m.to, m.promotionType, key, tt);
+        doMoveByKind<K, WithPrefetch>(f, st, moving, destBefore, fromIndex, toIndex, promo, key, tt);
     });
 
     const bool resetHistory = (moving & MASK_PIECE_TYPE) == PAWN || destBefore != EMPTY;
@@ -463,11 +473,12 @@ inline void Board::doMoveImpl(const Move& m, MoveState& st, HashPrefetch tt) noe
 
 __attribute__((hot))
 void Board::doMove(const Move& m, MoveState& st) noexcept {
-    doMoveImpl<false>(m, st, {});
+    static constexpr HashPrefetch kNoPrefetch{};
+    doMoveImpl<false>(m, st, kNoPrefetch);
 }
 
 __attribute__((hot))
-void Board::doMove(const Move& m, MoveState& st, HashPrefetch tt) noexcept {
+void Board::doMove(const Move& m, MoveState& st, const HashPrefetch& tt) noexcept {
     doMoveImpl<true>(m, st, tt);
 }
 
@@ -491,6 +502,20 @@ void Board::doNullMove(MoveState& st) noexcept {
     // The post-null position takes a history slot like any ply, so the same
     // side to move stays on every second slot; countRepetitions never looks
     // further back than this entry.
+    updateRepetitionAfterMove(false, st);
+    state.pliesFromNull = 0;
+}
+
+__attribute__((hot))
+void Board::doNullMove(MoveState& st, const HashPrefetch& tt) noexcept {
+    prepareMoveState(st, EMPTY);
+    uint64_t key = state.hash ^ zobrist::TABLES.sideToMove;
+    if (st.prev.epHashFile < 8) key ^= zobrist::TABLES.enPassant[st.prev.epHashFile];
+    tt.prefetch(key);
+    state.enPassant = NO_SQUARE;
+    state.epHashFile = 0xFF;
+    passTurn(false);
+    state.hash = key;
     updateRepetitionAfterMove(false, st);
     state.pliesFromNull = 0;
 }
