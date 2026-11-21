@@ -846,7 +846,7 @@ int32_t quiescenceSearch(Board& b, SearchRuntime& runtime, int32_t alpha, int32_
     if (!movePicker.hasNext()) return inCheck ? (-MATE_VALUE + ply) : best; // mated, or the stand pat
 
     while (movePicker.hasNext()) {
-        const Move m = movePicker.nextMove();
+        const Move m = movePicker.nextMove<false>();
         if (runtime.shouldAbort()) {
             runtime.markInterrupted();
             return evaluate(b);
