@@ -11,6 +11,9 @@
 #include <array>
 #include <bit>
 #include <cstdint>
+#if defined(__BMI2__)
+#include <immintrin.h>
+#endif
 
 namespace NNUE {
 
@@ -146,9 +149,14 @@ inline constexpr std::array<uint16_t, 16> PAIR_FEATURE_MASK = [] {
 
 constexpr bool tryIndexBase(uint32_t entryIdx, int to, uint32_t& out) noexcept {
     const Entry& e = TABLE.entries[entryIdx];
-    const uint64_t bit = 1ULL << to;
-    if (!(e.mask & bit)) return false;
-    out = e.first + static_cast<uint32_t>(std::popcount(e.mask & (bit - 1)));
+    if (!((e.mask >> to) & 1ULL)) return false;
+#if defined(__BMI2__)
+    if !consteval {
+        out = e.first + static_cast<uint32_t>(std::popcount(_bzhi_u64(e.mask, static_cast<unsigned>(to))));
+        return true;
+    }
+#endif
+    out = e.first + static_cast<uint32_t>(std::popcount(e.mask & ((1ULL << to) - 1)));
     return true;
 }
 
