@@ -2,7 +2,24 @@
 #include "board.hpp"
 #include "../tt/zobrist.hpp"
 
+#if defined(__x86_64__) && defined(__GNUC__)
+#include <cpuid.h>
+#endif
+
 namespace chess {
+
+bool Board::onEfficiencyCore() noexcept {
+#if defined(__x86_64__) && defined(__GNUC__)
+    unsigned a = 0, b = 0, c = 0, d = 0;
+    if (__get_cpuid_max(0, nullptr) < 0x1A) return false;
+    __cpuid_count(7, 0, a, b, c, d);
+    if ((d & (1U << 15)) == 0) return false;   // not a hybrid CPU
+    __cpuid_count(0x1A, 0, a, b, c, d);
+    return (a >> 24) == 0x20;                  // Intel Atom core type
+#else
+    return false;
+#endif
+}
 
 // Slider attack tables, filled once before main.
 [[maybe_unused]] static const bool sliderTablesReady = (pieces::Rook::init(), pieces::Bishop::init(), true);
@@ -203,7 +220,8 @@ int ownKingView(const Board& b, int p) noexcept {
 // first and applied in chunks: a board holds at most 64 pieces, so neither
 // side of it can exceed that.
 __attribute__((always_inline))
-inline void syncRow(const Board& b, int16_t* row, uint64_t (&cached)[2][6], int p, int rowBase, int rowFlip) noexcept {
+inline void syncRow(const Board& b, int16_t* row, uint64_t (&cached)[2][6], int p, int rowBase, int rowFlip,
+                    bool prefetch) noexcept {
     const int16_t* sub[64];
     const int16_t* add[64];
     int ns = 0;
@@ -220,7 +238,8 @@ inline void syncRow(const Board& b, int16_t* row, uint64_t (&cached)[2][6], int 
             cached[c][t] = b.bb[t + 1][c];
         }
     }
-    NNUE::Accumulator::applyRows(row, sub, ns, add, na);
+    if (prefetch) NNUE::Accumulator::applyRows<true>(row, sub, ns, add, na);
+    else          NNUE::Accumulator::applyRows<false>(row, sub, ns, add, na);
 }
 
 // Drops the rows that appear in both lists; add needs 8 spare slots past na.
@@ -282,27 +301,36 @@ void cancelThreats(const int8_t** sub, int& ns, const int8_t** add, int& na) noe
 #endif
 }
 
+template<bool Prefetch>
+__attribute__((always_inline))
+inline void applyMixedShape(int16_t* __restrict dst, const int16_t* __restrict src,
+                            const int16_t* const* psub, int pns, const int16_t* const* padd, int pna,
+                            const int8_t* const* tsub, int tns, const int8_t* const* tadd, int tna) noexcept {
+    using Acc = NNUE::Accumulator;
+    switch (pns * 4 + pna) {
+        case 1 * 4 + 1: Acc::applyMixedRows<1, 1, Prefetch>(dst, src, psub, padd, tsub, tns, tadd, tna); return;
+        case 2 * 4 + 1: Acc::applyMixedRows<2, 1, Prefetch>(dst, src, psub, padd, tsub, tns, tadd, tna); return;
+        case 2 * 4 + 2: Acc::applyMixedRows<2, 2, Prefetch>(dst, src, psub, padd, tsub, tns, tadd, tna); return;
+        case 0:         Acc::applyMixedRows<0, 0, Prefetch>(dst, src, psub, padd, tsub, tns, tadd, tna); return;
+        default:
+            Acc::applyMixedRows<0, 0, Prefetch>(dst, src, psub, padd, tsub, tns, tadd, tna);
+            Acc::applyRows<Prefetch>(dst, psub, pns, padd, pna);
+    }
+}
+
 // dst = src - psub + padd - tsub + tadd (piece rows i16, threat rows i8) in
 // one pass when the piece rows fit the kernel's shapes. Out of line: one copy
-// of the kernels.
+// of the kernels per prefetch mode.
 __attribute__((noinline, hot))
 void applyMixed(int16_t* __restrict dst, const int16_t* __restrict src,
                 const int16_t* const* psub, int pns, const int16_t* const* padd, int pna,
-                const int8_t* const* tsub, int tns, const int8_t* const* tadd, int tna) noexcept {
-    using Acc = NNUE::Accumulator;
+                const int8_t* const* tsub, int tns, const int8_t* const* tadd, int tna, bool prefetch) noexcept {
     if (pns + pna + tns + tna == 0) {
         std::memcpy(dst, src, NNUE::HIDDEN * sizeof(int16_t));
         return;
     }
-    switch (pns * 4 + pna) {
-        case 1 * 4 + 1: Acc::applyMixedRows<1, 1>(dst, src, psub, padd, tsub, tns, tadd, tna); return;
-        case 2 * 4 + 1: Acc::applyMixedRows<2, 1>(dst, src, psub, padd, tsub, tns, tadd, tna); return;
-        case 2 * 4 + 2: Acc::applyMixedRows<2, 2>(dst, src, psub, padd, tsub, tns, tadd, tna); return;
-        case 0:         Acc::applyMixedRows<0, 0>(dst, src, psub, padd, tsub, tns, tadd, tna); return;
-        default:
-            Acc::applyMixedRows<0, 0>(dst, src, psub, padd, tsub, tns, tadd, tna);
-            Acc::applyRows(dst, psub, pns, padd, pna);
-    }
+    if (prefetch) applyMixedShape<true>(dst, src, psub, pns, padd, pna, tsub, tns, tadd, tna);
+    else          applyMixedShape<false>(dst, src, psub, pns, padd, pna, tsub, tns, tadd, tna);
 }
 
 // Both perspectives of dst from src, one move apart: the move logged in
@@ -313,7 +341,7 @@ __attribute__((noinline, hot))
 void applyFramePair1(NNUE::Accumulator& dst, const NNUE::Accumulator& src, const NNUE::Accumulator& moved,
                      bool invert, int flip0, int flip1,
                      const int16_t* const (&psub)[2][NNUE::ACC_MAX_DELTAS], int pns,
-                     const int16_t* const (&padd)[2][NNUE::ACC_MAX_DELTAS], int pna) noexcept {
+                     const int16_t* const (&padd)[2][NNUE::ACC_MAX_DELTAS], int pna, bool prefetch) noexcept {
     const int8_t* sub[2][NNUE::ACC_MAX_THREATS];
     const int8_t* add[2][NNUE::ACC_MAX_THREATS];
     int ns[2] = {0, 0};
@@ -330,13 +358,14 @@ void applyFramePair1(NNUE::Accumulator& dst, const NNUE::Accumulator& src, const
             (isAdd ? add[p][na[p]++] : sub[p][ns[p]++]) = row;
 #if defined(__AVX2__)
             _mm_prefetch(reinterpret_cast<const char*>(row), _MM_HINT_T0);
+            if (prefetch) _mm_prefetch(reinterpret_cast<const char*>(row) + 64, _MM_HINT_T0);
 #endif
         };
         pushRow(0, f0);
         pushRow(1, f1);
     }
     for (int p = 0; p < 2; ++p)
-        applyMixed(dst.v[p], src.v[p], psub[p], pns, padd[p], pna, sub[p], ns[p], add[p], na[p]);
+        applyMixed(dst.v[p], src.v[p], psub[p], pns, padd[p], pna, sub[p], ns[p], add[p], na[p], prefetch);
 }
 
 } // namespace
@@ -356,8 +385,13 @@ void Board::computeThreats(int16_t* row, const int16_t* src, int p, int flip) co
         uint32_t feature = 0;
         while (victims) {
             const auto to = static_cast<uint8_t>(pieces::popLSB(victims));
-            if (tp.tryFeature(relA, fromView, get(to), to, feature))
-                add[na++] = NNUE::Accumulator::threatRow(feature);
+            if (tp.tryFeature(relA, fromView, get(to), to, feature)) {
+                add[na] = NNUE::Accumulator::threatRow(feature);
+#if defined(__AVX2__)
+                if (weightPrefetch) NNUE::Accumulator::prefetchLines<2>(add[na]);
+#endif
+                ++na;
+            }
         }
     };
 
@@ -391,7 +425,7 @@ void Board::computeThreats(int16_t* row, const int16_t* src, int p, int flip) co
             emit(baseA + (KING - 1), from, pieces::KING_ATTACKS[from] & kingVictims);
         }
     }
-    applyMixed(row, src, nullptr, 0, nullptr, 0, nullptr, 0, add, na);
+    applyMixed(row, src, nullptr, 0, nullptr, 0, nullptr, 0, add, na, weightPrefetch);
 }
 
 // From-scratch rebuild of the current frame, which becomes the oldest one of
@@ -416,7 +450,7 @@ void Board::refreshNnueAccumulator() noexcept {
         uint64_t empty[2][6] = {};
         alignas(64) int16_t pieceRow[NNUE::HIDDEN];
         std::memcpy(pieceRow, NNUE::activeNetwork->l0b, sizeof(pieceRow));
-        syncRow(*this, pieceRow, empty, p, acc.base[p], acc.flip[p]);
+        syncRow(*this, pieceRow, empty, p, acc.base[p], acc.flip[p], weightPrefetch);
         computeThreats(acc.v[p], pieceRow, p, acc.flip[p]);
     }
 }
@@ -480,6 +514,7 @@ void Board::ensureNnueAccumulatorClean() const noexcept {
 #if defined(__AVX2__)
                     // The row loads while the others are collected and cancelled.
                     _mm_prefetch(reinterpret_cast<const char*>(row), _MM_HINT_T0);
+                    if (weightPrefetch) _mm_prefetch(reinterpret_cast<const char*>(row) + 64, _MM_HINT_T0);
 #endif
                 }
             }
@@ -526,7 +561,7 @@ void Board::ensureNnueAccumulatorClean() const noexcept {
             for (int k = 0; k < ns; ++k) subRow[p][k] = row(p, sub[k]);
             for (int k = 0; k < na; ++k) addRow[p][k] = row(p, add[k]);
         }
-        applyFramePair1(dst, src, moved, invert, rowFlip[0], rowFlip[1], subRow, ns, addRow, na);
+        applyFramePair1(dst, src, moved, invert, rowFlip[0], rowFlip[1], subRow, ns, addRow, na, weightPrefetch);
     };
 
     // Frame `target` from frame `start` for the usable perspectives, through
@@ -554,7 +589,7 @@ void Board::ensureNnueAccumulatorClean() const noexcept {
             int tns = 0;
             int tna = 0;
             collectThreats(p, start, target, tsub, tns, tadd, tna);
-            applyMixed(dst.v[p], src.v[p], subRow, ns, addRow, na, tsub, tns, tadd, tna);
+            applyMixed(dst.v[p], src.v[p], subRow, ns, addRow, na, tsub, tns, tadd, tna, weightPrefetch);
         }
     };
 
@@ -597,7 +632,7 @@ void Board::ensureNnueAccumulatorClean() const noexcept {
         if (usable[p]) continue;
         finny.ensureInitialised();
         NNUE::FinnyEntry& e = finny.entry[p][NNUE::KING_BUCKET_MAP[kingView[p]]][rowFlip[p] ? 1 : 0];
-        syncRow(*this, e.v, e.bb, p, rowBase[p], rowFlip[p]);
+        syncRow(*this, e.v, e.bb, p, rowBase[p], rowFlip[p], weightPrefetch);
         computeThreats(top.v[p], e.v, p, rowFlip[p]);
     }
 

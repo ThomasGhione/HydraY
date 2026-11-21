@@ -91,6 +91,15 @@ struct alignas(64) Accumulator {
     }
 
     enum class RowInit { Src, InPlace };
+    // Starts loading N lines from p: on an efficiency core the rows, spread
+    // over megabytes, arrive too late for the kernel otherwise.
+    template<int N, typename T>
+    __attribute__((always_inline))
+    static inline void prefetchLines([[maybe_unused]] const T* p) noexcept {
+#if defined(__AVX2__)
+        for (int l = 0; l < N; ++l) _mm_prefetch(reinterpret_cast<const char*>(p) + 64 * l, _MM_HINT_T0);
+#endif
+    }
 
 #if defined(__AVX2__)
     template<bool Add>
@@ -126,7 +135,7 @@ struct alignas(64) Accumulator {
     // is 256 * w[16 + i] + w[i] + 128 exactly. r sums the lanes and q their
     // high bytes, so no row is widened; applyMixedRows takes w[i] back as
     // r - 256 q - 128 (adds - subs).
-    template<bool Add>
+    template<bool Add, bool Prefetch>
     __attribute__((always_inline))
     static inline void applyThreatList(const int8_t* const* __restrict rows, int n, int b,
                                        __m256i (&r)[4], __m256i (&q)[4]) noexcept {
@@ -135,6 +144,10 @@ struct alignas(64) Accumulator {
             else               return _mm256_sub_epi16(acc, d);
         };
         const auto load = [](const int8_t* p) noexcept { return _mm256_loadu_si256(reinterpret_cast<const __m256i*>(p)); };
+        if constexpr (Prefetch) {
+            if (b + 128 < HIDDEN)
+                for (int k = 0; k < n; ++k) prefetchLines<2>(rows[k] + b + 128);
+        }
         int k = 0;
         for (; k + 1 < n; k += 2)
             for (int j = 0; j < 4; ++j) {
@@ -155,7 +168,7 @@ struct alignas(64) Accumulator {
     // row = init - sub + add over rows of i16 piece weights. Any number of
     // rows costs one pass over row: each tile of it stays in registers while
     // every row is added in.
-    template<RowInit Init>
+    template<RowInit Init, bool Prefetch>
     static inline void applyWeightRows(int16_t* __restrict row, const int16_t* __restrict src,
                                        const int16_t* const* __restrict sub, int ns,
                                        const int16_t* const* __restrict add, int na) noexcept {
@@ -164,6 +177,12 @@ struct alignas(64) Accumulator {
         constexpr int TILE = 128;
         static_assert(HIDDEN % TILE == 0);
         for (int b = 0; b < HIDDEN; b += TILE) {
+            if constexpr (Prefetch) {
+                if (b + TILE < HIDDEN) {
+                    for (int k = 0; k < ns; ++k) prefetchLines<4>(sub[k] + b + TILE);
+                    for (int k = 0; k < na; ++k) prefetchLines<4>(add[k] + b + TILE);
+                }
+            }
             const auto* s = reinterpret_cast<const __m256i*>(base + b);
             __m256i x0 = _mm256_loadu_si256(s + 0), x1 = _mm256_loadu_si256(s + 1);
             __m256i x2 = _mm256_loadu_si256(s + 2), x3 = _mm256_loadu_si256(s + 3);
@@ -194,7 +213,7 @@ struct alignas(64) Accumulator {
 
     // row = src - psub + padd - tsub + tadd in one pass: S and A piece rows
     // (i16) and any number of threat rows (i8).
-    template<int S, int A>
+    template<int S, int A, bool Prefetch>
     static inline void applyMixedRows(int16_t* __restrict row, const int16_t* __restrict src,
                                       const int16_t* const* psub, const int16_t* const* padd,
                                       const int8_t* const* __restrict tsub, int tns,
@@ -205,10 +224,16 @@ struct alignas(64) Accumulator {
         const auto loadVec = [](const int16_t* p) noexcept { return _mm256_loadu_si256(reinterpret_cast<const __m256i*>(p)); };
         const __m256i bias = _mm256_set1_epi16(static_cast<int16_t>(128 * (tna - tns)));
         for (int b = 0; b < HIDDEN; b += TILE) {
+            if constexpr (Prefetch) {
+                if (b + TILE < HIDDEN) {
+                    for (int k = 0; k < S; ++k) prefetchLines<4>(psub[k] + b + TILE);
+                    for (int k = 0; k < A; ++k) prefetchLines<4>(padd[k] + b + TILE);
+                }
+            }
             __m256i r[4], q[4];
             for (int j = 0; j < 4; ++j) r[j] = q[j] = _mm256_setzero_si256();
-            applyThreatList<false>(tsub, tns, b, r, q);
-            applyThreatList<true>(tadd, tna, b, r, q);
+            applyThreatList<false, Prefetch>(tsub, tns, b, r, q);
+            applyThreatList<true, Prefetch>(tadd, tna, b, r, q);
             for (int j = 0; j < 4; ++j) {
                 const int o = b + 32 * j;
                 __m256i lo = _mm256_sub_epi16(_mm256_sub_epi16(r[j], _mm256_slli_epi16(q[j], 8)), bias);
@@ -241,6 +266,7 @@ struct alignas(64) Accumulator {
 
     // Applies a whole piece-feature diff to one row in one pass, from src (a
     // different row) when it is given, in place otherwise.
+    template<bool Prefetch>
     static inline void applyRows(int16_t* __restrict row,
                                  const int16_t* const* sub, int ns,
                                  const int16_t* const* add, int na,
@@ -249,8 +275,8 @@ struct alignas(64) Accumulator {
             if (src != nullptr) std::memcpy(row, src, HIDDEN * sizeof(int16_t));
             return;
         }
-        if (src != nullptr) applyWeightRows<RowInit::Src>(row, src, sub, ns, add, na);
-        else                applyWeightRows<RowInit::InPlace>(row, nullptr, sub, ns, add, na);
+        if (src != nullptr) applyWeightRows<RowInit::Src, Prefetch>(row, src, sub, ns, add, na);
+        else                applyWeightRows<RowInit::InPlace, Prefetch>(row, nullptr, sub, ns, add, na);
     }
 };
 
