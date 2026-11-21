@@ -397,18 +397,24 @@ inline void Board::doMoveByKind(NNUE::Accumulator& f, MoveState& st, uint8_t mov
     if constexpr (isCaptureKind(Kind)) {
         removePieceFromBB<true>(destBefore, toIndex, &f);
     }
-    relocate<true>(moving, fromIndex, toIndex, &f);
-    if constexpr (Kind == MoveKind::Castling) {
-        const Castling& c = castlingTo(toIndex);
-        recordThreats<true>(f, moving, toIndex);
-        recordThreats<false>(f, rook, c.rook);
-        relocate<true>(rook, c.rook, c.rookTo, &f);
-        recordThreats<true>(f, rook, c.rookTo);
-    }
     if constexpr (isPromotionKind(Kind)) {
-        removePieceFromBB<true>(moving, toIndex, &f);
-        addPieceToBB<true>(placed, toIndex, &f);
+        // Log Remove(pawn, from) + Add(placed, to) directly instead of relocating
+        // the pawn to toIndex and immediately removing it, so no single move ever
+        // produces self-cancelling piece deltas.
         set(toIndex, static_cast<piece_id>(placed));
+        set(fromIndex, EMPTY);
+        occupancy = (occupancy | (1ULL << toIndex)) & ~(1ULL << fromIndex);
+        removePieceFromBB<true>(moving, fromIndex, &f);
+        addPieceToBB<true>(placed, toIndex, &f);
+    } else {
+        relocate<true>(moving, fromIndex, toIndex, &f);
+        if constexpr (Kind == MoveKind::Castling) {
+            const Castling& c = castlingTo(toIndex);
+            recordThreats<true>(f, moving, toIndex);
+            recordThreats<false>(f, rook, c.rook);
+            relocate<true>(rook, c.rook, c.rookTo, &f);
+            recordThreats<true>(f, rook, c.rookTo);
+        }
     }
     if constexpr (isCaptureKind(Kind)) {
         recordReplacedThreats(f, destBefore, placed, toIndex);

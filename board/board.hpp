@@ -218,7 +218,9 @@ public:
     // nearest computed ancestor or the Finny table. Must be called with the
     // Board in a consistent state (NNUE::evaluate and the selftest do); const
     // because the accumulator is a cache of board-derived state.
-    void               ensureNnueAccumulatorClean() const noexcept;
+    inline void        ensureNnueAccumulatorClean() const noexcept {
+        if (NNUE::activeNetwork != nullptr && frame(accTop).dirty[0]) ensureNnueAccumulatorCleanSlow();
+    }
     // The current position's accumulator, valid after ensureNnueAccumulatorClean.
     const NNUE::Accumulator& accumulator() const noexcept { return frame(accTop); }
     // Whether the thread runs on an efficiency core of a hybrid CPU, where the
@@ -271,6 +273,7 @@ private:
                                          uint64_t newAttackers) const noexcept;
     // row = src + perspective p's threat values of the current position.
     void computeThreats(int16_t* row, const int16_t* src, int p, int flip) const noexcept;
+    void ensureNnueAccumulatorCleanSlow() const noexcept;
 
     // --- Private helpers: move execution ---
     // Record: doMove logs the change in the new frame; undoMove only pops it.
