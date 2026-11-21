@@ -78,22 +78,30 @@ struct MovePicker {
         return true;
     }
 
+    template<bool CheckSee = true>
     inline chess::Move nextMove() noexcept {
         while (currentIndex < moves.size) {
             uint32_t best;
 #if defined(__AVX2__)
             if (moves.size - currentIndex >= 8) {
                 // The first load is the last 8 keys: no scalar tail, no padding.
-                __m256i vmax = _mm256_loadu_si256(reinterpret_cast<const __m256i*>(keys + moves.size - 8));
-                for (int i = currentIndex; i + 8 < moves.size; i += 8) {
-                    vmax = _mm256_max_epu32(vmax, _mm256_loadu_si256(reinterpret_cast<const __m256i*>(keys + i)));
+                const uint32_t* p = keys + currentIndex;
+                const uint32_t* const end = keys + moves.size - 8;
+                __m256i vmax = _mm256_loadu_si256(reinterpret_cast<const __m256i*>(end));
+                for (; p < end; p += 8) {
+                    vmax = _mm256_max_epu32(vmax, _mm256_loadu_si256(reinterpret_cast<const __m256i*>(p)));
                 }
                 __m128i m = _mm_max_epu32(_mm256_castsi256_si128(vmax), _mm256_extracti128_si256(vmax, 1));
                 m = _mm_max_epu32(m, _mm_shuffle_epi32(m, _MM_SHUFFLE(1, 0, 3, 2)));
                 m = _mm_max_epu32(m, _mm_shuffle_epi32(m, _MM_SHUFFLE(2, 3, 0, 1)));
                 best = static_cast<uint32_t>(_mm_cvtsi128_si32(m));
             } else {
+                // At most 7 keys remain: disable auto-vectorisation so clang does not
+                // emit a dead 32-wide vector loop and its invariant setup before the branch.
                 best = keys[currentIndex];
+#if defined(__clang__)
+                #pragma clang loop vectorize(disable)
+#endif
                 for (int i = currentIndex + 1; i < moves.size; ++i) {
                     best = best > keys[i] ? best : keys[i];
                 }
@@ -108,20 +116,23 @@ struct MovePicker {
 
             // Deferred SEE: finalise the top candidate; only when it actually
             // demotes itself do we re-pick (a kept move is still the max).
-            if (finalizeSee(bestIdx)) {
-                continue;
+            if constexpr (CheckSee) {
+                if (finalizeSee(bestIdx)) {
+                    continue;
+                }
             }
 
+            const chess::Move picked = moves[bestIdx];
             if (bestIdx != currentIndex) {
                 // The move at currentIndex takes the picked one's slot, and
-                // with it that slot's tie rank.
-                std::swap(moves[currentIndex],      moves[bestIdx]);
-                std::swap(seePending[currentIndex], seePending[bestIdx]);
-                keys[bestIdx]      = (keys[currentIndex] & ~255u) | static_cast<uint32_t>(255 - bestIdx);
-                keys[currentIndex] = (best & ~255u) | static_cast<uint32_t>(255 - currentIndex);
+                // with it that slot's tie rank; slots < currentIndex are never read again.
+                moves[bestIdx] = moves[currentIndex];
+                if constexpr (CheckSee) seePending[bestIdx] = seePending[currentIndex];
+                keys[bestIdx] = (keys[currentIndex] & ~255u) | static_cast<uint32_t>(255 - bestIdx);
             }
 
-            return moves[currentIndex++];
+            ++currentIndex;
+            return picked;
         }
         return {};
     }
