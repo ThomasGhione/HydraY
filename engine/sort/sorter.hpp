@@ -37,12 +37,16 @@ namespace Sorter {
 MovePicker sortLegalMoves(MoveList moves, int ply, const chess::Board& b, const SearchRuntime& runtime,
                           uint16_t encodedHashMove = 0, const chess::Move* previousMove = nullptr,
                           bool* outHashMoveIsLegal = nullptr, const int16_t* contHistEntry = nullptr) noexcept;
+// The same for the moves already in picker.
+void scoreLegalMoves(MovePicker& picker, int ply, const chess::Board& b, const SearchRuntime& runtime,
+                     uint16_t encodedHashMove, const chess::Move* previousMove,
+                     bool* outHashMoveIsLegal, const int16_t* contHistEntry) noexcept;
 
 MovePicker sortTacticalMoves(const MoveList& tacticalMoves, const chess::Board& b,
                              int32_t standPat, int32_t alpha, int ply) noexcept;
 
 // Captures, en passant and promotions first, both groups in generation order.
-MoveList sortEvasionsForcingFirst(MoveList evasions, const chess::Board& b) noexcept;
+void sortEvasionsForcingFirst(MoveList& evasions, const chess::Board& b) noexcept;
 
 bool givesCheckAfterQuietMoveFast(const chess::Board& b, const chess::Move& m,
                                   int fromPieceType, int oppKingSq, uint64_t occ) noexcept;

@@ -163,8 +163,7 @@ uint64_t computePinRays(const Board& b, int kingSq, uint64_t pinRays[64]) noexce
 
 // All legal moves, or with Tactical (never in check) the captures and promotions.
 template<bool IsWhite, bool Tactical>
-MoveList generateMovesFor(const Board& b, uint64_t checkers) noexcept {
-    MoveList moves;
+void generateMovesFor(const Board& b, uint64_t checkers, MoveList& moves) noexcept {
     const SideView<IsWhite> v(b);
     const bool inCheck = (checkers != 0ULL);
     const bool inDoubleCheck = (checkers & (checkers - 1)) != 0ULL;
@@ -191,7 +190,7 @@ MoveList generateMovesFor(const Board& b, uint64_t checkers) noexcept {
             for (const int right : {2 * v.side, 2 * v.side + 1})
                 if (b.canCastle(right)) moves.emplace_back(Board::CASTLINGS[right].king, Board::CASTLINGS[right].kingTo);
         }
-        if (inDoubleCheck) return moves; // only the king can move
+        if (inDoubleCheck) return; // only the king can move
     }
 
     // Read only where pinnedMask has a bit, so left uninitialised.
@@ -208,24 +207,32 @@ MoveList generateMovesFor(const Board& b, uint64_t checkers) noexcept {
             if (b.isLegalPseudoMove(kingFrom, to, kingPiece)) moves.emplace_back(kingFrom, to);
         }
     }
-    return moves;
 }
 
 } // namespace
 
+void generateLegalMoves(const Board& b, uint64_t checkers, MoveList& moves) noexcept {
+    if (b.getActiveColor() == Board::WHITE) generateMovesFor<true, false>(b, checkers, moves);
+    else                                    generateMovesFor<false, false>(b, checkers, moves);
+}
+
 MoveList generateLegalMoves(const Board& b, uint64_t checkers) noexcept {
-    return (b.getActiveColor() == Board::WHITE) ? generateMovesFor<true, false>(b, checkers)
-                                                : generateMovesFor<false, false>(b, checkers);
+    MoveList moves;
+    generateLegalMoves(b, checkers, moves);
+    return moves;
 }
 
 MoveList generateTacticalMoves(const Board& b) noexcept {
-    return (b.getActiveColor() == Board::WHITE) ? generateMovesFor<true, true>(b, 0)
-                                                : generateMovesFor<false, true>(b, 0);
+    MoveList moves;
+    if (b.getActiveColor() == Board::WHITE) generateMovesFor<true, true>(b, 0, moves);
+    else                                    generateMovesFor<false, true>(b, 0, moves);
+    return moves;
 }
 
 MovePicker generateQSearchEvasions(const Board& b, uint64_t checkers) noexcept {
     MovePicker picker;
-    picker.moves = Sorter::sortEvasionsForcingFirst(generateLegalMoves(b, checkers), b);
+    generateLegalMoves(b, checkers, picker.moves);
+    Sorter::sortEvasionsForcingFirst(picker.moves, b);
     // Equal scores keep the forcing-first order through nextMove(); no deferred SEE.
     for (int i = 0; i < picker.moves.size; ++i) {
         picker.setScore(i, 0);

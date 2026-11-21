@@ -753,12 +753,12 @@ int32_t searchPosition(Board& b, SearchRuntime& runtime, int depth, int32_t alph
         contHistEntry = &runtime.contHist[side ^ 1][prevPiece - 1][previousMove->to][0][0];
     }
 
-    MoveList moves = MoveGenerator::generateLegalMoves(b, checkers);
-    if (moves.is_empty()) return inCheck ? (-MATE_VALUE + ply) : 0; // mated or stalemated
+    MovePicker movePicker;
+    MoveGenerator::generateLegalMoves(b, checkers, movePicker.moves);
+    if (movePicker.moves.is_empty()) return inCheck ? (-MATE_VALUE + ply) : 0; // mated or stalemated
 
     bool hasHashMove = false;
-    MovePicker movePicker = Sorter::sortLegalMoves(std::move(moves), ply, b, runtime, tte.move,
-                                                   previousMove, &hasHashMove, contHistEntry);
+    Sorter::scoreLegalMoves(movePicker, ply, b, runtime, tte.move, previousMove, &hasHashMove, contHistEntry);
     // Without a verified hash move: no singular extension, and IIR reduces:
     // one ply of depth at PV and cut nodes in IIR_MODE 1, else one more LMR ply.
     const bool iirNode = !hasHashMove && depth >= 6 && ply > 0;
