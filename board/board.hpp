@@ -220,6 +220,11 @@ public:
     void               ensureNnueAccumulatorClean() const noexcept;
     // The current position's accumulator, valid after ensureNnueAccumulatorClean.
     const NNUE::Accumulator& accumulator() const noexcept { return frame(accTop); }
+    // Whether the thread runs on an efficiency core of a hybrid CPU, where the
+    // accumulator kernels prefetch their weight rows (a performance core's
+    // own prefetchers do better without).
+    static bool onEfficiencyCore() noexcept;
+    void setWeightPrefetch(bool on) noexcept { weightPrefetch = on; }
     // The squares `piece` on sq attacks with `occ` as the blockers.
     static uint64_t attacksFrom(uint8_t piece, uint8_t sq, uint64_t occ) noexcept {
         switch (piece & MASK_PIECE_TYPE) {
@@ -333,6 +338,7 @@ private:
     // pays nothing. Garbage until the first refreshNnueAccumulator(); a cache
     // that the const evaluation paths settle. On the heap: half a MiB.
     int accTop   = 0;   // grows with every move, frame() wraps it
+    bool weightPrefetch = false;
     int accFloor = 0;   // oldest frame of this line: a load, a copy or a refresh
     std::unique_ptr<NNUE::Accumulator[]> accFrames{new NNUE::Accumulator[NNUE::ACC_FRAMES]};
 };

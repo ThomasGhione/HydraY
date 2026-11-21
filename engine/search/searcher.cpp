@@ -919,6 +919,7 @@ IterativeSearchResult runIterativeDeepening(Board& rootBoard, SearchRuntime& run
                                             int startDepth, int targetDepth) noexcept {
     IterativeSearchResult result;
     if constexpr (kSearchStats) gSearchStats = SearchStats{};
+    rootBoard.setWeightPrefetch(Board::onEfficiencyCore());
     const int firstDepth = std::max(1, startDepth);
     const int maxDepth = std::max(firstDepth, targetDepth);
 
