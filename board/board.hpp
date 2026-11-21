@@ -167,9 +167,10 @@ public:
 
     // --- Move execution ---
     void doMove(const Move& m, MoveState& st) noexcept;
-    void doMove(const Move& m, MoveState& st, HashPrefetch tt) noexcept;
+    void doMove(const Move& m, MoveState& st, const HashPrefetch& tt) noexcept;
     void undoMove(const Move& m, const MoveState& st) noexcept;
     void doNullMove(MoveState& st) noexcept;
+    void doNullMove(MoveState& st, const HashPrefetch& tt) noexcept;
     void undoNullMove(const MoveState& st) noexcept;
     bool move(Move move) noexcept;
 
@@ -251,14 +252,14 @@ public:
 
 private:
     NNUE::Accumulator& frame(int i) const noexcept { return accFrames[static_cast<size_t>(i & (NNUE::ACC_FRAMES - 1))]; }
-    inline void pushAccFrame() noexcept;
-    inline void recordAcc(NNUE::AccDelta delta) noexcept;
+    inline NNUE::Accumulator& pushAccFrame() noexcept;
+    static inline void recordAcc(NNUE::Accumulator& f, NNUE::AccDelta delta) noexcept;
     // Logs the threats that `piece` on sq takes part in as appearing (Add) or
     // vanishing, with the board as it stands and the piece on sq.
-    template<bool Add> void recordThreats(uint8_t piece, uint8_t sq) noexcept;
+    template<bool Add> void recordThreats(NNUE::Accumulator& f, uint8_t piece, uint8_t sq) noexcept;
     // The same for oldPiece on sq becoming newPiece, with the board after the
     // move: sq stays occupied, so no line opens.
-    void recordReplacedThreats(uint8_t oldPiece, uint8_t newPiece, uint8_t sq) noexcept;
+    void recordReplacedThreats(NNUE::Accumulator& f, uint8_t oldPiece, uint8_t newPiece, uint8_t sq) noexcept;
     template<bool Add, bool Checked>
     inline void emitThreatDeltas(NNUE::Accumulator& f, uint8_t startN, uint8_t piece, uint8_t sq,
                                  uint64_t victims, uint64_t attackers, uint64_t sliders,
@@ -274,19 +275,19 @@ private:
     // --- Private helpers: move execution ---
     // Record: doMove logs the change in the new frame; undoMove only pops it.
     inline void set(uint8_t index, piece_id value) noexcept;
-    template<bool Record> inline void addPieceToBB(uint8_t piece, uint8_t index) noexcept;
-    template<bool Record> inline void removePieceFromBB(uint8_t piece, uint8_t index) noexcept;
-    template<bool Record> inline void relocate(uint8_t piece, uint8_t fromIndex, uint8_t toIndex) noexcept;
+    template<bool Record> inline void addPieceToBB(uint8_t piece, uint8_t index, NNUE::Accumulator* f = nullptr) noexcept;
+    template<bool Record> inline void removePieceFromBB(uint8_t piece, uint8_t index, NNUE::Accumulator* f = nullptr) noexcept;
+    template<bool Record> inline void relocate(uint8_t piece, uint8_t fromIndex, uint8_t toIndex, NNUE::Accumulator* f = nullptr) noexcept;
     inline void prepareMoveState(MoveState& st, uint8_t destBefore) const noexcept;
     inline void restoreState(const MoveState& st) noexcept;
     inline void passTurn(bool resetHalfMoves) noexcept;
     template<typename F>
     static inline void visitKind(MoveKind kind, F&& f) noexcept;
     template<bool WithPrefetch>
-    inline void doMoveImpl(const Move& m, MoveState& st, HashPrefetch tt) noexcept;
+    inline void doMoveImpl(const Move& m, MoveState& st, const HashPrefetch& tt) noexcept;
     template<MoveKind Kind, bool WithPrefetch>
-    inline void doMoveByKind(MoveState& st, uint8_t moving, uint8_t destBefore, uint8_t fromIndex,
-                             uint8_t toIndex, uint8_t promotionType, uint64_t& key, HashPrefetch tt) noexcept;
+    inline void doMoveByKind(NNUE::Accumulator& f, MoveState& st, uint8_t moving, uint8_t destBefore, uint8_t fromIndex,
+                             uint8_t toIndex, uint8_t promotionType, uint64_t& key, const HashPrefetch& tt) noexcept;
     template<MoveKind Kind>
     inline void undoMoveByKind(const MoveState& st, uint8_t pieceOnTo, uint8_t fromIndex, uint8_t toIndex) noexcept;
 
