@@ -285,7 +285,7 @@ datagen writes the host name in the manifests unless it gets `--machine`.
 |---|---|
 | `compose.yaml` | the service and its settings |
 | `.env.example` | template of `.env` (token only) |
-| `Dockerfile` | two static builds (`make prod`, `HYDRAY_RELEASE`; `ARCH` and `FALLBACK_ARCH`) into a `python:3.13-slim` image with `huggingface_hub` |
+| `Dockerfile` | two static builds (`make pgo`, or `make prod` where a build cannot run on the build machine; `HYDRAY_RELEASE`; `ARCH` and `FALLBACK_ARCH`) into a `python:3.13-slim` image with `huggingface_hub` |
 | `Dockerfile.dockerignore` | only the sources reach the build |
 | `datagen.sh` | entry point: defaults, upload flags, datagen and uploader side by side |
 | `../nnue/tools/hf_upload.py` | the uploader |

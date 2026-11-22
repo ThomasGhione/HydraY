@@ -10,8 +10,9 @@
 
 FROM debian:trixie-slim AS build
 # curl: make downloads the net from Hugging Face when the context lacks it.
+# llvm, libclang-rt-dev: llvm-profdata and the profile runtime for make pgo.
 RUN apt-get update \
-    && apt-get install -y --no-install-recommends clang g++ make curl ca-certificates \
+    && apt-get install -y --no-install-recommends clang llvm libclang-rt-dev g++ make curl ca-certificates \
     && rm -rf /var/lib/apt/lists/*
 WORKDIR /src
 COPY . .
@@ -19,13 +20,17 @@ ARG ARCH="-march=x86-64-v3 -mavxvnni"
 ARG FALLBACK_ARCH="-march=x86-64-v3"
 ARG JOBS=2
 # Static, like `make release`: the binaries need nothing from the final image.
-# Each goes to bin/ with its ISA beside it.
+# Each goes to bin/ with its ISA beside it. make pgo trains on this machine,
+# so a build that cannot run here (no AVX-VNNI) falls back to make prod; the
+# ISA line says which one it is.
 RUN mkdir bin \
     && for b in main fallback; do \
            [ $b = main ] && arch=$ARCH || arch=$FALLBACK_ARCH; \
            [ -n "$arch" ] || continue; \
-           make prod -j"$JOBS" ARCH="$arch" RELEASE_FLAGS="-DHYDRAY_RELEASE -static -Wl,-u,log" \
-               && mv chess bin/$b && echo "$arch" > bin/$b.arch || exit 1; \
+           flags="-DHYDRAY_RELEASE -static -Wl,-u,log"; \
+           if make pgo -j"$JOBS" ARCH="$arch" RELEASE_FLAGS="$flags"; then tag=" pgo"; \
+           else make prod -j"$JOBS" ARCH="$arch" RELEASE_FLAGS="$flags" || exit 1; tag=""; fi; \
+           mv chess bin/$b && echo "$arch$tag" > bin/$b.arch || exit 1; \
        done
 # Recorded in every shard manifest: the version, a hash of the sources (net
 # included) and, when the build passes it, the git commit; datagen.sh adds
