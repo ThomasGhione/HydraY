@@ -143,6 +143,10 @@ inline Spin LMR_CHECK_LESS{0, "LMR_CHECK_LESS", 0, 3};
 // HINDSIGHT_MARGIN (0 = off).
 inline Spin HINDSIGHT_EXT{0, "HINDSIGHT_EXT", 0, 1};
 inline Spin HINDSIGHT_MARGIN{0, "HINDSIGHT_MARGIN", 0, 2000};
+// Re-search after a reduced fail high: one ply deeper when the score beats the
+// best so far by LMR_DEEPER_MARGIN + 2 * depth, one shallower below LMR_SHALLOWER_MARGIN.
+inline Spin LMR_DEEPER_MARGIN{35, "LMR_DEEPER_MARGIN", 0, 200};
+inline Spin LMR_SHALLOWER_MARGIN{7, "LMR_SHALLOWER_MARGIN", 0, 100};
 inline constexpr int LMR_MAX_DEPTH = 20; // deeper nodes use the last row
 
 // --- History bounds ---
