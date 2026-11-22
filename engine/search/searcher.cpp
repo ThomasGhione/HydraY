@@ -456,6 +456,7 @@ SearchMoveResult searchMoves(Board& b, MovePicker& movePicker, const SearchConte
         };
 
         int32_t score;
+        int fullDepth = childDepth;
         // Late captures are reduced too: ordering puts the good ones early.
         const int lmrMinIndex = (!PV && !ctx.cutNode) ? LMR_MIN_INDEX_ALL : 4;
         // Below index 4 only plain quiets may be reduced: captures, killers and
@@ -495,14 +496,20 @@ SearchMoveResult searchMoves(Board& b, MovePicker& movePicker, const SearchConte
             runtime.reductionStack[ctx.ply] = 0;
             if (score > alpha) {
                 if constexpr (kSearchStats) ++gSearchStats.lmrResearches;
-                score = search(childDepth, alpha, scoutBeta, !ctx.cutNode);
+                // A reduced score far above the best so far earns an extra ply, one
+                // barely above it loses one; none is made unless it goes deeper than the first.
+                if (best > NEG_INF) {
+                    fullDepth += (score > best + LMR_DEEPER_MARGIN + 2 * childDepth)
+                               - (score < best + LMR_SHALLOWER_MARGIN);
+                }
+                if (fullDepth > reducedDepth) score = search(fullDepth, alpha, scoutBeta, !ctx.cutNode);
             }
         } else {
             // The first move of a PV node is a PV child; every other first search is a null window.
             score = search(childDepth, alpha, scoutBeta, !(PV && isFirstMove) && !ctx.cutNode);
         }
         // Only a PV node's full window is wider than the scout's.
-        if (PV && !isFirstMove && score > alpha) score = search(childDepth, alpha, beta, false);
+        if (PV && !isFirstMove && score > alpha) score = search(fullDepth, alpha, beta, false);
 
         b.undoMove(m, state);
         searchedAnyMove = true;
