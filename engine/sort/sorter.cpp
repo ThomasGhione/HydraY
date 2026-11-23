@@ -32,6 +32,7 @@ struct MoveOrderingContext {
     uint64_t threats;
     const int16_t (*captureHistory)[7][CAPTURE_HISTORY_SLOTS];
     const int16_t* contHistEntry;
+    const int16_t* contX[CONT_X_N];
     uint16_t killer0Ft;
     uint16_t killer1Ft;
     uint16_t counterFt;      // 0xFFFF = none (never matches any legal move)
@@ -60,11 +61,16 @@ inline int32_t scoreMove(const MoveOrderingContext& ctx, const chess::Move& m, u
     if (ft == ctx.counterFt && m.promotionType == ctx.counterPromo) return COUNTER_MOVE_SCORE;
     if (t.isPromotion) return PROMOTION_BASE_SCORE + PIECE_VALUES[m.promotionType];
 
+    const int ci = contHistIndex(t.fromType, m.to);
     int32_t score = clampHist(ctx.history[(ctx.threats >> m.from) & 1][(ctx.threats >> m.to) & 1][m.from][m.to]);
     if constexpr (HasContHist) {
-        score += clampHist(ctx.contHistEntry[contHistIndex(t.fromType, m.to)]) / 2;
+        score += clampHist(ctx.contHistEntry[ci]) / 2;
     }
-    return score;
+    for (int k = 0; k < CONT_X_N; ++k) {
+        if (ctx.contX[k] != nullptr) score += clampHist(ctx.contX[k][ci]) / 2;
+    }
+    // Capped at the butterfly + 1-ply maximum: the extra terms lift no quiet past a killer.
+    return std::min(score, HISTORY_SCORE_MAX + HISTORY_SCORE_MAX / 2);
 }
 
 // Square and type of `side`'s least valuable attacker of sq (square 64: none).
@@ -140,11 +146,12 @@ bool givesCheckAfterQuietMoveFast(const Board& b, const chess::Move& m,
 
 MovePicker sortLegalMoves(MoveList moves, int ply, const Board& b, const SearchRuntime& runtime,
                           uint16_t encodedHashMove, const chess::Move* previousMove,
-                          bool* outHashMoveIsLegal, const int16_t* contHistEntry) noexcept {
+                          bool* outHashMoveIsLegal, const int16_t* contHistEntry,
+                          const int16_t* const* contX) noexcept {
     MovePicker picker;
     picker.moves = std::move(moves);
     scoreLegalMoves(picker, ply, b, runtime, encodedHashMove, previousMove, outHashMoveIsLegal, contHistEntry,
-                    b.attackedBy(Board::colorToIndex(b.getActiveColor()) ^ 1));
+                    b.attackedBy(Board::colorToIndex(b.getActiveColor()) ^ 1), contX);
     return picker;
 }
 
@@ -180,7 +187,8 @@ static void scoreLegalMovesImpl(MovePicker& picker, const Board& b, const MoveOr
 
 void scoreLegalMoves(MovePicker& picker, int ply, const Board& b, const SearchRuntime& runtime,
                      uint16_t encodedHashMove, const chess::Move* previousMove,
-                     bool* outHashMoveIsLegal, const int16_t* contHistEntry, uint64_t threats) noexcept {
+                     bool* outHashMoveIsLegal, const int16_t* contHistEntry, uint64_t threats,
+                     const int16_t* const* contX) noexcept {
     picker.board = &b;
 
     const int usSide = Board::colorToIndex(b.getActiveColor());
@@ -199,16 +207,18 @@ void scoreLegalMoves(MovePicker& picker, int ply, const Board& b, const SearchRu
 
     const chess::Move& k0 = runtime.killerMoves[ply][0];
     const chess::Move& k1 = runtime.killerMoves[ply][1];
-    const MoveOrderingContext ctx{
+    MoveOrderingContext ctx{
         runtime.history[usSide],
         threats,
         runtime.captureHistory[usSide],
         contHistEntry,
+        {},
         packFromTo(k0.from, k0.to),
         packFromTo(k1.from, k1.to),
         counterFt,
         counterPromo
     };
+    for (int k = 0; k < CONT_X_N; ++k) ctx.contX[k] = (contX != nullptr) ? contX[k] : nullptr;
 
     uint16_t hashFt = 0xFFFFu;
     uint8_t hashPromo = 0;

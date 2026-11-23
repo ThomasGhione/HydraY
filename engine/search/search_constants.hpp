@@ -214,8 +214,16 @@ inline constexpr int MAX_HELPER_THREADS = 63;
 // of bounds (the debug assert in searchPosition guards the one board read).
 inline constexpr int CONT_HIST_PIECE_TYPES   = 6;
 inline constexpr int CONT_HIST_PIECE_STRIDE  = 64;
+inline constexpr int CONT_HIST_ROW_SIZE      = CONT_HIST_PIECE_TYPES * CONT_HIST_PIECE_STRIDE;
+// Extra continuation histories keyed by our own move CONT_X_PLIES[k] plies back.
+inline constexpr int CONT_X_PLIES[] = {2, 4};
+inline constexpr int CONT_X_N = 2;
 inline constexpr int contHistIndex(int pieceType, int toSq) noexcept {
     return (pieceType - 1) * CONT_HIST_PIECE_STRIDE + toSq;
+}
+// Row of a continuation table selected by `side` moving a pieceType to toSq.
+constexpr int16_t contHistRow(int side, int pieceType, int toSq) noexcept {
+    return static_cast<int16_t>((side * CONT_HIST_PIECE_TYPES + pieceType - 1) * CONT_HIST_PIECE_STRIDE + toSq);
 }
 
 // --- Move ordering scores ---

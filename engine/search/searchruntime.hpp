@@ -53,6 +53,9 @@ struct SearchRuntime {
     int16_t  captureHistory[2][64][7][CAPTURE_HISTORY_SLOTS] {};
     // Continuation history (layout at contHistIndex): 576 KiB per thread.
     int16_t  contHist[2][CONT_HIST_PIECE_TYPES][64][CONT_HIST_PIECE_TYPES][64] {};
+    int16_t  contHistX[CONT_X_N][2 * CONT_HIST_PIECE_TYPES * 64 * CONT_HIST_ROW_SIZE] {};
+    // contHistRow of the move made at each ply of the line, -1 for a null move.
+    int16_t  contRowStack[MAX_PLY + 1] {};
     // Static-eval correction; never decayed between searches, only cleared.
     CorrectionHistory corrHist {};
 
@@ -97,6 +100,7 @@ struct SearchRuntime {
         std::memset(counterMoves, 0, sizeof(counterMoves));
         std::memset(captureHistory, 0, sizeof(captureHistory));
         std::memset(contHist, 0, sizeof(contHist));
+        std::memset(contHistX, 0, sizeof(contHistX));
         corrHist.clear();
     }
 
@@ -109,6 +113,7 @@ struct SearchRuntime {
         };
         halve(history);
         halve(contHist);
+        halve(contHistX);
         halve(captureHistory);
     }
 };
