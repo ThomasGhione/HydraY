@@ -287,6 +287,7 @@ struct SearchContext {
     // Expected cut node: a null-window child whose parent hopes it fails
     // high. Always false at PV nodes.
     bool     cutNode         {};
+    uint64_t threats         {};
 };
 
 struct SearchMoveResult {
@@ -420,7 +421,8 @@ SearchMoveResult searchMoves(Board& b, MovePicker& movePicker, const SearchConte
         }
         // Late quiets with a very negative history rarely raise alpha at low depth.
         if (isQuietMove && interiorNonPv && ctx.depth >= 1 && ctx.depth <= 3 && moveIndex > 0
-            && runtime.history[usSide][m.from][m.to] < HISTORY_PRUNE_THRESHOLD[ctx.depth]) {
+            && runtime.history[usSide][(ctx.threats >> m.from) & 1][(ctx.threats >> m.to) & 1][m.from][m.to]
+               < HISTORY_PRUNE_THRESHOLD[ctx.depth]) {
             if constexpr (kSearchStats) ++gSearchStats.prunedHistory;
             prunedAny = true;
             continue;
@@ -474,7 +476,7 @@ SearchMoveResult searchMoves(Board& b, MovePicker& movePicker, const SearchConte
             reduction += !ctx.improving + (ctx.cutNode ? LMR_CUT_BONUS : 0);
             // History sign: the few quiets above zero fail high several times as often.
             if (isQuietMove) {
-                const bool goodBf = runtime.history[usSide][m.from][m.to] > 0;
+                const bool goodBf = runtime.history[usSide][(ctx.threats >> m.from) & 1][(ctx.threats >> m.to) & 1][m.from][m.to] > 0;
                 if (LMR_HIST_MODE == 0) {
                     reduction += goodBf ? -LMR_GOOD_HIST : LMR_BAD_HIST;
                 } else {
@@ -538,7 +540,8 @@ SearchMoveResult searchMoves(Board& b, MovePicker& movePicker, const SearchConte
             const int32_t bonus = (ctx.depth + 1) * (ctx.depth + 1) * HIST_BONUS_PCT / 100;
             // A quiet move's butterfly and continuation history, for the bonus and the malus alike.
             const auto quietHistory = [&](int from, int to, int pieceType, int32_t delta) {
-                applyHistoryGravity(runtime.history[usSide][from][to], delta, MAX_HISTORY);
+                applyHistoryGravity(runtime.history[usSide][(ctx.threats >> from) & 1][(ctx.threats >> to) & 1][from][to],
+                                    delta, MAX_HISTORY);
                 if (ctx.contHistEntry != nullptr)
                     applyHistoryGravity(ctx.contHistEntry[contHistIndex(pieceType, to)], delta, MAX_HISTORY);
             };
@@ -621,7 +624,9 @@ int32_t searchPosition(Board& b, SearchRuntime& runtime, int depth, int32_t alph
                 const uint8_t us = b.getActiveColor();
                 const MoveTraits tt = moveTraits(b, ttMove, b.getEnPassant(), Board::promotionRank(us == Board::WHITE));
                 if (piece != Board::EMPTY && (piece & Board::MASK_COLOR) == us && !tt.isCapture && !tt.isPromotion) {
-                    applyHistoryGravity(runtime.history[Board::colorToIndex(us)][ttMove.from][ttMove.to],
+                    const uint64_t thr = b.attackedBy(Board::colorToIndex(us) ^ 1);
+                    applyHistoryGravity(runtime.history[Board::colorToIndex(us)][(thr >> ttMove.from) & 1]
+                                                       [(thr >> ttMove.to) & 1][ttMove.from][ttMove.to],
                                         (depth + 1) * (depth + 1) * HIST_BONUS_PCT / 100, MAX_HISTORY);
                 }
             }
@@ -771,7 +776,8 @@ int32_t searchPosition(Board& b, SearchRuntime& runtime, int depth, int32_t alph
     if (movePicker.moves.is_empty()) return inCheck ? (-MATE_VALUE + ply) : 0; // mated or stalemated
 
     bool hasHashMove = false;
-    Sorter::scoreLegalMoves(movePicker, ply, b, runtime, tte.move, previousMove, &hasHashMove, contHistEntry);
+    const uint64_t threats = b.attackedBy(side ^ 1);
+    Sorter::scoreLegalMoves(movePicker, ply, b, runtime, tte.move, previousMove, &hasHashMove, contHistEntry, threats);
     // Without a verified hash move: no singular extension, and IIR reduces:
     // one ply of depth at PV and cut nodes in IIR_MODE 1, else one more LMR ply.
     const bool iirNode = !hasHashMove && depth >= 6 && ply > 0;
@@ -781,7 +787,7 @@ int32_t searchPosition(Board& b, SearchRuntime& runtime, int depth, int32_t alph
     const SearchContext ctx{
         previousMove, contHistEntry, depth, ply, staticEval,
         hasHashMove ? singularExtension : 0, excludedMove, activeColor, inCheck,
-        iirNode && !iirDepth, improving, cutNode && !isPVNode
+        iirNode && !iirDepth, improving, cutNode && !isPVNode, threats
     };
 
     const SearchMoveResult result = searchMoves<PV>(b, movePicker, ctx, alpha, beta, runtime, allowHeuristicUpdates);
