@@ -57,7 +57,7 @@ constexpr int      MIN_RECORD_PLY           = 16;
 constexpr int32_t  MAX_RECORD_SCORE_CP      = 3000;
 constexpr int32_t  WIN_ADJ_CP               = 2500;
 constexpr int      WIN_ADJ_PLIES            = 4;
-constexpr int32_t  DRAW_ADJ_CP              = 10;
+constexpr int32_t  DRAW_ADJ_CP              = 25;
 constexpr int      DRAW_ADJ_PLIES           = 8;
 constexpr int      DRAW_ADJ_MIN_PLY         = 80;
 constexpr int      MAX_GAME_PLIES           = 400;
@@ -949,6 +949,7 @@ int runDatagen(int argc, char* argv[]) {
         + ",\n  \"start\": " + jsonString(g_chess324 ? "chess324" : "standard")
         + ",\n  \"eg_every\": " + std::to_string(g_endgameSeedEvery)
         + ",\n  \"syzygy_men\": " + std::to_string(tbOn ? g_syzygy.maxPieces() : 0)
+        + ",\n  \"draw_adj_cp\": " + std::to_string(DRAW_ADJ_CP)
         + ",\n  \"seed\": " + std::to_string(g_benchSeed);
     if (!g_writer.open(outPrefix, opts.shardSize, settings, opts.firstShard)) return 1;
 
