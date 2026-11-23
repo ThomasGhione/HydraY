@@ -47,7 +47,8 @@ struct SearchRuntime {
     // --- Heuristics ---
     // [ply][slot]: both killers of a ply share a cache line.
     chess::Move killerMoves[MAX_PLY][2] {};
-    int16_t  history[2][64][64] {};
+    // Butterfly history, [side][from attacked][to attacked][from][to] by the opponent.
+    int16_t  history[2][2][2][64][64] {};
     uint16_t counterMoves[64][64] {};
     int16_t  captureHistory[2][64][7][CAPTURE_HISTORY_SLOTS] {};
     // Continuation history (layout at contHistIndex): 576 KiB per thread.

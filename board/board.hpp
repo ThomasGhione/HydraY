@@ -228,6 +228,21 @@ public:
     // own prefetchers do better without).
     static bool onEfficiencyCore() noexcept;
     void setWeightPrefetch(bool on) noexcept { weightPrefetch = on; }
+    // Every square `side` attacks.
+    uint64_t attackedBy(int side) const noexcept {
+        const uint64_t occ = getPiecesBitMap();
+        constexpr uint64_t FILE_A = 0x0101010101010101ULL;
+        constexpr uint64_t FILE_H = FILE_A << 7;
+        // a8 = 0: a white pawn on sq attacks sq - 9 and sq - 7, a black one sq + 7 and sq + 9.
+        const uint64_t pawns = bb[PAWN][side];
+        uint64_t a = side == 0 ? (((pawns >> 9) & ~FILE_H) | ((pawns >> 7) & ~FILE_A))
+                               : (((pawns << 7) & ~FILE_H) | ((pawns << 9) & ~FILE_A));
+        for (uint64_t p = bb[KNIGHT][side]; p; p &= p - 1) a |= pieces::KNIGHT_ATTACKS[std::countr_zero(p)];
+        for (uint64_t p = bb[BISHOP][side] | bb[QUEEN][side]; p; p &= p - 1) a |= pieces::Bishop::attacks(std::countr_zero(p), occ);
+        for (uint64_t p = bb[ROOK][side] | bb[QUEEN][side]; p; p &= p - 1) a |= pieces::Rook::attacks(std::countr_zero(p), occ);
+        return a | pieces::KING_ATTACKS[std::countr_zero(bb[KING][side])];
+    }
+
     // The squares `piece` on sq attacks with `occ` as the blockers.
     static uint64_t attacksFrom(uint8_t piece, uint8_t sq, uint64_t occ) noexcept {
         switch (piece & MASK_PIECE_TYPE) {

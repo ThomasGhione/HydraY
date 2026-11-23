@@ -28,7 +28,8 @@ inline int32_t clampHist(int16_t raw) noexcept {
 
 // The scorer's node-invariant inputs, resolved once per node.
 struct MoveOrderingContext {
-    const int16_t (*history)[64];
+    const int16_t (*history)[2][64][64];
+    uint64_t threats;
     const int16_t (*captureHistory)[7][CAPTURE_HISTORY_SLOTS];
     const int16_t* contHistEntry;
     uint16_t killer0Ft;
@@ -59,7 +60,7 @@ inline int32_t scoreMove(const MoveOrderingContext& ctx, const chess::Move& m, u
     if (ft == ctx.counterFt && m.promotionType == ctx.counterPromo) return COUNTER_MOVE_SCORE;
     if (t.isPromotion) return PROMOTION_BASE_SCORE + PIECE_VALUES[m.promotionType];
 
-    int32_t score = clampHist(ctx.history[m.from][m.to]);
+    int32_t score = clampHist(ctx.history[(ctx.threats >> m.from) & 1][(ctx.threats >> m.to) & 1][m.from][m.to]);
     if constexpr (HasContHist) {
         score += clampHist(ctx.contHistEntry[contHistIndex(t.fromType, m.to)]) / 2;
     }
@@ -142,7 +143,8 @@ MovePicker sortLegalMoves(MoveList moves, int ply, const Board& b, const SearchR
                           bool* outHashMoveIsLegal, const int16_t* contHistEntry) noexcept {
     MovePicker picker;
     picker.moves = std::move(moves);
-    scoreLegalMoves(picker, ply, b, runtime, encodedHashMove, previousMove, outHashMoveIsLegal, contHistEntry);
+    scoreLegalMoves(picker, ply, b, runtime, encodedHashMove, previousMove, outHashMoveIsLegal, contHistEntry,
+                    b.attackedBy(Board::colorToIndex(b.getActiveColor()) ^ 1));
     return picker;
 }
 
@@ -178,7 +180,7 @@ static void scoreLegalMovesImpl(MovePicker& picker, const Board& b, const MoveOr
 
 void scoreLegalMoves(MovePicker& picker, int ply, const Board& b, const SearchRuntime& runtime,
                      uint16_t encodedHashMove, const chess::Move* previousMove,
-                     bool* outHashMoveIsLegal, const int16_t* contHistEntry) noexcept {
+                     bool* outHashMoveIsLegal, const int16_t* contHistEntry, uint64_t threats) noexcept {
     picker.board = &b;
 
     const int usSide = Board::colorToIndex(b.getActiveColor());
@@ -199,6 +201,7 @@ void scoreLegalMoves(MovePicker& picker, int ply, const Board& b, const SearchRu
     const chess::Move& k1 = runtime.killerMoves[ply][1];
     const MoveOrderingContext ctx{
         runtime.history[usSide],
+        threats,
         runtime.captureHistory[usSide],
         contHistEntry,
         packFromTo(k0.from, k0.to),
