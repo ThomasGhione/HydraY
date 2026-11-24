@@ -31,7 +31,7 @@ namespace {
     return fastLround(y * net.outputScale);
 }
 
-// CReLU + pairwise product: 1024 accumulators -> 512 values in [0, QA]. The
+// CReLU + pairwise product: HIDDEN accumulators -> PAIRWISE_OUT values in [0, QA]. The
 // division by QA is integer and truncating, as in sanity_deep.rs.
 inline void pairwise(const int16_t* acc, int32_t* out) noexcept {
     for (int j = 0; j < PAIRWISE_OUT; ++j) {
