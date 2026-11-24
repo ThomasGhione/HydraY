@@ -107,23 +107,6 @@ inline constexpr Table TABLE = [] {
 }();
 static_assert(TABLE.total == THREAT_FEATURES, "threats.rs counts 63,554");
 
-// Bit (victim & 0xf) of entry (attacker & 0xf): Board pieces a and v can form a feature.
-inline constexpr std::array<uint16_t, 16> PAIR_FEATURE_MASK = [] {
-    std::array<uint16_t, 16> m{};
-    for (int a = 1; a <= 14; ++a) {
-        const int ta = (a & 7) - 1;
-        if (ta < 0 || ta >= 6) continue;
-        const int ra = ((a & 8) ? 0 : 6) + ta;
-        for (int v = 1; v <= 14; ++v) {
-            const int tv = (v & 7) - 1;
-            if (tv < 0 || tv >= 6) continue;
-            const int rv = ((v & 8) ? 0 : 6) + tv;
-            if (pairIsFeature(ra, rv)) m[a] |= static_cast<uint16_t>(1U << v);
-        }
-    }
-    return m;
-}();
-
 constexpr bool tryIndexBase(uint32_t entryIdx, int to, uint32_t& out) noexcept {
     const Entry& e = TABLE.entries[entryIdx];
     if (!((e.mask >> to) & 1ULL)) return false;
@@ -142,11 +125,6 @@ constexpr bool tryIndex(int a, int from, int v, int to, uint32_t& out) noexcept 
 }
 
 } // namespace threats
-
-// Whether attacker and victim pieces (Board encoding: bit 3 = colour, bits 0-2 = 1-6) can form a feature.
-[[nodiscard]] constexpr bool threatPairIsFeature(uint8_t attacker, uint8_t victim) noexcept {
-    return (threats::PAIR_FEATURE_MASK[attacker & 0xF] >> (victim & 0xF)) & 1;
-}
 
 // [perspective][Board piece] -> relative piece 0-11.
 inline constexpr std::array<std::array<uint8_t, 16>, 2> REL_PIECE = [] {
@@ -174,6 +152,12 @@ inline constexpr std::array<std::array<uint32_t, 16>, 16> BOTH_PAIR_BASE = [] {
         }
     return b;
 }();
+
+// Whether attacker and victim pieces (Board encoding: bit 3 = colour, bits
+// 0-2 = 1-6) can form a feature: then they have a pair base, in either view.
+[[nodiscard]] constexpr bool threatPairIsFeature(uint8_t attacker, uint8_t victim) noexcept {
+    return (BOTH_PAIR_BASE[attacker & 0xF][victim & 0xF] & 0xFFFF) != threats::INVALID_PAIR_BASE;
+}
 
 // Perspective p (0 = white) whose king puts the file mirror `flip`, on Board
 // pieces and squares (a8 = 0).
