@@ -55,15 +55,6 @@ void Board::rebuildBitboardsFromSquares() noexcept {
     refreshNnueAccumulator();
 }
 
-inline bool Board::isKingSafeAfterMove(uint8_t movingColor, uint8_t fromIndex, uint8_t toIndex,
-                                       uint64_t capturedMask) const noexcept {
-    const uint8_t side = colorToIndex(movingColor);
-    if (!bb[KING][side]) [[unlikely]] return false;
-    const uint64_t occNew =
-        (occupancy & ~(1ULL << fromIndex) & ~capturedMask) | (1ULL << toIndex);
-    return (attackersOf(std::countr_zero(bb[KING][side]), side ^ 1, occNew) & ~capturedMask) == 0;
-}
-
 bool Board::move(Move move) noexcept {
     const uint8_t moving = get(move.from);
     if (moving == EMPTY || (moving & MASK_COLOR) != activeColor) [[unlikely]]
@@ -75,68 +66,53 @@ bool Board::move(Move move) noexcept {
     return true;
 }
 
+// The destination is in reach, and our king (on its new square if it is the
+// mover) stands unattacked once the mover and its capture are lifted.
 bool Board::isLegalPseudoMove(uint8_t fromIndex, uint8_t toIndex, uint8_t fromPiece) const noexcept {
-    const uint8_t fromType = fromPiece & MASK_PIECE_TYPE;
-    const uint8_t movingColor = fromPiece & MASK_COLOR;
-
-    const uint8_t destPiece = get(toIndex);
-
-    if (destPiece != EMPTY && (destPiece & MASK_COLOR) == movingColor) [[unlikely]]
-        return false;
-
-    const uint64_t toBit = (1ULL << toIndex);
-    switch (fromType) {
-        case PAWN: {
-            const bool isWhite = (movingColor == WHITE);
-
-            // Diagonal move (capture or en-passant)?
-            if (pieces::PAWN_ATTACKS[colorToIndex(movingColor)][fromIndex] & toBit) {
-                // En-passant: diagonal to empty square that matches EP target
-                if (destPiece == EMPTY) {
-                    if (isValidSquare(state.enPassant) && toIndex == state.enPassant)
-                        return isKingSafeAfterMove(movingColor, fromIndex, toIndex, 1ULL << enPassantVictim(fromPiece, toIndex));
-                    return false; // diagonal to empty square but not en-passant
-                }
-                // Normal capture (destPiece is enemy)
-                return isKingSafeAfterMove(movingColor, fromIndex, toIndex, toBit);
+    const uint8_t color = fromPiece & MASK_COLOR;
+    const uint8_t dest = get(toIndex);
+    if (dest != EMPTY && (dest & MASK_COLOR) == color) [[unlikely]] return false;
+    const int side = colorToIndex(color);
+    const uint64_t toBit = 1ULL << toIndex;
+    uint64_t captured = (dest != EMPTY) ? toBit : 0ULL;
+    uint64_t reach = 0ULL;
+    switch (fromPiece & MASK_PIECE_TYPE) {
+        case PAWN:
+            reach = pieces::PAWN_ATTACKS[side][fromIndex];
+            if (!(reach & toBit)) {
+                reach = (dest == EMPTY) ? pieces::getPawnForwardPushes(fromIndex, color == WHITE, occupancy) : 0ULL;
+            } else if (dest == EMPTY) {
+                // A diagonal step to an empty square is en passant or nothing.
+                if (toIndex != state.enPassant) return false;
+                captured = 1ULL << enPassantVictim(fromPiece, toIndex);
             }
-
-            // Forward push: must land on valid push square and destination must be empty
-            if (destPiece != EMPTY) [[unlikely]] return false;
-            if (!(pieces::getPawnForwardPushes(fromIndex, isWhite, occupancy) & toBit)) return false;
-            return isKingSafeAfterMove(movingColor, fromIndex, toIndex, 0ULL);
+            break;
+        case KNIGHT: reach = pieces::KNIGHT_ATTACKS[fromIndex]; break;
+        case BISHOP: reach = pieces::Bishop::attacks(fromIndex, occupancy); break;
+        case ROOK:   reach = pieces::Rook::attacks(fromIndex, occupancy); break;
+        case QUEEN:  reach = pieces::Rook::attacks(fromIndex, occupancy) | pieces::Bishop::attacks(fromIndex, occupancy); break;
+        case KING: {
+            // Only castling moves the king two files: a one-step offset is 1, 7, 8 or 9.
+            const int diff = static_cast<int>(toIndex) - fromIndex;
+            if (diff == 2 || diff == -2) [[unlikely]] {
+                const int right = 2 * side + (diff < 0);
+                return fromIndex == CASTLINGS[right].king && canCastle(right);
+            }
+            reach = pieces::KING_ATTACKS[fromIndex];
+            break;
         }
-        case KNIGHT: return pseudoMoveLegalByType<KNIGHT>(fromIndex, toIndex, toBit, movingColor, destPiece);
-        case BISHOP: return pseudoMoveLegalByType<BISHOP>(fromIndex, toIndex, toBit, movingColor, destPiece);
-        case ROOK:   return pseudoMoveLegalByType<ROOK>(fromIndex, toIndex, toBit, movingColor, destPiece);
-        case QUEEN:  return pseudoMoveLegalByType<QUEEN>(fromIndex, toIndex, toBit, movingColor, destPiece);
-        case KING: return isKingMoveLegal(fromIndex, toIndex, toBit, movingColor);
         default: return false;
     }
+    if (!(reach & toBit) || !bb[KING][side]) [[unlikely]] return false;
+    const uint64_t occNew = (occupancy & ~(1ULL << fromIndex) & ~captured) | toBit;
+    const auto king = static_cast<uint8_t>((fromPiece & MASK_PIECE_TYPE) == KING ? toIndex : std::countr_zero(bb[KING][side]));
+    return (attackersOf(king, side ^ 1, occNew) & ~captured) == 0;
 }
-
-template<uint8_t PieceType>
-inline bool Board::pseudoMoveLegalByType(uint8_t fromIndex, uint8_t toIndex, uint64_t toBit, uint8_t movingColor, uint8_t destPiece) const noexcept {
-    if ((pieces::generateMovesByType<PieceType>(fromIndex, occupancy) & toBit) == 0ULL) [[unlikely]] return false;
-    return isKingSafeAfterMove(movingColor, fromIndex, toIndex, (destPiece != EMPTY) ? toBit : 0ULL);
-}
-
 
 uint64_t Board::checkersTo(uint8_t color) const noexcept {
     const uint8_t side = colorToIndex(color);
     if (!bb[KING][side]) [[unlikely]] return 0ULL;
     return attackersOf(std::countr_zero(bb[KING][side]), side ^ 1, occupancy);
-}
-
-[[nodiscard]] bool Board::isKingMoveLegal(uint8_t fromIndex, uint8_t toIndex, uint64_t toBit,
-                                          uint8_t movingColor) const noexcept {
-    const int diff = static_cast<int>(toIndex) - fromIndex;
-    // Only castling moves the king two files: a one-step offset is 1, 7, 8 or 9.
-    if (diff == 2 || diff == -2) [[unlikely]] {
-        const int right = 2 * colorToIndex(movingColor) + (diff < 0);
-        return fromIndex == CASTLINGS[right].king && canCastle(right);
-    }
-    return (pieces::KING_ATTACKS[fromIndex] & toBit) && !isSquareAttacked(toIndex, oppositeColor(movingColor), fromIndex);
 }
 
 bool Board::canCastle(int right) const noexcept {
@@ -147,13 +123,6 @@ bool Board::canCastle(int right) const noexcept {
     for (uint64_t path = c.kingPath; path; )
         if (attackersOf(static_cast<uint8_t>(pieces::popLSB(path)), side ^ 1, occupancy)) return false;
     return true;
-}
-
-// Whether byColor attacks targetIndex, with excludeSquare (if < 64) lifted off
-// the board, as a moving king needs.
-bool Board::isSquareAttacked(uint8_t targetIndex, uint8_t byColor, uint8_t excludeSquare) const noexcept {
-    const uint64_t occMinus = excludeSquare < 64 ? (occupancy & ~(1ULL << excludeSquare)) : occupancy;
-    return attackersOf(targetIndex, colorToIndex(byColor), occMinus) != 0;
 }
 
 void Board::recomputeHashAndEp() noexcept {
