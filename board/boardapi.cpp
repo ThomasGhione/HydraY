@@ -142,130 +142,98 @@ struct SquareThreatInputs {
     }
 };
 
-} // namespace
-
-template<bool Add, bool Checked>
-inline void Board::emitThreatDeltas(NNUE::Accumulator& f, uint8_t startN, uint8_t piece, uint8_t sq,
-                                    uint64_t victims, uint64_t attackers, uint64_t sliders,
-                                    uint64_t sliderOcc) const noexcept {
-    uint8_t n = startN;
-    const auto push = [&f, &n](uint8_t attacker, uint8_t from, uint8_t victim, uint8_t to, bool add) {
-        if constexpr (Checked) {
-            if (n >= NNUE::ACC_MAX_THREATS) { n = NNUE::ACC_THREATS_OVERFLOW; return; }
-        }
-        f.threatDelta[n++] = NNUE::ThreatDelta::make(attacker, from, victim, to, add);
-    };
-    while (victims) {
-        const auto to = static_cast<uint8_t>(pieces::popLSB(victims));
-        push(piece, sq, get(to), to, Add);
-    }
-    while (attackers) {
-        const auto from = static_cast<uint8_t>(pieces::popLSB(attackers));
-        push(get(from), from, piece, sq, Add);
-    }
-    // A line past sq meets rookOcc only if orthogonal, bishopOcc only if
-    // diagonal: one mask serves both.
-    const uint64_t* const beyondSq = BEYOND_BY_SQ[sq].data();
-    while (sliders) {
-        const auto from = static_cast<uint8_t>(pieces::popLSB(sliders));
-        if (const uint64_t past = sliderOcc & beyondSq[from]) {
-            const auto to = static_cast<uint8_t>(std::countr_zero(past));
-            const uint8_t att = get(from);
-            const uint8_t vic = get(to);
-            if (NNUE::threatPairIsFeature(att, vic)) push(att, from, vic, to, !Add);
-        }
-    }
-    f.nthreat = n;
-}
-
+// Appends threat deltas to a frame's list. Checked: the list may fill up, and
+// then stays ACC_THREATS_OVERFLOW.
 template<bool Checked>
-__attribute__((always_inline))
-inline void Board::emitReplacedThreatDeltas(NNUE::Accumulator& f, uint8_t startN, uint8_t oldPiece,
-                                            uint8_t newPiece, uint8_t sq, uint64_t oldVictims,
-                                            uint64_t newVictims, uint64_t oldAttackers,
-                                            uint64_t newAttackers) const noexcept {
-    uint8_t n = startN;
-    const auto push = [&f, &n](uint8_t attacker, uint8_t from, uint8_t victim, uint8_t to, bool add) {
+struct ThreatSink {
+    NNUE::Accumulator& f;
+    uint8_t n;
+    __attribute__((always_inline)) void operator()(uint8_t attacker, uint8_t from, uint8_t victim, uint8_t to,
+                                                   bool add) noexcept {
         if constexpr (Checked) {
             if (n >= NNUE::ACC_MAX_THREATS) { n = NNUE::ACC_THREATS_OVERFLOW; return; }
         }
         f.threatDelta[n++] = NNUE::ThreatDelta::make(attacker, from, victim, to, add);
-    };
-    const auto emitVictims = [&](uint64_t mask, uint8_t att, bool add) {
-        while (mask) {
-            const auto to = static_cast<uint8_t>(pieces::popLSB(mask));
-            push(att, sq, get(to), to, add);
-        }
-    };
-    const auto emitAttackers = [&](uint64_t mask, uint8_t vic, bool add) {
-        while (mask) {
-            const auto from = static_cast<uint8_t>(pieces::popLSB(mask));
-            push(get(from), from, vic, sq, add);
-        }
-    };
-    emitVictims(oldVictims, oldPiece, false);
-    emitVictims(newVictims, newPiece, true);
-    uint64_t shared = oldAttackers & newAttackers;
-    emitAttackers(oldAttackers ^ shared, oldPiece, false);
-    emitAttackers(newAttackers ^ shared, newPiece, true);
-    while (shared) {
-        const auto from = static_cast<uint8_t>(pieces::popLSB(shared));
-        const uint8_t att = get(from);
-        push(att, from, oldPiece, sq, false);
-        push(att, from, newPiece, sq, true);
     }
-    f.nthreat = n;
+};
+
+// emit(sink) with an unchecked sink when the list has room for Bound more
+// deltas, or for the count() that can come; an overflowed list takes none.
+template<int Bound, typename Count, typename Emit>
+__attribute__((always_inline)) inline void emitWithin(NNUE::Accumulator& f, Count count, Emit emit) noexcept {
+    const uint8_t n = f.nthreat;
+    if (n <= NNUE::ACC_MAX_THREATS - Bound || n + count() <= NNUE::ACC_MAX_THREATS) [[likely]] {
+        ThreatSink<false> sink{f, n};
+        emit(sink);
+        f.nthreat = sink.n;
+    } else if (n != NNUE::ACC_THREATS_OVERFLOW) [[unlikely]] {
+        ThreatSink<true> sink{f, n};
+        emit(sink);
+        f.nthreat = sink.n;
+    }
 }
+
+// The threats of piece on sq against each of `others` (Victims), or of each
+// of `others` against it.
+template<bool Victims, typename Push>
+__attribute__((always_inline)) inline void pushThreats(const Board& b, Push& push, uint8_t piece, uint8_t sq,
+                                                       uint64_t others, bool add) noexcept {
+    while (others) {
+        const auto o = static_cast<uint8_t>(pieces::popLSB(others));
+        if constexpr (Victims) push(piece, sq, b.get(o), o, add);
+        else                   push(b.get(o), o, piece, sq, add);
+    }
+}
+
+} // namespace
 
 template<bool Add>
 __attribute__((noinline))
 void Board::recordThreats(NNUE::Accumulator& f, uint8_t piece, uint8_t sq) noexcept {
-    const uint8_t startN = f.nthreat;
-
     const SquareThreatInputs in = SquareThreatInputs::collect(sq, occupancy, bb);
-    const auto [victims, attackers] = in.masksFor(piece);
-    const uint64_t sliderOcc = in.rookOcc | in.bishopOcc;
-
+    const ThreatMasks m = in.masksFor(piece);
     // At most 8 victims, 19 attackers and 8 lines: 35 deltas.
-    if (startN <= NNUE::ACC_MAX_THREATS - 35) [[likely]] {
-        emitThreatDeltas<Add, false>(f, startN, piece, sq, victims, attackers, in.sliders, sliderOcc);
-        return;
-    }
-    const int worstCase = static_cast<int>(startN)
-        + std::popcount(victims)
-        + std::popcount(attackers)
-        + std::popcount(in.sliders);
-    if (worstCase <= NNUE::ACC_MAX_THREATS) {
-        emitThreatDeltas<Add, false>(f, startN, piece, sq, victims, attackers, in.sliders, sliderOcc);
-    } else if (startN != NNUE::ACC_THREATS_OVERFLOW) [[unlikely]] {
-        emitThreatDeltas<Add, true>(f, startN, piece, sq, victims, attackers, in.sliders, sliderOcc);
-    }
+    emitWithin<35>(f, [&] { return std::popcount(m.victims) + std::popcount(m.attackers) + std::popcount(in.sliders); },
+                   [&](auto& push) {
+        pushThreats<true>(*this, push, piece, sq, m.victims, Add);
+        pushThreats<false>(*this, push, piece, sq, m.attackers, Add);
+        // A line past sq meets rookOcc only if orthogonal, bishopOcc only if
+        // diagonal: one mask serves both.
+        const uint64_t sliderOcc = in.rookOcc | in.bishopOcc;
+        const uint64_t* const beyondSq = BEYOND_BY_SQ[sq].data();
+        for (uint64_t sliders = in.sliders; sliders; ) {
+            const auto from = static_cast<uint8_t>(pieces::popLSB(sliders));
+            if (const uint64_t past = sliderOcc & beyondSq[from]) {
+                const auto to = static_cast<uint8_t>(std::countr_zero(past));
+                const uint8_t att = get(from);
+                const uint8_t vic = get(to);
+                if (NNUE::threatPairIsFeature(att, vic)) push(att, from, vic, to, !Add);
+            }
+        }
+    });
 }
 
 __attribute__((noinline))
 void Board::recordReplacedThreats(NNUE::Accumulator& f, uint8_t oldPiece, uint8_t newPiece, uint8_t sq) noexcept {
-    const uint8_t startN = f.nthreat;
-
     const SquareThreatInputs in = SquareThreatInputs::collect(sq, occupancy, bb);
-    const auto [oldVictims, oldAttackers] = in.masksFor(oldPiece);
-    const auto [newVictims, newAttackers] = in.masksFor(newPiece);
-
+    const ThreatMasks was = in.masksFor(oldPiece);
+    const ThreatMasks is = in.masksFor(newPiece);
     // At most 2 * (8 + 19) = 54 deltas.
-    if (startN <= NNUE::ACC_MAX_THREATS - 54) [[likely]] {
-        emitReplacedThreatDeltas<false>(f, startN, oldPiece, newPiece, sq,
-                                        oldVictims, newVictims, oldAttackers, newAttackers);
-        return;
-    }
-    const int worstCase = static_cast<int>(startN)
-        + std::popcount(oldVictims) + std::popcount(newVictims)
-        + std::popcount(oldAttackers) + std::popcount(newAttackers);
-    if (worstCase <= NNUE::ACC_MAX_THREATS) {
-        emitReplacedThreatDeltas<false>(f, startN, oldPiece, newPiece, sq,
-                                        oldVictims, newVictims, oldAttackers, newAttackers);
-    } else if (startN != NNUE::ACC_THREATS_OVERFLOW) [[unlikely]] {
-        emitReplacedThreatDeltas<true>(f, startN, oldPiece, newPiece, sq,
-                                       oldVictims, newVictims, oldAttackers, newAttackers);
-    }
+    emitWithin<54>(f, [&] { return std::popcount(was.victims) + std::popcount(is.victims)
+                                 + std::popcount(was.attackers) + std::popcount(is.attackers); },
+                   [&](auto& push) {
+        pushThreats<true>(*this, push, oldPiece, sq, was.victims, false);
+        pushThreats<true>(*this, push, newPiece, sq, is.victims, true);
+        uint64_t shared = was.attackers & is.attackers;
+        pushThreats<false>(*this, push, oldPiece, sq, was.attackers ^ shared, false);
+        pushThreats<false>(*this, push, newPiece, sq, is.attackers ^ shared, true);
+        while (shared) {
+            const auto from = static_cast<uint8_t>(pieces::popLSB(shared));
+            const uint8_t att = get(from);
+            push(att, from, oldPiece, sq, false);
+            push(att, from, newPiece, sq, true);
+        }
+    });
 }
 
 template<bool Record>
