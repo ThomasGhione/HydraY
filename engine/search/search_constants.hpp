@@ -120,29 +120,14 @@ inline Spin LMR_CUT_BONUS{1, "LMR_CUT_BONUS", 0, 4};
 // First reduced move index: LMR_MIN_INDEX_ALL at an expected all node
 // (non-PV, not cut), 4 elsewhere.
 inline Spin LMR_MIN_INDEX_ALL{4, "LMR_MIN_INDEX_ALL", 1, 8};
-// 1: below index 4 only quiets that are neither killer nor countermove.
-inline Spin LMR_EARLY_QUIET_ONLY{0, "LMR_EARLY_QUIET_ONLY", 0, 1};
-// Reduction change for a quiet by its butterfly history sign: -LMR_GOOD_HIST
-// above zero, +LMR_BAD_HIST otherwise.
+// Reduction change for a quiet: LMR_BAD_HIST - LMR_GOOD_HIST * n, n = positive
+// signals among its butterfly and continuation history.
 inline Spin LMR_GOOD_HIST{1, "LMR_GOOD_HIST", 0, 3};
 inline Spin LMR_BAD_HIST{1, "LMR_BAD_HIST", 0, 3};
-// 0: butterfly sign only; 1: LMR_BAD_HIST - LMR_GOOD_HIST * n, n = positive
-// signals among butterfly and continuation history; 2: -LMR_GOOD_HIST if any.
-inline Spin LMR_HIST_MODE{1, "LMR_HIST_MODE", 0, 2};
 // Quiet, continuation and capture history bonus: (depth + 1)^2 * HIST_BONUS_PCT / 100.
 inline Spin HIST_BONUS_PCT{101, "HIST_BONUS_PCT", 25, 1000};
-// 0: no hash move adds an LMR ply; 1: at PV and cut nodes it takes a ply of depth.
-inline Spin IIR_MODE{1, "IIR_MODE", 0, 1};
+// Without a hash move a PV or cut node from IIR_MIN_DEPTH takes a ply of depth.
 inline Spin IIR_MIN_DEPTH{4, "IIR_MIN_DEPTH", 2, 12};
-// 1: a TT cutoff by a quiet hash move gives it the cutoff history bonus.
-inline Spin TT_CUT_HIST{0, "TT_CUT_HIST", 0, 1};
-// Plies less of reduction for a move that gives check (0 = off).
-inline Spin LMR_CHECK_LESS{0, "LMR_CHECK_LESS", 0, 3};
-// Hindsight depth: +1 after a reduction of 3+ when the opponent is not worse
-// off (1 = on); -1 after a reduction of 2+ when both static evals sum above
-// HINDSIGHT_MARGIN (0 = off).
-inline Spin HINDSIGHT_EXT{0, "HINDSIGHT_EXT", 0, 1};
-inline Spin HINDSIGHT_MARGIN{0, "HINDSIGHT_MARGIN", 0, 2000};
 // Re-search after a reduced fail high: one ply deeper when the score beats the
 // best so far by LMR_DEEPER_MARGIN + 2 * depth, one shallower below LMR_SHALLOWER_MARGIN.
 inline Spin LMR_DEEPER_MARGIN{35, "LMR_DEEPER_MARGIN", 0, 200};
