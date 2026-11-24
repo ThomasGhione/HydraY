@@ -112,6 +112,11 @@ inline NodeEval nodeEval(Board& b, SearchRuntime& runtime, const TT::ProbeResult
     return {raw, corrected, replaced ? std::clamp(ttScore, -TB_WIN_BOUND + 1, TB_WIN_BOUND - 1) : corrected};
 }
 
+// The child's TT bucket and eval-cache slot, for doMove to prefetch.
+Board::HashPrefetch hashPrefetch(const TT& tt) noexcept {
+    return {tt.rawTableBase(), tt.bucketByteMask(), evalCache.rawBase(), EvalCache::BYTE_MASK};
+}
+
 // "Level enough that a repetition is acceptable": half a pawn, converted to
 // eval units because it is compared with a static eval.
 constexpr int32_t REPETITION_DRAW_ADVANTAGE_THRESHOLD = materialToEval(PIECE_VALUES[Board::PAWN] / 2);
@@ -382,11 +387,11 @@ SearchMoveResult searchMoves(Board& b, MovePicker& movePicker, const SearchConte
     const uint8_t oppColor = Board::oppositeColor(ctx.activeColor);
     bool prunedAny = false;
     bool lmpSkipTried = false;
-    const Board::HashPrefetch ttPrefetch{
-        runtime.transpositionTable->rawTableBase(),
-        runtime.transpositionTable->bucketByteMask(),
-        evalCache.rawBase(),
-        EvalCache::BYTE_MASK,
+    const Board::HashPrefetch ttPrefetch = hashPrefetch(*runtime.transpositionTable);
+    // A move skipped by a pruning rule, counted in its SEARCH_STATS field.
+    const auto pruned = [&](uint64_t SearchStats::* counter) {
+        if constexpr (kSearchStats) ++(gSearchStats.*counter);
+        prunedAny = true;
     };
 
     while (movePicker.hasNext()) {
@@ -401,47 +406,42 @@ SearchMoveResult searchMoves(Board& b, MovePicker& movePicker, const SearchConte
         const bool isFirstMove = (moveIndex == 0);
         const MoveTraits t = moveTraits(b, m, enPassant, promotionRank);
         const bool isQuietMove = !t.isCapture && !t.isPromotion;
+        // Always the last term of a rule: it costs two magic lookups, and every
+        // cheaper term rejects far more often.
+        const auto noCheck = [&] {
+            return t.fromType == Board::KING
+                || !Sorter::givesCheckAfterQuietMoveFast(b, m, t.fromType, oppKingSq, b.getPiecesBitMap());
+        };
 
         if (canLMP && isQuietMove && moveIndex >= lmpLimit) {
-            if constexpr (kSearchStats) ++gSearchStats.prunedLmp;
-            prunedAny = true;
+            pruned(&SearchStats::prunedLmp);
             if (!lmpSkipTried) {
                 lmpSkipTried = true;
                 skipToLosingCaptures(movePicker, b, enPassant, promotionRank);
             }
             continue;
         }
-        // givesCheck is the last term: it costs two magic lookups, and every
-        // cheaper term rejects far more often.
-        if (canFutilityPrune && isQuietMove && moveIndex > 0 && ctx.staticEval + futilityMargin <= alpha
-            && (t.fromType == Board::KING
-                || !Sorter::givesCheckAfterQuietMoveFast(b, m, t.fromType, oppKingSq, b.getPiecesBitMap()))) {
-            if constexpr (kSearchStats) ++gSearchStats.prunedFutility;
-            prunedAny = true;
+        if (canFutilityPrune && isQuietMove && moveIndex > 0 && ctx.staticEval + futilityMargin <= alpha && noCheck()) {
+            pruned(&SearchStats::prunedFutility);
             continue;
         }
         // Late quiets with a very negative history rarely raise alpha at low depth.
         if (isQuietMove && interiorNonPv && ctx.depth >= 1 && ctx.depth <= 3 && moveIndex > 0
             && runtime.history[usSide][(ctx.threats >> m.from) & 1][(ctx.threats >> m.to) & 1][m.from][m.to]
                < HISTORY_PRUNE_THRESHOLD[ctx.depth]) {
-            if constexpr (kSearchStats) ++gSearchStats.prunedHistory;
-            prunedAny = true;
+            pruned(&SearchStats::prunedHistory);
             continue;
         }
         // Clearly losing captures at shallow non-PV nodes; move 0 is always searched.
         if (t.isCapture && !t.isPromotion && moveIndex > 0 && interiorNonPv && ctx.depth <= SEE_PRUNE_MAX_DEPTH
             && Sorter::staticExchangeEvaluation(b, m) < -SEE_CAPTURE_MARGIN * ctx.depth) {
-            if constexpr (kSearchStats) ++gSearchStats.prunedSee;
-            prunedAny = true;
+            pruned(&SearchStats::prunedSee);
             continue;
         }
         // Quiets that lose material, checks excepted as in futility.
         if (isQuietMove && moveIndex > 0 && interiorNonPv && ctx.depth <= QUIET_SEE_MAX_DEPTH
-            && Sorter::staticExchangeEvaluation(b, m) < -QUIET_SEE_MARGIN * ctx.depth * ctx.depth
-            && (t.fromType == Board::KING
-                || !Sorter::givesCheckAfterQuietMoveFast(b, m, t.fromType, oppKingSq, b.getPiecesBitMap()))) {
-            if constexpr (kSearchStats) ++gSearchStats.prunedSee;
-            prunedAny = true;
+            && Sorter::staticExchangeEvaluation(b, m) < -QUIET_SEE_MARGIN * ctx.depth * ctx.depth && noCheck()) {
+            pruned(&SearchStats::prunedSee);
             continue;
         }
 
@@ -680,11 +680,8 @@ int32_t searchPosition(Board& b, SearchRuntime& runtime, int depth, int32_t alph
         if constexpr (kSearchStats) ++gSearchStats.nmpTries;
         const int reduction = NMP_BASE_R + depth / 3 + std::clamp<int32_t>((staticEval - beta) / NMP_EVAL_DIV, 0, NMP_EVAL_MAX);
         Board::MoveState nullState;
-        const Board::HashPrefetch nullPrefetch{
-            tt.rawTableBase(), tt.bucketByteMask(), evalCache.rawBase(), EvalCache::BYTE_MASK
-        };
         runtime.contRowStack[ply] = -1;
-        b.doNullMove(nullState, nullPrefetch);
+        b.doNullMove(nullState, hashPrefetch(tt));
         const int32_t nullScore = -searchPosition<false>(b, runtime, depth - reduction, -beta, -alpha, ply + 1,
                                                   allowHeuristicUpdates, nullptr, false);
         b.undoNullMove(nullState);
@@ -706,9 +703,7 @@ int32_t searchPosition(Board& b, SearchRuntime& runtime, int depth, int32_t alph
     // (behind a qsearch filter above depth 4) makes a fail high very likely.
     if (interiorNonPv && depth >= PROBCUT_MIN_DEPTH && std::abs(beta) < POS_INF - 1000) {
         const int32_t probcutBound = beta + PROBCUT_MARGIN;
-        const Board::HashPrefetch pcPrefetch{
-            tt.rawTableBase(), tt.bucketByteMask(), evalCache.rawBase(), EvalCache::BYTE_MASK
-        };
+        const Board::HashPrefetch pcPrefetch = hashPrefetch(tt);
         for (const Move& mc : MoveGenerator::generateTacticalMoves(b)) {
             // A singular probe asks about the OTHER moves: the excluded one must not answer.
             if (hasExcludedMove && mc.sameFromTo(excludedMove)) continue;
@@ -842,9 +837,7 @@ int32_t quiescenceSearch(Board& b, SearchRuntime& runtime, int32_t alpha, int32_
                                     : MoveGenerator::generateQSearchTacticalMoves(b, best, alpha, ply);
     if (!movePicker.hasNext()) return inCheck ? (-MATE_VALUE + ply) : best; // mated, or the stand pat
 
-    const Board::HashPrefetch qsPrefetch{
-        tt.rawTableBase(), tt.bucketByteMask(), evalCache.rawBase(), EvalCache::BYTE_MASK
-    };
+    const Board::HashPrefetch qsPrefetch = hashPrefetch(tt);
     while (movePicker.hasNext()) {
         const Move m = movePicker.nextMove<false>();
         if (runtime.shouldAbort()) {
