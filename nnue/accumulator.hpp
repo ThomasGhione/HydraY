@@ -30,6 +30,13 @@ struct AccDelta {
     uint8_t piece;
     uint8_t from;   // Add/Remove: the square
     uint8_t to;     // Move only
+
+    // Its feature changes as f(add, piece, square); invert undoes the move.
+    template<typename F>
+    __attribute__((always_inline)) void forEachChange(bool invert, F&& f) const noexcept {
+        f(kind == Add ? !invert : invert, piece, from);
+        if (kind == Move) f(!invert, piece, to);
+    }
 };
 
 // A threat that appears or vanishes with a move, in Board's pieces and squares;
@@ -94,6 +101,12 @@ struct alignas(64) Accumulator {
 #if defined(__AVX2__)
         for (int l = 0; l < N; ++l) _mm_prefetch(reinterpret_cast<const char*>(p) + 64 * l, _MM_HINT_T0);
 #endif
+    }
+    // A threat row's first line, and with `second` its next one.
+    __attribute__((always_inline))
+    static inline void prefetchThreatRow(const int8_t* row, bool second) noexcept {
+        prefetchLines<1>(row);
+        if (second) prefetchLines<1>(row + 64);
     }
 
 #if defined(__AVX2__)

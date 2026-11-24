@@ -1,4 +1,6 @@
 #include <algorithm>
+#include <type_traits>
+
 #include "board.hpp"
 #include "../tt/zobrist.hpp"
 
@@ -242,55 +244,9 @@ inline void syncRow(const Board& b, int16_t* row, uint64_t (&cached)[2][6], int 
     else          NNUE::Accumulator::applyRows<false>(row, sub, ns, add, na);
 }
 
-// Drops the rows that appear in both lists; add needs 8 spare slots past na.
-// Out of line: every caller shares one copy.
-__attribute__((noinline, hot))
-void cancelThreats(const int8_t** sub, int& ns, const int8_t** add, int& na) noexcept {
-    if (ns == 0 || na == 0) return;
-#if defined(__AVX2__)
-    // A fixed-size store: clang turns a variable-length one into a memset call.
-    std::memset(add + na, 0, 8 * sizeof(const int8_t*));
-    const auto matchMask8 = [](const __m256i key, const __m256i a0, const __m256i a1) noexcept {
-        const int m0 = _mm256_movemask_pd(_mm256_castsi256_pd(_mm256_cmpeq_epi64(key, a0)));
-        const int m1 = _mm256_movemask_pd(_mm256_castsi256_pd(_mm256_cmpeq_epi64(key, a1)));
-        return m0 | (m1 << 4);
-    };
-    const auto swapRemove = [&](int i, int j) noexcept {
-        sub[i] = sub[--ns];
-        add[j] = add[--na];
-        add[na] = nullptr;
-    };
-    if (na <= 8) {
-        __m256i a0 = _mm256_loadu_si256(reinterpret_cast<const __m256i*>(add));
-        __m256i a1 = _mm256_loadu_si256(reinterpret_cast<const __m256i*>(add + 4));
-        for (int i = 0; i < ns; ) {
-            const int mask = matchMask8(_mm256_set1_epi64x(reinterpret_cast<int64_t>(sub[i])), a0, a1);
-            if (mask == 0) { ++i; continue; }
-            swapRemove(i, std::countr_zero(static_cast<unsigned>(mask)));
-            if (na == 0) break;
-            a0 = _mm256_loadu_si256(reinterpret_cast<const __m256i*>(add));
-            a1 = _mm256_loadu_si256(reinterpret_cast<const __m256i*>(add + 4));
-        }
-    } else {
-        for (int i = 0; i < ns; ) {
-            const __m256i key = _mm256_set1_epi64x(reinterpret_cast<int64_t>(sub[i]));
-            int hit = -1;
-            for (int base = 0; base < na; base += 8) {
-                const int mask = matchMask8(
-                    key,
-                    _mm256_loadu_si256(reinterpret_cast<const __m256i*>(add + base)),
-                    _mm256_loadu_si256(reinterpret_cast<const __m256i*>(add + base + 4)));
-                if (mask != 0) {
-                    hit = base + std::countr_zero(static_cast<unsigned>(mask));
-                    break;
-                }
-            }
-            if (hit < 0) { ++i; continue; }
-            swapRemove(i, hit);
-            if (na == 0) break;
-        }
-    }
-#else
+// Drops the entries that appear in both lists: they cancel, in any order.
+template<typename T>
+inline void cancelPairs(T* sub, int& ns, T* add, int& na) noexcept {
     for (int i = 0; i < ns; ) {
         int j = 0;
         while (j < na && add[j] != sub[i]) ++j;
@@ -298,6 +254,34 @@ void cancelThreats(const int8_t** sub, int& ns, const int8_t** add, int& na) noe
         sub[i] = sub[--ns];
         add[j] = add[--na];
     }
+}
+
+// The same for threat rows, eight at a time; add needs 8 spare slots past na.
+// Out of line: every caller shares one copy.
+__attribute__((noinline, hot))
+void cancelThreats(const int8_t** sub, int& ns, const int8_t** add, int& na) noexcept {
+#if defined(__AVX2__)
+    if (ns == 0 || na == 0) return;
+    // A fixed-size store: clang turns a variable-length one into a memset call.
+    std::memset(add + na, 0, 8 * sizeof(const int8_t*));
+    for (int i = 0; i < ns; ) {
+        const __m256i key = _mm256_set1_epi64x(reinterpret_cast<int64_t>(sub[i]));
+        const auto matches = [&](const int8_t** at) noexcept {
+            return _mm256_movemask_pd(_mm256_castsi256_pd(
+                _mm256_cmpeq_epi64(key, _mm256_loadu_si256(reinterpret_cast<const __m256i*>(at)))));
+        };
+        int hit = -1;
+        for (int base = 0; base < na && hit < 0; base += 8)
+            if (const int mask = matches(add + base) | (matches(add + base + 4) << 4))
+                hit = base + std::countr_zero(static_cast<unsigned>(mask));
+        if (hit < 0) { ++i; continue; }
+        sub[i] = sub[--ns];
+        add[hit] = add[--na];
+        add[na] = nullptr;
+        if (na == 0) break;
+    }
+#else
+    cancelPairs(sub, ns, add, na);
 #endif
 }
 
@@ -339,7 +323,7 @@ void applyMixed(int16_t* __restrict dst, const int16_t* __restrict src,
 // nothing is cancelled.
 template<bool Invert>
 __attribute__((noinline, hot))
-void applyFramePair1Impl(NNUE::Accumulator& dst, const NNUE::Accumulator& src, const NNUE::Accumulator& moved,
+void applyFramePair1(NNUE::Accumulator& dst, const NNUE::Accumulator& src, const NNUE::Accumulator& moved,
                          int flip0, int flip1,
                          const int16_t* const (&psub)[2][NNUE::ACC_MAX_DELTAS], int pns,
                          const int16_t* const (&padd)[2][NNUE::ACC_MAX_DELTAS], int pna, bool prefetch) noexcept {
@@ -352,46 +336,28 @@ void applyFramePair1Impl(NNUE::Accumulator& dst, const NNUE::Accumulator& src, c
     const int8_t** sub1 = sub1Buf;
     const int8_t** add1 = add1Buf;
 
-#if defined(__AVX2__)
+    using Acc = NNUE::Accumulator;
     // Prefetch the piece weight rows (6 MiB l0w) while the threat rows are resolved.
-    for (int k = 0; k < pns; ++k) {
-        _mm_prefetch(reinterpret_cast<const char*>(psub[0][k]), _MM_HINT_T0);
-        _mm_prefetch(reinterpret_cast<const char*>(psub[1][k]), _MM_HINT_T0);
-    }
-    for (int k = 0; k < pna; ++k) {
-        _mm_prefetch(reinterpret_cast<const char*>(padd[0][k]), _MM_HINT_T0);
-        _mm_prefetch(reinterpret_cast<const char*>(padd[1][k]), _MM_HINT_T0);
-    }
-#endif
+    for (int k = 0; k < pns; ++k) Acc::prefetchLines<1>(psub[0][k]), Acc::prefetchLines<1>(psub[1][k]);
+    for (int k = 0; k < pna; ++k) Acc::prefetchLines<1>(padd[0][k]), Acc::prefetchLines<1>(padd[1][k]);
 
     // Hoist l0t base so stores of const int8_t* do not force clang to reload activeNetwork->l0t.
     const int8_t* const l0tBase = NNUE::activeNetwork->l0t.get();
+    const auto push = [&](const int8_t**& out, uint32_t entry, int to) noexcept {
+        uint32_t feat;
+        if (!NNUE::threats::tryIndexBase(entry, to, feat)) return;
+        const int8_t* row = l0tBase + static_cast<size_t>(feat) * NNUE::HIDDEN;
+        *out++ = row;
+        Acc::prefetchThreatRow(row, prefetch);
+    };
     const int toView0 = 56 ^ flip0;
     const int nth = moved.nthreat;
     for (int k = 0; k < nth; ++k) {
         const NNUE::ThreatDelta d = moved.threatDelta[k];
         const uint32_t bases = NNUE::BOTH_PAIR_BASE[d.attacker & 0xf][d.victim & 0xf];
-        const uint8_t to = d.to();
         const bool isAdd = Invert ? !d.add() : d.add();
-        const int8_t**& dst0 = isAdd ? add0 : sub0;
-        const int8_t**& dst1 = isAdd ? add1 : sub1;
-        uint32_t feat;
-        if (NNUE::threats::tryIndexBase((bases & 0xffffu) + (d.from ^ toView0), to ^ toView0, feat)) {
-            const int8_t* row = l0tBase + static_cast<size_t>(feat) * NNUE::HIDDEN;
-            *dst0++ = row;
-#if defined(__AVX2__)
-            _mm_prefetch(reinterpret_cast<const char*>(row), _MM_HINT_T0);
-            if (prefetch) _mm_prefetch(reinterpret_cast<const char*>(row) + 64, _MM_HINT_T0);
-#endif
-        }
-        if (NNUE::threats::tryIndexBase((bases >> 16) + (d.from ^ flip1), to ^ flip1, feat)) {
-            const int8_t* row = l0tBase + static_cast<size_t>(feat) * NNUE::HIDDEN;
-            *dst1++ = row;
-#if defined(__AVX2__)
-            _mm_prefetch(reinterpret_cast<const char*>(row), _MM_HINT_T0);
-            if (prefetch) _mm_prefetch(reinterpret_cast<const char*>(row) + 64, _MM_HINT_T0);
-#endif
-        }
+        push(isAdd ? add0 : sub0, (bases & 0xffffu) + (d.from ^ toView0), d.to() ^ toView0);
+        push(isAdd ? add1 : sub1, (bases >> 16) + (d.from ^ flip1), d.to() ^ flip1);
     }
     applyMixed(dst.v[0], src.v[0], psub[0], pns, padd[0], pna,
                sub0Buf, static_cast<int>(sub0 - sub0Buf), add0Buf, static_cast<int>(add0 - add0Buf), prefetch);
@@ -399,14 +365,11 @@ void applyFramePair1Impl(NNUE::Accumulator& dst, const NNUE::Accumulator& src, c
                sub1Buf, static_cast<int>(sub1 - sub1Buf), add1Buf, static_cast<int>(add1 - add1Buf), prefetch);
 }
 
-inline void applyFramePair1(NNUE::Accumulator& dst, const NNUE::Accumulator& src, const NNUE::Accumulator& moved,
-                            bool invert, int flip0, int flip1,
-                            const int16_t* const (&psub)[2][NNUE::ACC_MAX_DELTAS], int pns,
-                            const int16_t* const (&padd)[2][NNUE::ACC_MAX_DELTAS], int pna, bool prefetch) noexcept {
-    if (!invert) [[likely]]
-        applyFramePair1Impl<false>(dst, src, moved, flip0, flip1, psub, pns, padd, pna, prefetch);
-    else
-        applyFramePair1Impl<true>(dst, src, moved, flip0, flip1, psub, pns, padd, pna, prefetch);
+// The king's move among a frame's deltas (a move makes at most one), or null.
+const NNUE::AccDelta* kingDelta(const NNUE::Accumulator& f) noexcept {
+    for (int k = 0; k < f.ndelta; ++k)
+        if ((f.delta[k].piece & Board::MASK_PIECE_TYPE) == Board::KING) return &f.delta[k];
+    return nullptr;
 }
 
 } // namespace
@@ -415,57 +378,35 @@ void Board::computeThreats(int16_t* row, const int16_t* src, int p, int flip) co
     const int8_t* add[NNUE::MAX_ACTIVE_THREATS];
     int na = 0;
     const NNUE::ThreatPerspective tp(p, flip);
-    const uint64_t bishops     = bb[BISHOP][0] | bb[BISHOP][1];
-    const uint64_t queens      = bb[QUEEN][0]  | bb[QUEEN][1];
-    const uint64_t kings       = bb[KING][0]   | bb[KING][1];
-    const uint64_t pawnVictims = occupancy ^ (bishops | queens | kings);
-    const uint64_t kingVictims = occupancy ^ (queens | kings);
-
+    const uint64_t queens = bb[QUEEN][0] | bb[QUEEN][1];
+    const uint64_t kings  = bb[KING][0] | bb[KING][1];
     const int8_t* const l0tBase = NNUE::activeNetwork->l0t.get();
-    const auto emit = [&](int relA, uint8_t from, uint64_t victims) {
-        const int fromView = from ^ tp.toView;
-        uint32_t feature = 0;
-        while (victims) {
-            const auto to = static_cast<uint8_t>(pieces::popLSB(victims));
-            if (tp.tryFeature(relA, fromView, get(to), to, feature)) {
-                add[na] = l0tBase + static_cast<size_t>(feature) * NNUE::HIDDEN;
-#if defined(__AVX2__)
-                if (weightPrefetch) NNUE::Accumulator::prefetchLines<2>(add[na]);
-#endif
-                ++na;
+    // Every piece of `side` and Type, against the victims its type can have.
+    const auto emit = [&]<uint8_t Type>(int side, uint64_t victims) {
+        for (uint64_t pcs = bb[Type][side]; pcs; ) {
+            const auto from = static_cast<uint8_t>(pieces::popLSB(pcs));
+            const int fromView = from ^ tp.toView;
+            uint64_t targets = victims & (Type == PAWN ? pieces::PAWN_ATTACKS[side][from]
+                                                       : pieces::generateMovesByType<Type>(from, occupancy));
+            uint32_t feature = 0;
+            while (targets) {
+                const auto to = static_cast<uint8_t>(pieces::popLSB(targets));
+                if (tp.tryFeature((side ^ p) * 6 + Type - 1, fromView, get(to), to, feature)) {
+                    add[na] = l0tBase + static_cast<size_t>(feature) * NNUE::HIDDEN;
+                    if (weightPrefetch) NNUE::Accumulator::prefetchLines<2>(add[na]);
+                    ++na;
+                }
             }
         }
     };
-
     for (int side = 0; side < 2; ++side) {
-        const int baseA = (side ^ p) * 6;
-        const uint64_t validOcc        = occupancy ^ bb[KING][side ^ 1];
-        const uint64_t nonQueenVictims = validOcc ^ queens;
-        for (uint64_t pcs = bb[PAWN][side]; pcs; ) {
-            const auto from = static_cast<uint8_t>(pieces::popLSB(pcs));
-            emit(baseA + (PAWN - 1), from, pieces::PAWN_ATTACKS[side][from] & pawnVictims);
-        }
-        for (uint64_t pcs = bb[KNIGHT][side]; pcs; ) {
-            const auto from = static_cast<uint8_t>(pieces::popLSB(pcs));
-            emit(baseA + (KNIGHT - 1), from, pieces::KNIGHT_ATTACKS[from] & validOcc);
-        }
-        for (uint64_t pcs = bb[BISHOP][side]; pcs; ) {
-            const auto from = static_cast<uint8_t>(pieces::popLSB(pcs));
-            emit(baseA + (BISHOP - 1), from, pieces::Bishop::attacks(from, occupancy) & nonQueenVictims);
-        }
-        for (uint64_t pcs = bb[ROOK][side]; pcs; ) {
-            const auto from = static_cast<uint8_t>(pieces::popLSB(pcs));
-            emit(baseA + (ROOK - 1), from, pieces::Rook::attacks(from, occupancy) & nonQueenVictims);
-        }
-        for (uint64_t pcs = bb[QUEEN][side]; pcs; ) {
-            const auto from = static_cast<uint8_t>(pieces::popLSB(pcs));
-            const uint64_t atks = pieces::Rook::attacks(from, occupancy) | pieces::Bishop::attacks(from, occupancy);
-            emit(baseA + (QUEEN - 1), from, atks & validOcc);
-        }
-        if (bb[KING][side]) {
-            const auto from = static_cast<uint8_t>(std::countr_zero(bb[KING][side]));
-            emit(baseA + (KING - 1), from, pieces::KING_ATTACKS[from] & kingVictims);
-        }
+        const uint64_t validOcc = occupancy ^ bb[KING][side ^ 1];
+        emit.template operator()<PAWN>(side, occupancy ^ (bb[BISHOP][0] | bb[BISHOP][1] | queens | kings));
+        emit.template operator()<KNIGHT>(side, validOcc);
+        emit.template operator()<BISHOP>(side, validOcc ^ queens);
+        emit.template operator()<ROOK>(side, validOcc ^ queens);
+        emit.template operator()<QUEEN>(side, validOcc);
+        emit.template operator()<KING>(side, occupancy ^ (queens | kings));
     }
     applyMixed(row, src, nullptr, 0, nullptr, 0, nullptr, 0, add, na, weightPrefetch);
 }
@@ -520,6 +461,14 @@ void Board::ensureNnueAccumulatorCleanSlow() const noexcept {
         rowBase[p] = NNUE::kingFeatureBase(kingView[p]);
         rowFlip[p] = NNUE::kingFlip(kingView[p]);
     }
+    // Marks both perspectives of a frame computed on this basis.
+    const auto stamp = [&](NNUE::Accumulator& f) noexcept {
+        for (int p = 0; p < 2; ++p) {
+            f.base[p] = rowBase[p];
+            f.flip[p] = static_cast<uint8_t>(rowFlip[p]);
+            f.dirty[p] = false;
+        }
+    };
     int from = -1;
     bool threatsLogged = top.nthreat != NNUE::ACC_THREATS_OVERFLOW;
     const int minFrom = std::max(accFloor, accTop - NNUE::ACC_MAX_WALK);
@@ -541,9 +490,9 @@ void Board::ensureNnueAccumulatorCleanSlow() const noexcept {
     // Frame dst from frame src one move away, both perspectives on this basis;
     // `moved` holds the move (dst's own, or src's with invert). No single move
     // logs cancelling piece deltas (promotions emit Remove+Add directly), so
-    // piece rows map straight from moved.delta without collectPieces or cancel.
+    // piece rows map straight from moved.delta without a cancel.
     const auto pair1FromDeltas = [&](NNUE::Accumulator& dst, const NNUE::Accumulator& src,
-                                     const NNUE::Accumulator& moved, bool invert) noexcept {
+                                     const NNUE::Accumulator& moved, auto invert) noexcept {
         const int16_t* subRow[2][NNUE::ACC_MAX_DELTAS];
         const int16_t* addRow[2][NNUE::ACC_MAX_DELTAS];
         int ns = 0;
@@ -558,16 +507,10 @@ void Board::ensureNnueAccumulatorCleanSlow() const noexcept {
 #if defined(__clang__)
         #pragma clang loop vectorize(disable) unroll(disable)
 #endif
-        for (int k = 0; k < nd; ++k) {
-            const NNUE::AccDelta& d = moved.delta[k];
-            if (d.kind == NNUE::AccDelta::Add) {
-                pushPiece(!invert, d.piece, d.from);
-            } else {
-                pushPiece(invert, d.piece, d.from);
-                if (d.kind == NNUE::AccDelta::Move) pushPiece(!invert, d.piece, d.to);
-            }
-        }
-        applyFramePair1(dst, src, moved, invert, rowFlip[0], rowFlip[1], subRow, ns, addRow, na, weightPrefetch);
+        for (int k = 0; k < nd; ++k) moved.delta[k].forEachChange(invert, pushPiece);
+        applyFramePair1<decltype(invert)::value>(dst, src, moved, rowFlip[0], rowFlip[1], subRow, ns, addRow, na,
+                                                 weightPrefetch);
+        stamp(dst);
     };
 
     // Multi-move or single-perspective incremental update: kept out of line so
@@ -580,42 +523,28 @@ void Board::ensureNnueAccumulatorCleanSlow() const noexcept {
         int na = 0;
         for (int i = start + 1; i <= target; ++i) {
             const NNUE::Accumulator& f = frame(i);
-            for (int k = 0; k < f.ndelta; ++k) {
-                const NNUE::AccDelta& d = f.delta[k];
-                const uint16_t at = static_cast<uint16_t>(d.piece << 8 | d.from);
-                if (d.kind == NNUE::AccDelta::Add) {
-                    add[na++] = at;
-                } else {
-                    sub[ns++] = at;
-                    if (d.kind == NNUE::AccDelta::Move) add[na++] = static_cast<uint16_t>(d.piece << 8 | d.to);
-                }
-            }
+            for (int k = 0; k < f.ndelta; ++k)
+                f.delta[k].forEachChange(false, [&](bool isAdd, uint8_t piece, uint8_t sq) noexcept {
+                    (isAdd ? add[na++] : sub[ns++]) = static_cast<uint16_t>(piece << 8 | sq);
+                });
         }
-        for (int i = 0; i < ns; ) {
-            int j = 0;
-            while (j < na && add[j] != sub[i]) ++j;
-            if (j == na) { ++i; continue; }
-            sub[i] = sub[--ns];   // swap-remove: order is irrelevant
-            add[j] = add[--na];
-        }
+        cancelPairs(sub, ns, add, na);
         const NNUE::Accumulator& src = frame(start);
         NNUE::Accumulator& dst = frame(target);
         for (int p = 0; p < 2; ++p) {
             if (!usable[p]) continue;
+            const auto rows = [&](const uint16_t* keys, int n, const int16_t** out) noexcept {
+#if defined(__clang__)
+                #pragma clang loop vectorize(disable)
+#endif
+                for (int k = 0; k < n; ++k)
+                    out[k] = NNUE::Accumulator::rowFor(rowBase[p], rowFlip[p], p, static_cast<uint8_t>(keys[k] >> 8),
+                                                       static_cast<uint8_t>(keys[k]));
+            };
             const int16_t* subRow[CAP];
             const int16_t* addRow[CAP];
-#if defined(__clang__)
-            #pragma clang loop vectorize(disable)
-#endif
-            for (int k = 0; k < ns; ++k)
-                subRow[k] = NNUE::Accumulator::rowFor(rowBase[p], rowFlip[p], p,
-                                                      static_cast<uint8_t>(sub[k] >> 8), static_cast<uint8_t>(sub[k]));
-#if defined(__clang__)
-            #pragma clang loop vectorize(disable)
-#endif
-            for (int k = 0; k < na; ++k)
-                addRow[k] = NNUE::Accumulator::rowFor(rowBase[p], rowFlip[p], p,
-                                                      static_cast<uint8_t>(add[k] >> 8), static_cast<uint8_t>(add[k]));
+            rows(sub, ns, subRow);
+            rows(add, na, addRow);
             const int8_t* tsub[NNUE::ACC_MAX_WALK * NNUE::ACC_MAX_THREATS];
             const int8_t* tadd[NNUE::ACC_MAX_WALK * NNUE::ACC_MAX_THREATS + 8];
             int tns = 0;
@@ -630,10 +559,7 @@ void Board::ensureNnueAccumulatorCleanSlow() const noexcept {
                     if (tp.tryFeature(d.attacker, d.from, d.victim, d.to(), feature)) {
                         const int8_t* r = l0tBase + static_cast<size_t>(feature) * NNUE::HIDDEN;
                         (d.add() ? tadd[tna++] : tsub[tns++]) = r;
-#if defined(__AVX2__)
-                        _mm_prefetch(reinterpret_cast<const char*>(r), _MM_HINT_T0);
-                        if (weightPrefetch) _mm_prefetch(reinterpret_cast<const char*>(r) + 64, _MM_HINT_T0);
-#endif
+                        NNUE::Accumulator::prefetchThreatRow(r, weightPrefetch);
                     }
                 }
             }
@@ -647,31 +573,14 @@ void Board::ensureNnueAccumulatorCleanSlow() const noexcept {
         // the last king move (an older frame stands on another basis): the
         // siblings and cousins that follow start one move away.
         int first = accTop;
-        if (usable[0] && usable[1]) {
-            while (first - 1 > from) {
-                bool kingMoved = false;
-                const NNUE::Accumulator& f = frame(first);
-                for (int k = 0; k < f.ndelta; ++k) {
-                    if ((f.delta[k].piece & MASK_PIECE_TYPE) == KING) {
-                        kingMoved = true;
-                        break;
-                    }
-                }
-                if (kingMoved) break;
-                --first;
-            }
-        }
+        if (usable[0] && usable[1])
+            while (first - 1 > from && kingDelta(frame(first)) == nullptr) --first;
         for (int i = first; i <= accTop; ++i) {
-            NNUE::Accumulator& dst = frame(i);
             if (usable[0] && usable[1] && i == from + 1) {
-                pair1FromDeltas(dst, frame(from), dst, false);
+                pair1FromDeltas(frame(i), frame(from), frame(i), std::false_type{});
             } else {
                 incrementalMulti(from, i);
-            }
-            for (int p = 0; p < 2; ++p) {
-                dst.base[p] = rowBase[p];
-                dst.flip[p] = static_cast<uint8_t>(rowFlip[p]);
-                dst.dirty[p] = false;
+                stamp(frame(i));
             }
             from = i;
         }
@@ -683,10 +592,8 @@ void Board::ensureNnueAccumulatorCleanSlow() const noexcept {
     // own thread). Stale entries from other positions are still correct diff
     // bases - no invalidation needed, ever.
     static thread_local NNUE::FinnyTable finny;
+    stamp(top);
     for (int p = 0; p < 2; ++p) {
-        top.base[p] = rowBase[p];
-        top.flip[p] = static_cast<uint8_t>(rowFlip[p]);
-        top.dirty[p] = false;
         if (usable[p]) continue;
         finny.ensureInitialised();
         NNUE::FinnyEntry& e = finny.entry[p][NNUE::KING_BUCKET_MAP[kingView[p]]][rowFlip[p] ? 1 : 0];
@@ -699,21 +606,13 @@ void Board::ensureNnueAccumulatorCleanSlow() const noexcept {
     // while the moves kept both bases.
     for (int i = accTop; i - 1 >= accFloor && i > accTop - NNUE::ACC_MAX_WALK; --i) {
         NNUE::Accumulator& child = frame(i);
-        NNUE::Accumulator& parent = frame(i - 1);
-        if (!parent.dirty[0] || child.nthreat == NNUE::ACC_THREATS_OVERFLOW) return;
-        for (int k = 0; k < child.ndelta; ++k) {
-            const NNUE::AccDelta& d = child.delta[k];
-            if ((d.piece & MASK_PIECE_TYPE) != KING) continue;
-            const int p = colorToIndex(d.piece);
-            const int view = (p == 1) ? d.from : (d.from ^ 56);
+        if (!frame(i - 1).dirty[0] || child.nthreat == NNUE::ACC_THREATS_OVERFLOW) return;
+        if (const NNUE::AccDelta* king = kingDelta(child)) {
+            const int p = colorToIndex(king->piece);
+            const int view = (p == 1) ? king->from : (king->from ^ 56);
             if (NNUE::kingFeatureBase(view) != rowBase[p] || NNUE::kingFlip(view) != rowFlip[p]) return;
         }
-        pair1FromDeltas(parent, child, child, true);
-        for (int p = 0; p < 2; ++p) {
-            parent.base[p] = rowBase[p];
-            parent.flip[p] = static_cast<uint8_t>(rowFlip[p]);
-            parent.dirty[p] = false;
-        }
+        pair1FromDeltas(frame(i - 1), child, child, std::true_type{});
     }
 }
 
