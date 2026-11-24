@@ -40,9 +40,6 @@ struct SearchRuntime {
     // getBestMove seeds it. Members rather than thread_local: mingw emulates TLS
     // with a function call per access.
     int32_t  evalStack[MAX_PLY] {};
-    // The LMR reduction of the move being searched at each ply, 0 outside a
-    // reduced search.
-    int      reductionStack[MAX_PLY] {};
 
     // --- Heuristics ---
     // [ply][slot]: both killers of a ply share a cache line.

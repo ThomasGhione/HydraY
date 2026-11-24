@@ -463,41 +463,25 @@ SearchMoveResult searchMoves(Board& b, MovePicker& movePicker, const SearchConte
         int fullDepth = childDepth;
         // Late captures are reduced too: ordering puts the good ones early.
         const int lmrMinIndex = (!PV && !ctx.cutNode) ? LMR_MIN_INDEX_ALL : 4;
-        // Below index 4 only plain quiets may be reduced: captures, killers and
-        // the countermove fail high there several times as often.
-        const bool earlyReducible = moveIndex >= 4 || !LMR_EARLY_QUIET_ONLY
-            || (isQuietMove && !m.sameFromTo(runtime.killerMoves[ctx.ply][0])
-                && !m.sameFromTo(runtime.killerMoves[ctx.ply][1])
-                && !(ctx.previousMove != nullptr
-                     && runtime.counterMoves[ctx.previousMove->from][ctx.previousMove->to] == TT::Entry::encodeMove(m)));
-        if (ctx.depth >= 3 && moveIndex >= lmrMinIndex && earlyReducible && !t.isPromotion) {
+        if (ctx.depth >= 3 && moveIndex >= lmrMinIndex && !t.isPromotion) {
             int reduction = LMR_REDUCTIONS[std::min(ctx.depth, LMR_MAX_DEPTH - 1)][moveIndex];
             if (PV) reduction = std::max(1, reduction - 1);
             if (ctx.iirActive) reduction = std::min(reduction + 1, childDepth - 1);
             // More when the eval is falling, and at an expected cut node.
             reduction += !ctx.improving + (ctx.cutNode ? LMR_CUT_BONUS : 0);
-            // History sign: the few quiets above zero fail high several times as often.
+            // History signs: the few quiets above zero fail high several times as often.
             if (isQuietMove) {
-                const bool goodBf = runtime.history[usSide][(ctx.threats >> m.from) & 1][(ctx.threats >> m.to) & 1][m.from][m.to] > 0;
-                if (LMR_HIST_MODE == 0) {
-                    reduction += goodBf ? -LMR_GOOD_HIST : LMR_BAD_HIST;
-                } else {
-                    const int n = goodBf + (ctx.contHistEntry != nullptr
-                                            && ctx.contHistEntry[contHistIndex(t.fromType, m.to)] > 0);
-                    reduction += (LMR_HIST_MODE == 1) ? LMR_BAD_HIST - LMR_GOOD_HIST * n
-                                                      : (n > 0 ? -LMR_GOOD_HIST : LMR_BAD_HIST);
-                }
+                const int n = (runtime.history[usSide][(ctx.threats >> m.from) & 1][(ctx.threats >> m.to) & 1][m.from][m.to] > 0)
+                            + (ctx.contHistEntry != nullptr && ctx.contHistEntry[contHistIndex(t.fromType, m.to)] > 0);
+                reduction += LMR_BAD_HIST - LMR_GOOD_HIST * n;
             }
-            if (LMR_CHECK_LESS > 0 && b.inCheck(oppColor)) reduction -= LMR_CHECK_LESS;
             reduction = std::clamp(reduction, 1, childDepth - 1);
             const int reducedDepth = std::max(1, childDepth - reduction);
             if constexpr (kSearchStats) {
                 ++gSearchStats.lmrSearches;
                 gSearchStats.lmrReductionSum += static_cast<uint64_t>(childDepth - reducedDepth);
             }
-            runtime.reductionStack[ctx.ply] = childDepth - reducedDepth;
             score = search(reducedDepth, alpha, scoutBeta, true);
-            runtime.reductionStack[ctx.ply] = 0;
             if (score > alpha) {
                 if constexpr (kSearchStats) ++gSearchStats.lmrResearches;
                 // A reduced score far above the best so far earns an extra ply, one
@@ -622,20 +606,6 @@ int32_t searchPosition(Board& b, SearchRuntime& runtime, int depth, int32_t alph
         const int32_t ttScore = scoreFromTT(tte.score, ply);
         if (ttBoundCutoff(tte.flag, ttScore, alpha, beta)) {
             if constexpr (kSearchStats) ++gSearchStats.ttCuts;
-            // A quiet hash move that fails high here earns the history bonus a
-            // searched cutoff would give it.
-            if (TT_CUT_HIST && allowHeuristicUpdates && ttScore >= beta && tte.move != 0) {
-                const Move ttMove = TT::Entry::decodeMove(tte.move);
-                const uint8_t piece = b.get(ttMove.from);
-                const uint8_t us = b.getActiveColor();
-                const MoveTraits tt = moveTraits(b, ttMove, b.getEnPassant(), Board::promotionRank(us == Board::WHITE));
-                if (piece != Board::EMPTY && (piece & Board::MASK_COLOR) == us && !tt.isCapture && !tt.isPromotion) {
-                    const uint64_t thr = b.attackedBy(Board::colorToIndex(us) ^ 1);
-                    applyHistoryGravity(runtime.history[Board::colorToIndex(us)][(thr >> ttMove.from) & 1]
-                                                       [(thr >> ttMove.to) & 1][ttMove.from][ttMove.to],
-                                        (depth + 1) * (depth + 1) * HIST_BONUS_PCT / 100, MAX_HISTORY);
-                }
-            }
             return ttScore;
         }
     }
@@ -675,15 +645,6 @@ int32_t searchPosition(Board& b, SearchRuntime& runtime, int depth, int32_t alph
     runtime.evalStack[ply] = inCheck ? NEG_INF : staticEval;
     const bool improving = !inCheck && ply >= 2
         && runtime.evalStack[ply - 2] != NEG_INF && staticEval > runtime.evalStack[ply - 2];
-
-    // Hindsight: a node reduced a lot whose opponent is not worse off gets a
-    // ply back; a reduced node where both static evals look good gives one up.
-    if (ply > 0 && !inCheck && runtime.evalStack[ply - 1] != NEG_INF) {
-        const int priorReduction = runtime.reductionStack[ply - 1];
-        if (HINDSIGHT_EXT && priorReduction >= 3 && staticEval <= -runtime.evalStack[ply - 1]) ++depth;
-        if (HINDSIGHT_MARGIN > 0 && priorReduction >= 2 && depth >= 2
-            && staticEval + runtime.evalStack[ply - 1] > HINDSIGHT_MARGIN) --depth;
-    }
 
     const int side = Board::colorToIndex(activeColor);
     int singularExtension = 0;
@@ -796,10 +757,9 @@ int32_t searchPosition(Board& b, SearchRuntime& runtime, int depth, int32_t alph
     Sorter::scoreLegalMoves(movePicker, ply, b, runtime, tte.move, previousMove, &hasHashMove, contHistEntry, threats,
                             contX);
     // Without a verified hash move: no singular extension, and IIR reduces:
-    // one ply of depth at PV and cut nodes in IIR_MODE 1, else one more LMR ply.
+    // one ply of depth at PV and cut nodes, else one more LMR ply.
     const bool iirNode = !hasHashMove && depth >= 6 && ply > 0;
-    const bool iirDepth = IIR_MODE == 1 && !hasHashMove && depth >= IIR_MIN_DEPTH && ply > 0
-                          && (isPVNode || cutNode);
+    const bool iirDepth = !hasHashMove && depth >= IIR_MIN_DEPTH && ply > 0 && (isPVNode || cutNode);
     if (iirDepth) --depth;
     SearchContext ctx{
         previousMove, contHistEntry, depth, ply, staticEval,
