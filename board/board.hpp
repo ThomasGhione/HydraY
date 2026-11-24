@@ -201,6 +201,8 @@ public:
     bool isThreefoldRepetition() const noexcept { return countRepetitions() >= 3; }
     int  countRepetitions() const noexcept;
     bool hasInsufficientMaterialDraw() const noexcept;
+    // A malformed FEN loads without kings: the cheap test that it was a chess position.
+    bool hasOneKingEach() const noexcept { return std::popcount(bb[KING][0]) == 1 && std::popcount(bb[KING][1]) == 1; }
 
     // --- State accessors ---
     constexpr uint8_t  getActiveColor() const noexcept   { return activeColor; }
