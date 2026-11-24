@@ -530,20 +530,13 @@ uint64_t playOneGame(WorkerContext& w, uint64_t nodesPerMove, bool endgameSeed) 
         // (cursed wins and blessed losses are draws). Not for seeded games,
         // which would end before recording anything.
         if (!endgameSeed && b.castlingRights() == 0) {
-            if (const auto wdl = g_syzygy.probeWDL(b)) {
-                const bool stmWin  = (*wdl == syzygy::WDL::Win);
-                const bool stmLoss = (*wdl == syzygy::WDL::Loss);
-                if (!stmWin && !stmLoss) {
-                    whiteResultX2 = 1;
-                    g_totalTbAdjudications.fetch_add(1, std::memory_order_relaxed);
-                    break;
-                }
-                if (b.getHalfMoveClock() <= DECISIVE_TB_ADJ_MAX_HMC) {
-                    const int stmResultX2 = stmWin ? 2 : 0;
-                    whiteResultX2 = (active == Board::WHITE) ? stmResultX2 : 2 - stmResultX2;
-                    g_totalTbAdjudications.fetch_add(1, std::memory_order_relaxed);
-                    break;
-                }
+            const auto wdl = g_syzygy.probeWDL(b);
+            const bool decisive = wdl && (*wdl == syzygy::WDL::Win || *wdl == syzygy::WDL::Loss);
+            if (wdl && (!decisive || b.getHalfMoveClock() <= DECISIVE_TB_ADJ_MAX_HMC)) {
+                const int stmResultX2 = !decisive ? 1 : (*wdl == syzygy::WDL::Win ? 2 : 0);
+                whiteResultX2 = (active == Board::WHITE) ? stmResultX2 : 2 - stmResultX2;
+                g_totalTbAdjudications.fetch_add(1, std::memory_order_relaxed);
+                break;
             }
         }
 
@@ -796,6 +789,17 @@ struct DatagenOptions {
 
 // Sets the options and the g_* knobs; false after printing why it failed.
 bool parseDatagenArgs(int argc, char* argv[], DatagenOptions& o) {
+    constexpr uint64_t ANY = UINT64_MAX;
+    uint64_t threads = static_cast<uint64_t>(o.threads), firstShard = static_cast<uint64_t>(o.firstShard);
+    uint64_t egEvery = static_cast<uint64_t>(g_endgameSeedEvery);
+    // Whole numbers in [lo, hi].
+    const struct { const char* flag; uint64_t lo, hi; uint64_t* value; } counts[] = {
+        {"--threads", 1, 32, &threads}, {"--nodes", 256, ANY, &o.nodesPerMove}, {"--shard", 0, ANY, &o.shardSize},
+        {"--min-free-gb", 0, 1 << 20, &o.minFreeGb}, {"--first-shard", 0, 9999, &firstShard},
+        {"--eg-every", 1, 1000, &egEvery}, {"--games", 1, ANY, &g_gameLimit}, {"--target", 1, ANY, &g_targetPositions},
+        {"--seed", 1, ANY, &g_benchSeed}};
+    const struct { const char* flag; std::string* value; } texts[] = {
+        {"--out", &o.outPrefix}, {"--tb", &o.tbPath}, {"--machine", &o.machine}, {"--build", &o.build}};
     for (int i = 2; i < argc; ++i) {
         std::string flag = argv[i];
         const char* value = nullptr;
@@ -824,64 +828,34 @@ bool parseDatagenArgs(int argc, char* argv[], DatagenOptions& o) {
             value = argv[++i];
         }
 
-        uint64_t n = 0;
-        const auto count = [&](uint64_t lo, uint64_t hi) {
-            if (parseCount(value, n) && n >= lo && n <= hi) return true;
-            std::cerr << "datagen: " << flag << " must be a whole number in "
-                      << lo << ".." << hi << ", got '" << value << "'\n";
-            return false;
-        };
-        constexpr uint64_t ANY = UINT64_MAX;
-        if (flag == "--out") {
-            o.outPrefix = value;
-        } else if (flag == "--threads") {
-            if (!count(1, 32)) return false;
-            o.threads = static_cast<int>(n);
-        } else if (flag == "--nodes") {
-            if (!count(256, ANY)) return false;
-            o.nodesPerMove = n;
+        if (const auto c = std::ranges::find_if(counts, [&](const auto& e) { return flag == e.flag; });
+            c != std::end(counts)) {
+            if (!parseCount(value, *c->value) || *c->value < c->lo || *c->value > c->hi) {
+                std::cerr << "datagen: " << flag << " must be a whole number in "
+                          << c->lo << ".." << c->hi << ", got '" << value << "'\n";
+                return false;
+            }
+        } else if (const auto t = std::ranges::find_if(texts, [&](const auto& e) { return flag == e.flag; });
+                   t != std::end(texts)) {
+            *t->value = value;
         } else if (flag == "--net") {
             o.netPath = value;
-        } else if (flag == "--tb") {
-            o.tbPath = value;
-        } else if (flag == "--machine") {
-            o.machine = value;
-        } else if (flag == "--build") {
-            o.build = value;
-        } else if (flag == "--shard") {
-            if (!count(0, ANY)) return false;
-            o.shardSize = n;
-        } else if (flag == "--min-free-gb") {
-            if (!count(0, 1 << 20)) return false;
-            o.minFreeGb = n;
-        } else if (flag == "--first-shard") {
-            if (!count(0, 9999)) return false;
-            o.firstShard = static_cast<int>(n);
         } else if (flag == "--start") {
             // Rejected, not ignored: a typo would fill a Chess324 pool with standard games.
-            const std::string mode = value;
+            const std::string_view mode = value;
             if (mode != "standard" && mode != "chess324") {
                 std::cerr << "datagen: --start must be standard or chess324\n";
                 return false;
             }
             g_chess324 = (mode == "chess324");
-        } else if (flag == "--eg-every") {
-            if (!count(1, 1000)) return false;
-            g_endgameSeedEvery = static_cast<int>(n);
-        } else if (flag == "--games") {
-            if (!count(1, ANY)) return false;
-            g_gameLimit = n;
-        } else if (flag == "--target") {
-            if (!count(1, ANY)) return false;
-            g_targetPositions = n;
-        } else if (flag == "--seed") {
-            if (!count(1, ANY)) return false;
-            g_benchSeed = n;
         } else {
             std::cerr << "datagen: unknown option " << flag << "\n" << DATAGEN_USAGE;
             return false;
         }
     }
+    o.threads = static_cast<int>(threads);
+    o.firstShard = static_cast<int>(firstShard);
+    g_endgameSeedEvery = static_cast<int>(egEvery);
     return true;
 }
 
