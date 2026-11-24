@@ -9,10 +9,7 @@
 
 #include "position.hpp"
 
-#include <algorithm>
 #include <cstdio>
-#include <cstdlib>
-#include <cstring>
 #include <string>
 #include <vector>
 
@@ -38,68 +35,6 @@ constexpr Case DEFAULT_CASES[] = {
     {"kings on 2nd rank (w)", "8/1k3ppp/1p6/p1p5/P1P5/1P4P1/1K3P1P/8 w - - 0 1"},
     {"active kings endgame (w)", "8/8/3k4/8/2p5/2P1K3/8/8 w - - 0 1"},
 };
-
-} // namespace
-
-
-// --- benchmark (DEEPCHECK_BENCH=1): the deep forward against a single-layer one,
-// a local copy of the old single-layer arithmetic (SCReLU over 2*HIDDEN i16).
-#include <chrono>
-#include <immintrin.h>
-namespace {
-
-// The old AVX2 arithmetic (mullo + madd), not a scalar version: against a
-// scalar reference the deep SIMD forward would look far better than it is.
-int32_t singleLayerForward(const int16_t* accStm, const int16_t* accNtm,
-                           const int16_t* w) noexcept {
-    const __m256i zero = _mm256_setzero_si256();
-    const __m256i qa   = _mm256_set1_epi16(static_cast<int16_t>(QA));
-    int64_t out = 0;
-    for (int half = 0; half < 2; ++half) {
-        const int16_t* a  = half == 0 ? accStm : accNtm;
-        const int16_t* ww = w + half * HIDDEN;
-        __m256i sum = _mm256_setzero_si256();
-        for (int i = 0; i < HIDDEN; i += 16) {
-            const __m256i v  = _mm256_loadu_si256(reinterpret_cast<const __m256i*>(a + i));
-            const __m256i t  = _mm256_min_epi16(_mm256_max_epi16(v, zero), qa);
-            const __m256i wi = _mm256_loadu_si256(reinterpret_cast<const __m256i*>(ww + i));
-            const __m256i pr = _mm256_mullo_epi16(t, wi);
-            sum = _mm256_add_epi32(sum, _mm256_madd_epi16(pr, t));
-        }
-        const __m128i lo = _mm256_castsi256_si128(sum);
-        const __m128i hi = _mm256_extracti128_si256(sum, 1);
-        __m128i sN = _mm_add_epi32(lo, hi);
-        sN = _mm_add_epi32(sN, _mm_shuffle_epi32(sN, 0x4E));
-        sN = _mm_add_epi32(sN, _mm_shuffle_epi32(sN, 0xB1));
-        out += _mm_cvtsi128_si32(sN);
-    }
-    return static_cast<int32_t>(out / (QA * QB));
-}
-
-void bench(const NetworkDeep& net, const int16_t* us, const int16_t* them, int bucket) {
-    constexpr int N = 100000;
-    constexpr int ROUNDS = 7;
-    std::vector<int16_t> w(2 * HIDDEN);
-    for (int i = 0; i < 2 * HIDDEN; ++i) w[i] = static_cast<int16_t>((i * 37) % 127 - 63);
-
-    // The minimum over rounds, not the mean: noise only ever slows a run down.
-    // The two paths alternate within a round, so a transient slowdown hits both.
-    volatile int32_t sink = 0;
-    double a = 1e18, b = 1e18;
-    for (int r = 0; r < ROUNDS; ++r) {
-        auto t0 = std::chrono::steady_clock::now();
-        for (int i = 0; i < N; ++i) sink = singleLayerForward(us, them, w.data());
-        auto t1 = std::chrono::steady_clock::now();
-        for (int i = 0; i < N; ++i) sink = forwardSimd(net, us, them, bucket);
-        auto t2 = std::chrono::steady_clock::now();
-        a = std::min(a, std::chrono::duration<double, std::nano>(t1 - t0).count() / N);
-        b = std::min(b, std::chrono::duration<double, std::nano>(t2 - t1).count() / N);
-    }
-    (void)sink;
-    std::printf("\nsingle-layer forward (local reference): %6.1f ns/eval\n", a);
-    std::printf("deep forward (SIMD):                    %6.1f ns/eval   = %.2fx\n", b, b / a);
-    std::printf("VNNI path: %s\n", hasVnniPath() ? "on" : "OFF (i16 fallback)");
-}
 
 } // namespace
 
@@ -140,11 +75,6 @@ int main(int argc, char** argv) {
             return 1;
         }
         std::printf("%s: %d cp (stm)\n", c.label, sc);
-    }
-    if (const char* e = std::getenv("DEEPCHECK_BENCH"); e != nullptr && e[0] == '1') {
-        parseFenNormPos(DEFAULT_CASES[6].fen, pos);
-        accumulatePos(net, nullptr, pos, us, them);
-        bench(net, us, them, pos.outBucket);
     }
     return 0;
 }
