@@ -2,7 +2,6 @@
 
 #include <algorithm>
 #include <array>
-#include <bit>
 #include <chrono>
 #include <cstdlib>
 #include <iostream>
@@ -58,21 +57,15 @@ std::string joinArgs(int argc, char* argv[], int first) {
     return joined;
 }
 
-// fenToBoard bails out silently on malformed input, which would leave perft
-// counting a position the user never asked for. One king per side is the cheap
-// invariant that catches it.
-bool boardLooksValid(const chess::Board& b) noexcept {
-    return std::popcount(b.bb[chess::Board::KING][0]) == 1 && std::popcount(b.bb[chess::Board::KING][1]) == 1;
-}
-
 int64_t msSince(std::chrono::steady_clock::time_point start) {
     return std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now() - start).count();
 }
 
-void printUsage() {
+int usage() {
     std::cerr << "usage: ./chess perft <depth> [fen]\n"
                  "       ./chess perft divide <depth> [fen]\n"
                  "       ./chess perft suite [maxdepth]   (default 4)\n";
+    return 1;
 }
 
 } // namespace
@@ -110,7 +103,7 @@ bool runPerftSuite(int maxDepth, bool verbose) {
             if (expected == 0) continue; // unchecked depth
 
             chess::Board b(tc.fen);
-            if (!boardLooksValid(b)) {
+            if (!b.hasOneKingEach()) {
                 std::cout << tc.name << ": FAIL - FEN rejected by the parser\n";
                 allPassed = false;
                 break;
@@ -141,28 +134,15 @@ bool runPerftSuite(int maxDepth, bool verbose) {
 
 int runPerftCommand(int argc, char* argv[]) {
     // argv is [0]=./chess [1]=perft [2]=<depth>|divide|suite ...
-    if (argc < 3) {
-        printUsage();
-        return 1;
-    }
-
+    if (argc < 3) return usage();
     const std::string_view sub = argv[2];
-
     if (sub == "suite") {
         const int maxDepth = (argc >= 4) ? std::atoi(argv[3]) : 4;
-        if (maxDepth < 1) {
-            printUsage();
-            return 1;
-        }
-        return runPerftSuite(maxDepth) ? 0 : 1;
+        return maxDepth < 1 ? usage() : runPerftSuite(maxDepth) ? 0 : 1;
     }
-
     const bool divide = (sub == "divide");
     const int depthIndex = divide ? 3 : 2;
-    if (argc <= depthIndex) {
-        printUsage();
-        return 1;
-    }
+    if (argc <= depthIndex) return usage();
 
     const int depth = std::atoi(argv[depthIndex]);
     if (depth < 0 || depth > 15) {
@@ -172,7 +152,8 @@ int runPerftCommand(int argc, char* argv[]) {
 
     const std::string fen = joinArgs(argc, argv, depthIndex + 1);
     chess::Board b = fen.empty() ? chess::Board{} : chess::Board(fen);
-    if (!boardLooksValid(b)) {
+    // fenToBoard falls back to an empty board on malformed input.
+    if (!b.hasOneKingEach()) {
         std::cerr << "perft: could not parse FEN \"" << fen << "\"\n";
         return 1;
     }
