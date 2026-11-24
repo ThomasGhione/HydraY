@@ -243,18 +243,6 @@ public:
         return a | pieces::KING_ATTACKS[std::countr_zero(bb[KING][side])];
     }
 
-    // The squares `piece` on sq attacks with `occ` as the blockers.
-    static uint64_t attacksFrom(uint8_t piece, uint8_t sq, uint64_t occ) noexcept {
-        switch (piece & MASK_PIECE_TYPE) {
-            case PAWN:   return pieces::PAWN_ATTACKS[colorToIndex(piece)][sq];
-            case KNIGHT: return pieces::KNIGHT_ATTACKS[sq];
-            case BISHOP: return pieces::Bishop::attacks(sq, occ);
-            case ROOK:   return pieces::Rook::attacks(sq, occ);
-            case QUEEN:  return pieces::Rook::attacks(sq, occ) | pieces::Bishop::attacks(sq, occ);
-            default:     return pieces::KING_ATTACKS[sq];
-        }
-    }
-
     // --- FEN ---
     // False on malformed input, and the board is then left as it was.
     bool        fenToBoard(const std::string& fen);
