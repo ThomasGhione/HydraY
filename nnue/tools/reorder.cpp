@@ -15,8 +15,8 @@
 //
 // Why the engine does not change: permuting l0's outputs (l0w, l0t if present,
 // l0b) and the matching columns of l1w computes exactly the same function, in
-// the same file format. The pairwise product couples neuron j with j + 384, so
-// the 384 PAIRS are permuted, never the 768 neurons, and one permutation
+// the same file format. The pairwise product couples neuron j with j + HIDDEN/2,
+// so the HIDDEN/2 PAIRS are permuted, never the HIDDEN neurons, and one permutation
 // serves both perspectives because l0 is shared.
 //
 // The final check reloads the output file and verifies identical evaluations on

@@ -2,7 +2,7 @@
 
 // The quantised network:
 //
-//   (768x4kb_hm + threats -> 768)x2 -> pairwise -> 768 -> 16 -> 1
+//   (768x4kb_hm + threats -> H)x2 -> pairwise -> H -> 16 -> 1,   H = HIDDEN
 //
 // The feature space and l0 are in network.hpp, all that board.hpp needs. One
 // hidden layer: trainer_deep.rs says why not bullet's 16->32->1 example. The
@@ -12,15 +12,14 @@
 // FILE LAYOUT (little-endian, padded to 64 B with "bullet" repeated), OB =
 // output buckets:
 //
-//   l0w [4*768][768]   i16  QA=255   (factoriser already folded in at save)
-//   l0b [768]          i16  QA
-//   l1w [OB][16][768]  i8   QB=64    (transposed: each bucket contiguous)
-//   l1b [OB][16]       f32  real scale
-//   l2w [OB][1][16]    f32
-//   l2b [OB]           f32
-//   l0t [63554][768]   i8   QA=255   (threat inputs, threats.hpp; absent in older nets)
-//   OB = 16: payload 4,918,848 B, with threats 53,728,320 B (no padding)
-//   OB = 8:  payload 4,819,488 B, with threats 53,628,960 B
+//   l0w [4*768][H]  i16  QA=255   (factoriser already folded in at save)
+//   l0b [H]         i16  QA
+//   l1w [OB][16][H] i8   QB=64    (transposed: each bucket contiguous)
+//   l1b [OB][16]    f32  real scale
+//   l2w [OB][1][16] f32
+//   l2b [OB]        f32
+//   l0t [63554][H]  i8   QA=255   (threat inputs, threats.hpp; absent in older nets)
+//   (payload sizes: the static_asserts below)
 //
 // All four are loaded. An 8-bucket file gives each of its heads the two
 // 16-bucket slots it covers, and a file without threats gets zero threat
@@ -30,7 +29,7 @@
 //
 //   acc[i] = pieces[i] + threats[i]              one i16 accumulator, modular
 //   c[i] = clamp(acc[i], 0, QA)                  QA scale, fits in u8
-//   p[j] = c[j] * c[j+384] / QA                  TRUNCATING INTEGER division
+//   p[j] = c[j] * c[j+H/2] / QA                  TRUNCATING INTEGER division
 //   z[o] = SUM(p[i] * l1w[o][i]) / (QA*QB) + l1b[o]   FLOAT division
 //   a[o] = clamp(z[o], 0, 1)^2                   SCReLU in float
 //   y    = SUM a[o]*l2w[o] + l2b                 linear
@@ -156,9 +155,13 @@ struct FileLayout {
             if (size == fileBytes(buckets, threats)) return {buckets, threats};
     return {};
 }
-static_assert(payloadBytes(OUTPUT_BUCKETS, false) == 4'918'848, "layout changed: update sanity_deep.rs");
-static_assert(payloadBytes(LEGACY_OUTPUT_BUCKETS, false) == 4'819'488, "legacy layout changed");
-static_assert(payloadBytes(LEGACY_OUTPUT_BUCKETS, true) == 53'628'960, "threat layout changed: update sanity_deep.rs");
+// The nets of the 1024 and the 768 wide branch.
+static_assert(payloadBytes(OUTPUT_BUCKETS, false) == (HIDDEN == 1024 ? 6'557'760 : 4'918'848),
+              "layout changed: update sanity_deep.rs");
+static_assert(payloadBytes(LEGACY_OUTPUT_BUCKETS, false) == (HIDDEN == 1024 ? 6'425'632 : 4'819'488),
+              "legacy layout changed");
+static_assert(payloadBytes(LEGACY_OUTPUT_BUCKETS, true) == (HIDDEN == 1024 ? 71'504'928 : 53'628'960),
+              "threat layout changed: update sanity_deep.rs");
 
 // Scalar forward, from the two perspectives' accumulators to the evaluation
 // in centipawns. The correctness reference for the vectorised version.

@@ -45,9 +45,8 @@ using namespace NNUE::Deep::tools;
 
 namespace {
 
-// Single-layer quantised.bin: (768x4kb_hm -> HIDDEN)x2 -> 8, SCReLU. HIDDEN is the live
-// width: the single-layer nets that were trained are 1024 wide, so on the 768-wide
-// branch this reads only a 768 file, which does not exist; it is kept for the format. Same l0 as
+// Single-layer quantised.bin: (768x4kb_hm -> HIDDEN)x2 -> 8, SCReLU (the nets that
+// exist are 1024 wide; the 768 wide branch keeps the format only). Same l0 as
 // the deep format, so the accumulator is shared; only the output layer differs.
 // Layout and arithmetic transcribed from sanity.rs, the oracle for this format.
 //

@@ -110,30 +110,35 @@ struct alignas(64) Accumulator {
     }
 
 #if defined(__AVX2__)
+    __attribute__((always_inline)) static inline __m256i load(const void* p) noexcept {
+        return _mm256_loadu_si256(static_cast<const __m256i*>(p));
+    }
+    template<bool Add>
+    __attribute__((always_inline)) static inline __m256i accum(__m256i acc, __m256i d) noexcept {
+        if constexpr (Add) return _mm256_add_epi16(acc, d);
+        else               return _mm256_sub_epi16(acc, d);
+    }
+
+    // x0..x7 (a tile of 128 i16) +/-= the same tile of every row.
     template<bool Add>
     __attribute__((always_inline))
     static inline void applyWeightList(const int16_t* const* __restrict rows, int n, int b,
                                        __m256i& x0, __m256i& x1, __m256i& x2, __m256i& x3,
                                        __m256i& x4, __m256i& x5, __m256i& x6, __m256i& x7) noexcept {
-        const auto loadVec = [](const int16_t* p) noexcept { return _mm256_loadu_si256(reinterpret_cast<const __m256i*>(p)); };
-        const auto accum = [](__m256i acc, __m256i d) noexcept {
-            if constexpr (Add) return _mm256_add_epi16(acc, d);
-            else               return _mm256_sub_epi16(acc, d);
-        };
         int k = 0;
         for (; k + 1 < n; k += 2) {
             const int16_t* p0 = rows[k]     + b;
             const int16_t* p1 = rows[k + 1] + b;
             auto step2 = [&](__m256i& x, int off) noexcept {
                 // Two rows summed first: half the dependency chain on x.
-                x = accum(x, _mm256_add_epi16(loadVec(p0 + off), loadVec(p1 + off)));
+                x = accum<Add>(x, _mm256_add_epi16(load(p0 + off), load(p1 + off)));
             };
             step2(x0,   0); step2(x1,  16); step2(x2,  32); step2(x3,  48);
             step2(x4,  64); step2(x5,  80); step2(x6,  96); step2(x7, 112);
         }
         if (k < n) {
             const int16_t* p = rows[k] + b;
-            auto step1 = [&](__m256i& x, int off) noexcept { x = accum(x, loadVec(p + off)); };
+            auto step1 = [&](__m256i& x, int off) noexcept { x = accum<Add>(x, load(p + off)); };
             step1(x0,   0); step1(x1,  16); step1(x2,  32); step1(x3,  48);
             step1(x4,  64); step1(x5,  80); step1(x6,  96); step1(x7, 112);
         }
@@ -147,11 +152,6 @@ struct alignas(64) Accumulator {
     __attribute__((always_inline))
     static inline void applyThreatList(const int8_t* const* __restrict rows, int n, int b,
                                        __m256i (&r)[4], __m256i (&q)[4]) noexcept {
-        const auto accum = [](__m256i acc, __m256i d) noexcept {
-            if constexpr (Add) return _mm256_add_epi16(acc, d);
-            else               return _mm256_sub_epi16(acc, d);
-        };
-        const auto load = [](const int8_t* p) noexcept { return _mm256_loadu_si256(reinterpret_cast<const __m256i*>(p)); };
         if constexpr (Prefetch) {
             if (b + 128 < HIDDEN)
                 for (int k = 0; k < n; ++k) prefetchLines<2>(rows[k] + b + 128);
@@ -161,14 +161,14 @@ struct alignas(64) Accumulator {
             for (int j = 0; j < 4; ++j) {
                 const __m256i w0 = load(rows[k] + b + 32 * j);
                 const __m256i w1 = load(rows[k + 1] + b + 32 * j);
-                r[j] = accum(r[j], _mm256_add_epi16(w0, w1));
-                q[j] = accum(q[j], _mm256_add_epi16(_mm256_srai_epi16(w0, 8), _mm256_srai_epi16(w1, 8)));
+                r[j] = accum<Add>(r[j], _mm256_add_epi16(w0, w1));
+                q[j] = accum<Add>(q[j], _mm256_add_epi16(_mm256_srai_epi16(w0, 8), _mm256_srai_epi16(w1, 8)));
             }
         if (k < n)
             for (int j = 0; j < 4; ++j) {
                 const __m256i w = load(rows[k] + b + 32 * j);
-                r[j] = accum(r[j], w);
-                q[j] = accum(q[j], _mm256_srai_epi16(w, 8));
+                r[j] = accum<Add>(r[j], w);
+                q[j] = accum<Add>(q[j], _mm256_srai_epi16(w, 8));
             }
     }
 #endif
@@ -229,7 +229,6 @@ struct alignas(64) Accumulator {
 #if defined(__AVX2__)
         constexpr int TILE = 128;
         static_assert(HIDDEN % TILE == 0);
-        const auto loadVec = [](const int16_t* p) noexcept { return _mm256_loadu_si256(reinterpret_cast<const __m256i*>(p)); };
         const __m256i bias = _mm256_set1_epi16(static_cast<int16_t>(128 * (tna - tns)));
         for (int b = 0; b < HIDDEN; b += TILE) {
             if constexpr (Prefetch) {
@@ -246,15 +245,15 @@ struct alignas(64) Accumulator {
                 const int o = b + 32 * j;
                 __m256i lo = _mm256_sub_epi16(_mm256_sub_epi16(r[j], _mm256_slli_epi16(q[j], 8)), bias);
                 __m256i hi = q[j];
-                lo = _mm256_add_epi16(lo, loadVec(src + o));
-                hi = _mm256_add_epi16(hi, loadVec(src + o + 16));
+                lo = _mm256_add_epi16(lo, load(src + o));
+                hi = _mm256_add_epi16(hi, load(src + o + 16));
                 for (int k = 0; k < S; ++k) {
-                    lo = _mm256_sub_epi16(lo, loadVec(psub[k] + o));
-                    hi = _mm256_sub_epi16(hi, loadVec(psub[k] + o + 16));
+                    lo = _mm256_sub_epi16(lo, load(psub[k] + o));
+                    hi = _mm256_sub_epi16(hi, load(psub[k] + o + 16));
                 }
                 for (int k = 0; k < A; ++k) {
-                    lo = _mm256_add_epi16(lo, loadVec(padd[k] + o));
-                    hi = _mm256_add_epi16(hi, loadVec(padd[k] + o + 16));
+                    lo = _mm256_add_epi16(lo, load(padd[k] + o));
+                    hi = _mm256_add_epi16(hi, load(padd[k] + o + 16));
                 }
                 _mm256_storeu_si256(reinterpret_cast<__m256i*>(row + o), lo);
                 _mm256_storeu_si256(reinterpret_cast<__m256i*>(row + o + 16), hi);
