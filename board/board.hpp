@@ -265,15 +265,6 @@ private:
     // The same for oldPiece on sq becoming newPiece, with the board after the
     // move: sq stays occupied, so no line opens.
     void recordReplacedThreats(NNUE::Accumulator& f, uint8_t oldPiece, uint8_t newPiece, uint8_t sq) noexcept;
-    template<bool Add, bool Checked>
-    inline void emitThreatDeltas(NNUE::Accumulator& f, uint8_t startN, uint8_t piece, uint8_t sq,
-                                 uint64_t victims, uint64_t attackers, uint64_t sliders,
-                                 uint64_t sliderOcc) const noexcept;
-    template<bool Checked>
-    inline void emitReplacedThreatDeltas(NNUE::Accumulator& f, uint8_t startN, uint8_t oldPiece,
-                                         uint8_t newPiece, uint8_t sq, uint64_t oldVictims,
-                                         uint64_t newVictims, uint64_t oldAttackers,
-                                         uint64_t newAttackers) const noexcept;
     // row = src + perspective p's threat values of the current position.
     void computeThreats(int16_t* row, const int16_t* src, int p, int flip) const noexcept;
     void ensureNnueAccumulatorCleanSlow() const noexcept;
