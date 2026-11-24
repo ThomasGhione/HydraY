@@ -293,9 +293,9 @@ void applyMixed(int16_t* __restrict dst, const int16_t* __restrict src,
 template<bool Invert>
 __attribute__((noinline, hot))
 void applyFramePair1(NNUE::Accumulator& dst, const NNUE::Accumulator& src, const NNUE::Accumulator& moved,
-                         int flip0, int flip1,
-                         const int16_t* const (&psub)[2][NNUE::ACC_MAX_DELTAS], int pns,
-                         const int16_t* const (&padd)[2][NNUE::ACC_MAX_DELTAS], int pna, bool prefetch) noexcept {
+                     int flip0, int flip1,
+                     const int16_t* const (&psub)[2][NNUE::ACC_MAX_DELTAS], int pns,
+                     const int16_t* const (&padd)[2][NNUE::ACC_MAX_DELTAS], int pna, bool prefetch) noexcept {
     const int8_t* sub0Buf[NNUE::ACC_MAX_THREATS];
     const int8_t* add0Buf[NNUE::ACC_MAX_THREATS];
     const int8_t* sub1Buf[NNUE::ACC_MAX_THREATS];
