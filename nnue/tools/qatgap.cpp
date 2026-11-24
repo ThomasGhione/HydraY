@@ -28,7 +28,7 @@
 //   antidead-160sb  l1w 14.8, l0 3.9, truncation 2.6, total 15.7   2.14e-5
 //   ob8-160sb       l1w 16.9, l0 3.7, truncation 2.5, total 16.9   3.56e-5  (the 4.2.0 run)
 
-#include "fen_accumulator.hpp"
+#include "position.hpp"
 
 #include <cstdio>
 #include <iterator>
@@ -156,7 +156,9 @@ int main(int argc, char** argv) {
             fUs[h] = fThem[h] = fl.l0b[h];
             iUs[h] = iThem[h] = q.l0b[h];
         }
-        const int bucket = forEachFeature(r, [&](size_t us, size_t them) {
+        const NormPos pos = recordToNormPos(r);
+        const int bucket = pos.outBucket;
+        forEachFeature(pos, [&](size_t us, size_t them) {
             for (int h = 0; h < HIDDEN; ++h) {
                 fUs[h] += fl.l0w[us * HIDDEN + h];
                 fThem[h] += fl.l0w[them * HIDDEN + h];

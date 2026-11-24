@@ -55,17 +55,6 @@ bool Board::fenToBoard(const std::string& fen) {
     return true;
 }
 
-std::string placementFen(const std::array<char, 64>& squares) {
-    std::string fen;
-    for (int sq = 0; sq < 64; ++sq) {
-        if (sq > 0 && sq % 8 == 0) fen += '/';
-        if (squares[sq] != '.') fen += squares[sq];
-        else if (!fen.empty() && ascii::isDigit(fen.back())) ++fen.back();
-        else fen += '1';
-    }
-    return fen;
-}
-
 std::string Board::boardToFen() const {
     std::array<char, 64> squares;
     for (int sq = 0; sq < 64; ++sq) squares[sq] = PIECE_LETTERS[chessboard[sq]];

@@ -356,7 +356,4 @@ static_assert(PIECE_LETTERS[Board::PAWN] == 'p' && PIECE_LETTERS[Board::KING | B
            && Move::promotionTypeFromChar('N') == Board::KNIGHT && Move::promotionTypeFromChar('q') == Board::QUEEN
            && Move::promotionTypeFromChar('k') == 0, "piece letters and promotion types follow Board::piece_id");
 
-// FEN piece placement of 64 squares (0 = a8), each a piece letter or '.'.
-std::string placementFen(const std::array<char, 64>& squares);
-
 } // namespace chess

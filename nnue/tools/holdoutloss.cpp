@@ -34,7 +34,7 @@
 //   - the running loss is a mean taken while the net was still moving, so it
 //     sits slightly above the final net's loss on the same data.
 
-#include "fen_accumulator.hpp"
+#include "position.hpp"
 
 #include <cstdio>
 #include <cstdlib>
@@ -164,7 +164,9 @@ void scanRange(const Evaluator& ev, const std::string& path, const Options& opt,
 
         for (size_t i = 0; i < got; ++i) {
             const Record& r = buf[i];
-            const int bucket = accumulateRecord(*ev.l0, r, accUs.data(), accThem.data());
+            const NormPos pos = recordToNormPos(r);
+            accumulatePos(*ev.l0, nullptr, pos, accUs.data(), accThem.data());
+            const int bucket = pos.outBucket;
             const int32_t cp = ev.eval(accUs.data(), accThem.data(), bucket);
 
             const double target = opt.blend * (static_cast<double>(r.result) / 2.0)
@@ -187,38 +189,6 @@ void scanRange(const Evaluator& ev, const std::string& path, const Options& opt,
     }
 }
 
-// FEN of the stored position, for --selfcheck and for eyeballing against
-// `./chess datagen-dump`. Transcribed from bulletformat.hpp::recordToFen.
-std::string recordToFen(const Record& r) {
-    static constexpr char PIECE_CHARS[16] = {
-        'P', 'N', 'B', 'R', 'Q', 'K', '?', '?',
-        'p', 'n', 'b', 'r', 'q', 'k', '?', '?'
-    };
-    char squares[64] = {};
-    uint64_t occ = r.occ;
-    int idx = 0;
-    while (occ != 0) {
-        const int sq = std::countr_zero(occ);
-        occ &= occ - 1;
-        squares[sq] = PIECE_CHARS[(r.pcs[idx / 2] >> (4 * (idx & 1))) & 0xF];
-        ++idx;
-    }
-    std::string fen;
-    for (int rank = 7; rank >= 0; --rank) {
-        int run = 0;
-        for (int file = 0; file < 8; ++file) {
-            const char c = squares[rank * 8 + file];
-            if (c == '\0') { ++run; continue; }
-            if (run > 0) { fen += static_cast<char>('0' + run); run = 0; }
-            fen += c;
-        }
-        if (run > 0) fen += static_cast<char>('0' + run);
-        if (rank > 0) fen += '/';
-    }
-    fen += " w - - 0 1";
-    return fen;
-}
-
 // Holds the record decoder against the FEN path already validated by deepcheck
 // and reorder, and the SIMD forward against the scalar one. A silent decoder
 // bug would move the loss by exactly the amount we are trying to measure.
@@ -226,13 +196,15 @@ bool selfcheck(const Evaluator& ev, const std::string& path, uint64_t n) {
     std::ifstream in(path, std::ios::binary);
     if (!in) { std::fprintf(stderr, "cannot open %s\n", path.c_str()); return false; }
 
-    std::vector<int16_t> accUs(HIDDEN), accThem(HIDDEN), fenUs, fenThem;
+    std::vector<int16_t> accUs(HIDDEN), accThem(HIDDEN), fenUs(HIDDEN), fenThem(HIDDEN);
     Record r{};
     for (uint64_t i = 0; i < n; ++i) {
         in.read(reinterpret_cast<char*>(&r), sizeof(r));
         if (in.gcount() != sizeof(r)) break;
 
-        const int bucket = accumulateRecord(*ev.l0, r, accUs.data(), accThem.data());
+        const NormPos pos = recordToNormPos(r);
+        accumulatePos(*ev.l0, nullptr, pos, accUs.data(), accThem.data());
+        const int bucket = pos.outBucket;
         const int32_t simd = ev.eval(accUs.data(), accThem.data(), bucket);
         if (ev.deep != nullptr) {
             const int32_t scal = forwardScalar(*ev.deep, accUs.data(), accThem.data(), bucket);
@@ -243,14 +215,15 @@ bool selfcheck(const Evaluator& ev, const std::string& path, uint64_t n) {
             }
         }
 
-        const std::string fen = recordToFen(r);
-        int fenBucket = 0;
-        if (!accumulate(*ev.l0, fen, fenUs, fenThem, fenBucket)) {
+        const std::string fen = NNUE::recordToFen(r);
+        NormPos fenPos;
+        if (!parseFenNormPos(fen, fenPos)) {
             std::fprintf(stderr, "record %llu: FEN path rejected '%s'\n",
                          static_cast<unsigned long long>(i), fen.c_str());
             return false;
         }
-        if (fenBucket != bucket || fenUs != accUs || fenThem != accThem) {
+        accumulatePos(*ev.l0, nullptr, fenPos, fenUs.data(), fenThem.data());
+        if (fenPos.outBucket != bucket || fenUs != accUs || fenThem != accThem) {
             std::fprintf(stderr, "record %llu: record decoder disagrees with the FEN path\n%s\n",
                          static_cast<unsigned long long>(i), fen.c_str());
             return false;
