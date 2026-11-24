@@ -109,7 +109,6 @@ public:
 private:
     void   watchdogLoop() noexcept;
     void   recomputeSoft() noexcept;
-    static int estimateMovesToGo(int movesPlayed) noexcept;
 
     int64_t baseMs_   = 0;   // base target before stability scaling
     int64_t softCapMs_ = 0;  // OPT_MAX_FRACTION * timeLeft
