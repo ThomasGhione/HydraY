@@ -5,9 +5,9 @@
 //   g++ -std=c++23 -O2 -march=native nnue/tools/deepcheck.cpp nnue/nnue_deep.cpp -o /tmp/deepcheck
 //   /tmp/deepcheck <net.bin> [fen]...
 //
-// The accumulator comes from fen_accumulator.hpp, shared with the other tools.
+// The accumulator comes from position.hpp, shared with the other tools.
 
-#include "fen_accumulator.hpp"
+#include "position.hpp"
 
 #include <algorithm>
 #include <cstdio>
@@ -17,7 +17,7 @@
 #include <vector>
 
 using namespace NNUE::Deep;
-using NNUE::Deep::tools::accumulate;
+using namespace NNUE::Deep::tools;
 
 namespace {
 
@@ -76,8 +76,7 @@ int32_t singleLayerForward(const int16_t* accStm, const int16_t* accNtm,
     return static_cast<int32_t>(out / (QA * QB));
 }
 
-void bench(const NetworkDeep& net, const std::vector<int16_t>& us,
-           const std::vector<int16_t>& them, int bucket) {
+void bench(const NetworkDeep& net, const int16_t* us, const int16_t* them, int bucket) {
     constexpr int N = 100000;
     constexpr int ROUNDS = 7;
     std::vector<int16_t> w(2 * HIDDEN);
@@ -89,9 +88,9 @@ void bench(const NetworkDeep& net, const std::vector<int16_t>& us,
     double a = 1e18, b = 1e18;
     for (int r = 0; r < ROUNDS; ++r) {
         auto t0 = std::chrono::steady_clock::now();
-        for (int i = 0; i < N; ++i) sink = singleLayerForward(us.data(), them.data(), w.data());
+        for (int i = 0; i < N; ++i) sink = singleLayerForward(us, them, w.data());
         auto t1 = std::chrono::steady_clock::now();
-        for (int i = 0; i < N; ++i) sink = forwardSimd(net, us.data(), them.data(), bucket);
+        for (int i = 0; i < N; ++i) sink = forwardSimd(net, us, them, bucket);
         auto t2 = std::chrono::steady_clock::now();
         a = std::min(a, std::chrono::duration<double, std::nano>(t1 - t0).count() / N);
         b = std::min(b, std::chrono::duration<double, std::nano>(t2 - t1).count() / N);
@@ -126,15 +125,16 @@ int main(int argc, char** argv) {
         for (const auto& c : DEFAULT_CASES) cases.push_back(c);
     }
 
-    std::vector<int16_t> accUs, accThem;
+    alignas(64) int16_t us[HIDDEN], them[HIDDEN];
+    NormPos pos;
     for (const auto& c : cases) {
-        int bucket = 0;
-        if (!accumulate(net, c.fen, accUs, accThem, bucket)) {
+        if (!parseFenNormPos(c.fen, pos)) {
             std::fprintf(stderr, "invalid FEN: %s\n", c.fen);
             return 1;
         }
-        const int32_t sc = forwardScalar(net, accUs.data(), accThem.data(), bucket);
-        const int32_t sd = forwardSimd(net, accUs.data(), accThem.data(), bucket);
+        accumulatePos(net, nullptr, pos, us, them);
+        const int32_t sc = forwardScalar(net, us, them, pos.outBucket);
+        const int32_t sd = forwardSimd(net, us, them, pos.outBucket);
         if (sc != sd) {
             std::fprintf(stderr, "scalar/SIMD MISMATCH on '%s': %d vs %d\n", c.label, sc, sd);
             return 1;
@@ -142,9 +142,9 @@ int main(int argc, char** argv) {
         std::printf("%s: %d cp (stm)\n", c.label, sc);
     }
     if (const char* e = std::getenv("DEEPCHECK_BENCH"); e != nullptr && e[0] == '1') {
-        int bucket = 0;
-        accumulate(net, DEFAULT_CASES[6].fen, accUs, accThem, bucket);
-        bench(net, accUs, accThem, bucket);
+        parseFenNormPos(DEFAULT_CASES[6].fen, pos);
+        accumulatePos(net, nullptr, pos, us, them);
+        bench(net, us, them, pos.outBucket);
     }
     return 0;
 }

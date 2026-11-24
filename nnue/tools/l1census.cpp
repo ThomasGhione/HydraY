@@ -12,7 +12,7 @@
 //
 // Use positions no net trained on: the first 20,000,400 records of v8_std.t0.bin.
 
-#include "threat_accumulator.hpp"
+#include "position.hpp"
 
 #include <algorithm>
 #include <cstdio>
@@ -27,10 +27,6 @@ int main(int argc, char** argv) {
     if (argc < 3) {
         std::fprintf(stderr, "usage: %s <net> <data.bin> [offset] [count]\n", argv[0]);
         return 2;
-    }
-    if (!verifyAttackTables()) {
-        std::fprintf(stderr, "internal error: LERF attack table self-check failed\n");
-        return 1;
     }
     auto net = std::make_unique<NetworkDeep>();
     std::vector<int8_t> rawL0t;

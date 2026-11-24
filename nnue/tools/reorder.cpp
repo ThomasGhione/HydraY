@@ -23,7 +23,7 @@
 // both synthetic vectors (every output bucket) and the real positions (full
 // piece + threat accumulation and forwardSimd).
 
-#include "threat_accumulator.hpp"
+#include "position.hpp"
 
 #include <algorithm>
 #include <array>
@@ -149,10 +149,6 @@ int main(int argc, char** argv) {
     if (argc < 4) {
         std::fprintf(stderr, "usage: reorder <in.nnue> <positions.fen|data.bin> <out.nnue> [max_positions]\n");
         return 2;
-    }
-    if (!verifyAttackTables()) {
-        std::fprintf(stderr, "internal error: threat attack table check failed\n");
-        return 1;
     }
     uint64_t limit = 0;
     if (argc > 4 && (!parseU64(argv[4], limit) || limit == 0)) {

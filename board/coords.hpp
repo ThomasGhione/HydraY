@@ -1,5 +1,6 @@
 #pragma once
 
+#include <array>
 #include <string>
 #include <string_view>
 #include <cstdint>
@@ -32,6 +33,18 @@ inline Square parseSquare(std::string_view input) noexcept {
 inline std::string squareToString(Square sq) noexcept {
     if (!isValidSquare(sq)) [[unlikely]] return "??";
     return {static_cast<char>('a' + file(sq)), static_cast<char>('8' - rank(sq))};
+}
+
+// FEN piece placement of 64 squares (0 = a8), each a piece letter or '.'.
+inline std::string placementFen(const std::array<char, 64>& squares) {
+    std::string fen;
+    for (int sq = 0; sq < 64; ++sq) {
+        if (sq > 0 && sq % 8 == 0) fen += '/';
+        if (squares[sq] != '.') fen += squares[sq];
+        else if (!fen.empty() && ascii::isDigit(fen.back())) ++fen.back();
+        else fen += '1';
+    }
+    return fen;
 }
 
 } // namespace chess
