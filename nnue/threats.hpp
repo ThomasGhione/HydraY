@@ -160,11 +160,6 @@ constexpr bool tryIndexBase(uint32_t entryIdx, int to, uint32_t& out) noexcept {
     return true;
 }
 
-constexpr int indexBase(uint32_t entryIdx, int to) noexcept {
-    uint32_t out = 0;
-    return tryIndexBase(entryIdx, to, out) ? static_cast<int>(out) : -1;
-}
-
 constexpr bool tryIndex(int a, int from, int v, int to, uint32_t& out) noexcept {
     return tryIndexBase(TABLE.pairBase[a][v] + from, to, out);
 }
@@ -221,13 +216,5 @@ struct ThreatPerspective {
         return threats::tryIndex(relPiece(attacker), from ^ toView, relPiece(victim), to ^ toView, out);
     }
 };
-
-// Both perspectives' features of one threat, -1 where it is none.
-inline void threatFeaturePair(int toView0, int flip1, uint8_t attacker, uint8_t from,
-                              uint8_t victim, uint8_t to, int& out0, int& out1) noexcept {
-    const uint32_t bases = BOTH_PAIR_BASE[attacker & 0xf][victim & 0xf];
-    out0 = threats::indexBase((bases & 0xffffu) + (from ^ toView0), to ^ toView0);
-    out1 = threats::indexBase((bases >> 16)     + (from ^ flip1),   to ^ flip1);
-}
 
 } // namespace NNUE

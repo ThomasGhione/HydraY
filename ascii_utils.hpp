@@ -13,10 +13,6 @@ namespace ascii {
     return (c >= 'a' && c <= 'z') ? static_cast<char>(c - 'a' + 'A') : c;
 }
 
-[[nodiscard]] constexpr bool isSpace(char c) noexcept {
-    return c == ' ' || c == '\t' || c == '\n' || c == '\v' || c == '\f' || c == '\r';
-}
-
 [[nodiscard]] constexpr bool isDigit(char c) noexcept {
     return c >= '0' && c <= '9';
 }

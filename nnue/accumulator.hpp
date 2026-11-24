@@ -86,11 +86,6 @@ struct alignas(64) Accumulator {
         return activeNetwork->l0w[rowBase + (feat768 ^ rowFlip)];
     }
 
-    [[nodiscard]] static inline const int8_t* threatRow(uint32_t feature) noexcept {
-        return activeNetwork->l0t.get() + static_cast<size_t>(feature) * HIDDEN;
-    }
-
-    enum class RowInit { Src, InPlace };
     // Starts loading N lines from p: on an efficiency core the rows, spread
     // over megabytes, arrive too late for the kernel otherwise.
     template<int N, typename T>
@@ -165,14 +160,14 @@ struct alignas(64) Accumulator {
     }
 #endif
 
-    // row = init - sub + add over rows of i16 piece weights. Any number of
-    // rows costs one pass over row: each tile of it stays in registers while
-    // every row is added in.
-    template<RowInit Init, bool Prefetch>
-    static inline void applyWeightRows(int16_t* __restrict row, const int16_t* __restrict src,
-                                       const int16_t* const* __restrict sub, int ns,
-                                       const int16_t* const* __restrict add, int na) noexcept {
-        const int16_t* base = (Init == RowInit::Src) ? src : row;
+    // row += add - sub over rows of i16 piece weights. Any number of rows
+    // costs one pass over row: each tile of it stays in registers while every
+    // row is added in.
+    template<bool Prefetch>
+    static inline void applyRows(int16_t* __restrict row,
+                                 const int16_t* const* __restrict sub, int ns,
+                                 const int16_t* const* __restrict add, int na) noexcept {
+        if (ns == 0 && na == 0) return;
 #if defined(__AVX2__)
         constexpr int TILE = 128;
         static_assert(HIDDEN % TILE == 0);
@@ -183,7 +178,7 @@ struct alignas(64) Accumulator {
                     for (int k = 0; k < na; ++k) prefetchLines<4>(add[k] + b + TILE);
                 }
             }
-            const auto* s = reinterpret_cast<const __m256i*>(base + b);
+            const auto* s = reinterpret_cast<const __m256i*>(row + b);
             __m256i x0 = _mm256_loadu_si256(s + 0), x1 = _mm256_loadu_si256(s + 1);
             __m256i x2 = _mm256_loadu_si256(s + 2), x3 = _mm256_loadu_si256(s + 3);
             __m256i x4 = _mm256_loadu_si256(s + 4), x5 = _mm256_loadu_si256(s + 5);
@@ -201,7 +196,7 @@ struct alignas(64) Accumulator {
         static_assert(HIDDEN % TILE == 0);
         for (int b = 0; b < HIDDEN; b += TILE) {
             int16_t x[TILE];
-            for (int i = 0; i < TILE; ++i) x[i] = base[b + i];
+            for (int i = 0; i < TILE; ++i) x[i] = row[b + i];
             for (int k = 0; k < ns; ++k)
                 for (int i = 0; i < TILE; ++i) x[i] = static_cast<int16_t>(x[i] - sub[k][b + i]);
             for (int k = 0; k < na; ++k)
@@ -262,21 +257,6 @@ struct alignas(64) Accumulator {
             row[i] = static_cast<int16_t>(x);
         }
 #endif
-    }
-
-    // Applies a whole piece-feature diff to one row in one pass, from src (a
-    // different row) when it is given, in place otherwise.
-    template<bool Prefetch>
-    static inline void applyRows(int16_t* __restrict row,
-                                 const int16_t* const* sub, int ns,
-                                 const int16_t* const* add, int na,
-                                 const int16_t* src = nullptr) noexcept {
-        if (ns == 0 && na == 0) {
-            if (src != nullptr) std::memcpy(row, src, HIDDEN * sizeof(int16_t));
-            return;
-        }
-        if (src != nullptr) applyWeightRows<RowInit::Src, Prefetch>(row, src, sub, ns, add, na);
-        else                applyWeightRows<RowInit::InPlace, Prefetch>(row, nullptr, sub, ns, add, na);
     }
 };
 
