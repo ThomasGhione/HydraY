@@ -11,9 +11,8 @@
 #include <array>
 #include <bit>
 #include <cstdint>
-#if defined(__BMI2__)
-#include <immintrin.h>
-#endif
+
+#include "../board/piece.hpp"
 
 namespace NNUE {
 
@@ -26,40 +25,18 @@ namespace threats {
 inline constexpr int PAWN = 0, KNIGHT = 1, BISHOP = 2, ROOK = 3, QUEEN = 4, KING = 5;
 inline constexpr uint64_t BACK_RANKS = 0xFF000000000000FFULL;
 
-template<size_t N>
-constexpr uint64_t steps(int sq, const int (&offsets)[N][2]) noexcept {
-    uint64_t out = 0;
-    for (const auto& o : offsets) {
-        const int f = sq % 8 + o[0], r = sq / 8 + o[1];
-        if (f >= 0 && f < 8 && r >= 0 && r < 8) out |= 1ULL << (r * 8 + f);
-    }
-    return out;
-}
-
-constexpr uint64_t rays(int sq, const int (&dirs)[4][2]) noexcept {
-    uint64_t out = 0;
-    for (const auto& d : dirs)
-        for (int f = sq % 8 + d[0], r = sq / 8 + d[1]; f >= 0 && f < 8 && r >= 0 && r < 8; f += d[0], r += d[1])
-            out |= 1ULL << (r * 8 + f);
-    return out;
-}
-
-// The squares piece (0-11) on sq attacks on an empty board. No pawn stands on a
-// back rank, so none attacks from there.
+// The squares piece (0-11) on sq attacks on an empty board: the engine's
+// tables (a8 = 0) mirrored. No pawn stands on a back rank, so none attacks
+// from there.
 constexpr uint64_t emptyBoardAttacks(int piece, int sq) noexcept {
-    constexpr int ORTHOGONAL[4][2] = {{1, 0}, {-1, 0}, {0, 1}, {0, -1}};
-    constexpr int DIAGONAL[4][2] = {{1, 1}, {1, -1}, {-1, 1}, {-1, -1}};
-    constexpr int KNIGHT_STEPS[8][2] = {{1, 2}, {2, 1}, {2, -1}, {1, -2}, {-1, -2}, {-2, -1}, {-2, 1}, {-1, 2}};
-    constexpr int KING_STEPS[8][2] = {{1, 1}, {1, 0}, {1, -1}, {0, -1}, {-1, -1}, {-1, 0}, {-1, 1}, {0, 1}};
-    constexpr int OWN_PAWN[2][2] = {{-1, 1}, {1, 1}};
-    constexpr int THEIR_PAWN[2][2] = {{-1, -1}, {1, -1}};
+    const int e = sq ^ 56;
     switch (piece % 6) {
-        case PAWN:   return (BACK_RANKS >> sq & 1) ? 0 : steps(sq, piece < 6 ? OWN_PAWN : THEIR_PAWN);
-        case KNIGHT: return steps(sq, KNIGHT_STEPS);
-        case BISHOP: return rays(sq, DIAGONAL);
-        case ROOK:   return rays(sq, ORTHOGONAL);
-        case QUEEN:  return rays(sq, DIAGONAL) | rays(sq, ORTHOGONAL);
-        default:     return steps(sq, KING_STEPS);
+        case PAWN:   return (BACK_RANKS >> sq & 1) ? 0 : std::byteswap(pieces::PAWN_ATTACKS[piece / 6][e]);
+        case KNIGHT: return std::byteswap(pieces::KNIGHT_ATTACKS[e]);
+        case BISHOP: return std::byteswap(pieces::Bishop::EMPTY_ATTACKS[e]);
+        case ROOK:   return std::byteswap(pieces::Rook::EMPTY_ATTACKS[e]);
+        case QUEEN:  return std::byteswap(pieces::Bishop::EMPTY_ATTACKS[e] | pieces::Rook::EMPTY_ATTACKS[e]);
+        default:     return std::byteswap(pieces::KING_ATTACKS[e]);
     }
 }
 
