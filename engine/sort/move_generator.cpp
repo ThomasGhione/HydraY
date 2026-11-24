@@ -125,28 +125,6 @@ inline void appendAllPieceMoves(MoveList& moves, const SideView<IsWhite>& v, uin
     moves.size = static_cast<int>(out - moves.begin());
 }
 
-// Every square the opponent attacks with `occ` as blockers. Built with our king
-// taken off the board, so a slider's ray runs through the king's square exactly
-// as Board::isSquareAttacked(to, them, kingSq) sees it for each king step.
-template<bool IsWhite>
-inline uint64_t enemyAttacks(const Board& b, uint64_t occ) noexcept {
-    constexpr int them = IsWhite ? 1 : 0;
-    constexpr uint64_t FILE_A = 0x0101010101010101ULL;
-    constexpr uint64_t FILE_H = FILE_A << 7;
-    // a8 = 0: a white pawn on sq attacks sq - 9 and sq - 7, a black one sq + 7 and sq + 9.
-    const uint64_t p = b.bb[Board::PAWN][them];
-    uint64_t att = IsWhite ? (((p << 7) & ~FILE_H) | ((p << 9) & ~FILE_A))
-                           : (((p >> 9) & ~FILE_H) | ((p >> 7) & ~FILE_A));
-    uint64_t knights = b.bb[Board::KNIGHT][them];
-    while (knights) att |= pieces::KNIGHT_ATTACKS[pieces::popLSB(knights)];
-    uint64_t diag = b.bb[Board::BISHOP][them] | b.bb[Board::QUEEN][them];
-    while (diag) att |= pieces::Bishop::attacks(static_cast<uint8_t>(pieces::popLSB(diag)), occ);
-    uint64_t line = b.bb[Board::ROOK][them] | b.bb[Board::QUEEN][them];
-    while (line) att |= pieces::Rook::attacks(static_cast<uint8_t>(pieces::popLSB(line)), occ);
-    if (b.bb[Board::KING][them]) att |= pieces::KING_ATTACKS[std::countr_zero(b.bb[Board::KING][them])];
-    return att;
-}
-
 // Fills pinRays for our pinned pieces and returns their mask.
 template<bool IsWhite>
 uint64_t computePinRays(const Board& b, int kingSq, uint64_t ownNonKing, uint64_t occ, uint64_t pinRays[64]) noexcept {
@@ -193,8 +171,9 @@ void generateMovesFor(const Board& b, uint64_t checkers, MoveList& moves) noexce
     if constexpr (!Tactical) {
         uint64_t mask = pieces::KING_ATTACKS[kingFrom] & ~v.ownOcc;
         if (mask & (mask - 1)) {
-            // Two or more king steps: one attack map is cheaper than a scan per step.
-            mask &= ~enemyAttacks<IsWhite>(b, v.occ ^ v.kings);
+            // Two or more king steps: one attack map is cheaper than a scan per
+            // step. Our king is off the board, so a slider's ray runs on past it.
+            mask &= ~b.attackedBy(v.side ^ 1, v.occ ^ v.kings);
             while (mask) moves.emplace_back(kingFrom, pieces::popLSB(mask));
         } else if (mask) {
             const int to = std::countr_zero(mask);

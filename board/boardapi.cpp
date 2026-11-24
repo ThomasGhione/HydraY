@@ -464,22 +464,7 @@ void Board::undoMove(const Move& m, const MoveState& st) noexcept {
     --accTop;
 }
 
-__attribute__((hot))
-void Board::doNullMove(MoveState& st) noexcept {
-    prepareMoveState(st, EMPTY);
-    uint64_t key = state.hash ^ zobrist::TABLES.sideToMove;
-    if (st.prev.epHashFile < 8) key ^= zobrist::TABLES.enPassant[st.prev.epHashFile];
-    state.enPassant = NO_SQUARE;
-    state.epHashFile = 0xFF;
-    passTurn(false);
-    state.hash = key;
-    // The post-null position takes a history slot like any ply, so the same
-    // side to move stays on every second slot; countRepetitions never looks
-    // further back than this entry.
-    updateRepetitionAfterMove(false, st);
-    state.pliesFromNull = 0;
-}
-
+// Without a HashPrefetch (the tests) the prefetch reads address 0: harmless.
 __attribute__((hot))
 void Board::doNullMove(MoveState& st, const HashPrefetch& tt) noexcept {
     prepareMoveState(st, EMPTY);
@@ -490,6 +475,9 @@ void Board::doNullMove(MoveState& st, const HashPrefetch& tt) noexcept {
     state.epHashFile = 0xFF;
     passTurn(false);
     state.hash = key;
+    // The post-null position takes a history slot like any ply, so the same
+    // side to move stays on every second slot; countRepetitions never looks
+    // further back than this entry.
     updateRepetitionAfterMove(false, st);
     state.pliesFromNull = 0;
 }

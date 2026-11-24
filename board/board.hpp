@@ -153,10 +153,10 @@ public:
     // child's lines as soon as its key is known.
     struct HashPrefetch {
         static constexpr uint8_t BUCKET_SHIFT = 6;
-        const std::byte* base = nullptr;
-        size_t byteMask = 0;
-        const std::byte* evalBase = nullptr;
-        size_t evalByteMask = 0;
+        const std::byte* base;
+        size_t byteMask;
+        const std::byte* evalBase;
+        size_t evalByteMask;
 
         __attribute__((always_inline))
         void prefetch(uint64_t key) const noexcept {
@@ -169,14 +169,12 @@ public:
     void doMove(const Move& m, MoveState& st) noexcept;
     void doMove(const Move& m, MoveState& st, const HashPrefetch& tt) noexcept;
     void undoMove(const Move& m, const MoveState& st) noexcept;
-    void doNullMove(MoveState& st) noexcept;
-    void doNullMove(MoveState& st, const HashPrefetch& tt) noexcept;
+    void doNullMove(MoveState& st, const HashPrefetch& tt = {}) noexcept;
     void undoNullMove(const MoveState& st) noexcept;
     bool move(Move move) noexcept;
 
     // --- Legality & attack queries ---
     bool isLegalPseudoMove(uint8_t fromIndex, uint8_t toIndex, uint8_t fromPiece) const noexcept;
-    bool isSquareAttacked(uint8_t targetIndex, uint8_t byColor, uint8_t excludeSquare = 64) const noexcept;
     // Whether the side of `right` may castle that way now (CASTLINGS[right]).
     bool canCastle(int right) const noexcept;
     bool inCheck(uint8_t color) const noexcept { return checkersTo(color) != 0; }
@@ -230,9 +228,9 @@ public:
     // own prefetchers do better without).
     static bool onEfficiencyCore() noexcept;
     void setWeightPrefetch(bool on) noexcept { weightPrefetch = on; }
-    // Every square `side` attacks.
-    uint64_t attackedBy(int side) const noexcept {
-        const uint64_t occ = getPiecesBitMap();
+    // Every square `side` attacks with `occ` as the blockers.
+    uint64_t attackedBy(int side) const noexcept { return attackedBy(side, occupancy); }
+    uint64_t attackedBy(int side, uint64_t occ) const noexcept {
         constexpr uint64_t FILE_A = 0x0101010101010101ULL;
         constexpr uint64_t FILE_H = FILE_A << 7;
         // a8 = 0: a white pawn on sq attacks sq - 9 and sq - 7, a black one sq + 7 and sq + 9.
@@ -242,7 +240,8 @@ public:
         for (uint64_t p = bb[KNIGHT][side]; p; p &= p - 1) a |= pieces::KNIGHT_ATTACKS[std::countr_zero(p)];
         for (uint64_t p = bb[BISHOP][side] | bb[QUEEN][side]; p; p &= p - 1) a |= pieces::Bishop::attacks(std::countr_zero(p), occ);
         for (uint64_t p = bb[ROOK][side] | bb[QUEEN][side]; p; p &= p - 1) a |= pieces::Rook::attacks(std::countr_zero(p), occ);
-        return a | pieces::KING_ATTACKS[std::countr_zero(bb[KING][side])];
+        if (bb[KING][side]) a |= pieces::KING_ATTACKS[std::countr_zero(bb[KING][side])];
+        return a;
     }
 
     // --- FEN ---
@@ -290,14 +289,6 @@ private:
     template<MoveKind Kind>
     inline void undoMoveByKind(const MoveState& st, uint8_t pieceOnTo, uint8_t fromIndex, uint8_t toIndex) noexcept;
 
-    // --- Private helpers: legality ---
-    [[nodiscard]] inline bool isKingSafeAfterMove(uint8_t movingColor, uint8_t fromIndex,
-                                                   uint8_t toIndex, uint64_t capturedMask) const noexcept;
-    [[nodiscard]] inline bool isKingMoveLegal(uint8_t fromIndex, uint8_t toIndex,
-                                               uint64_t toBit, uint8_t movingColor) const noexcept;
-    template<uint8_t PieceType>
-    [[nodiscard]] inline bool pseudoMoveLegalByType(uint8_t fromIndex, uint8_t toIndex, uint64_t toBit,
-                                                    uint8_t movingColor, uint8_t destPiece) const noexcept;
     // The pieces of `side` on this board that attack sq with `occ` as the blockers.
     uint64_t attackersOf(uint8_t sq, uint8_t side, uint64_t occ) const noexcept {
         return attackersOf(sq, side, occ, [&](int type) { return bb[type][side]; });
